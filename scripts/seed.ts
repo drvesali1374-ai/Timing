@@ -17,7 +17,7 @@ const db = new PrismaClient();
 // همان ساختار تعریف پروفایل — برای جلوگیری از pull-in مسیر TS در اسکریپت seed،
 // از مسیر ماژول با alias استفاده می‌کنیم (bun از tsconfig paths پشتیبانی می‌کند)
 import { PROFILE_DEFINITIONS } from "../src/modules/profiles/definitions";
-import { instantiateSnapshot } from "../src/modules/profiles/domain/profile";
+import { instantiateSnapshot, buildV2Content } from "../src/modules/profiles/domain/profile";
 
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -41,6 +41,7 @@ const DEMO_PASSWORD = "demo1234";
 
 async function seedProfiles() {
   for (const def of PROFILE_DEFINITIONS) {
+    const contentV2 = buildV2Content(def);
     await db.profileTemplate.upsert({
       where: { id: def.id },
       update: {
@@ -55,7 +56,7 @@ async function seedProfiles() {
         assumptionsJson: JSON.stringify(def.assumptions),
         limitationsJson: JSON.stringify(def.limitations),
         licenseNote: def.licenseNote,
-        contentJson: JSON.stringify(def.content),
+        contentJson: JSON.stringify(contentV2),
         isDefault: def.isDefault ?? false,
         isActive: true,
       },
@@ -72,7 +73,7 @@ async function seedProfiles() {
         assumptionsJson: JSON.stringify(def.assumptions),
         limitationsJson: JSON.stringify(def.limitations),
         licenseNote: def.licenseNote,
-        contentJson: JSON.stringify(def.content),
+        contentJson: JSON.stringify(contentV2),
         isDefault: def.isDefault ?? false,
         isActive: true,
       },
@@ -107,13 +108,14 @@ async function seedDemoProject(demoUserId: string) {
   });
   if (existingDemoProject) {
     console.log(`[seed] demo project exists: ${existingDemoProject.code}`);
+    await seedDemoActivities(existingDemoProject.id, demoUserId);
     return;
   }
   const defaultTemplate = PROFILE_DEFINITIONS.find((d) => d.isDefault) ?? PROFILE_DEFINITIONS[0];
-  const snapshot = instantiateSnapshot(defaultTemplate, {
-    excludedFamilies: [],
-    parameterOverrides: [],
-  });
+  const snapshot = instantiateSnapshot(
+    { id: defaultTemplate.id, semver: defaultTemplate.semver, content: buildV2Content(defaultTemplate) },
+    { excludedFamilies: [], parameterOverrides: [] },
+  );
 
   const projectId = uuidv7();
   const configVersionId = uuidv7();
@@ -184,7 +186,42 @@ async function seedDemoProject(demoUserId: string) {
       },
     });
   });
+  await seedDemoActivities(projectId, demoUserId);
   console.log(`[seed] demo project created: DEMO-101 (isDemo=true, owner=${DEMO_EMAIL})`);
+}
+
+async function seedDemoActivities(projectId: string, demoUserId: string) {
+  // فعالیت‌های نمونه آموزشی (مدل B5) — فقط برای پروژه isDemo؛ با داده واقعی مخلوط نمی‌شود
+  const existingActivities = await db.activity.count({ where: { projectId } });
+  if (existingActivities > 0) {
+    console.log(`[seed] demo activities exist: ${existingActivities}`);
+    return;
+  }
+  const demoActivities: Array<{ stableKey: string; name: string; workType: string; description: string; order: number }> = [
+    { stableKey: "el.fetch-housing", name: "برداشتن بدنه از جایگاه", workType: "operatorManual", description: "برداشتن بدنه رادیاتور از پالت و قرار دادن روی فیکسچر.", order: 1 },
+    { stableKey: "el.insert-core", name: "جای‌گذاری هسته در بدنه", workType: "operatorManual", description: "هدایت هسته داخل بدنه با کنترل هم‌محوری.", order: 2 },
+    { stableKey: "el.tighten-bolts", name: "پیش‌بستن پیچ‌ها با گوشی بادی", workType: "operatorManual", description: "پیش‌بستن ۴ پیچ M6 با گوشی بادی (تنظیم گشتاور).", order: 3 },
+    { stableKey: "el.press-test", name: "آزمون نشتی (ماشین)", workType: "machineAuto", description: "چرخه خودکار آزمون نشتی هوای فشرده توسط دستگاه.", order: 4 },
+    { stableKey: "el.wait-press", name: "انتظار اپراتور در حین آزمون", workType: "waiting", description: "زمان انتظار تا پایان چرخه آزمون — کاندید بهبود.", order: 5 },
+    { stableKey: "el.final-inspect", name: "بازرسی نهایی چشمی", workType: "inspection", description: "کنترل چشمی درزها و برچسب، تفکیک مغایرت.", order: 6 },
+  ];
+  for (const act of demoActivities) {
+    await db.activity.create({
+      data: {
+        id: uuidv7(),
+        projectId,
+        stableKey: act.stableKey,
+        name: act.name,
+        description: act.description,
+        workType: act.workType,
+        sourceOfTime: "measured",
+        order: act.order,
+        archived: false,
+        createdBy: demoUserId,
+      },
+    });
+  }
+  console.log(`[seed] demo activities: ${demoActivities.length} عنصر نمونه ثبت شد`);
 }
 
 async function main() {

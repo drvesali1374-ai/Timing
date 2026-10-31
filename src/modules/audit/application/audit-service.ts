@@ -18,6 +18,13 @@ export const AUDIT_ACTIONS = {
   projectUnarchived: "project.unarchived",
   projectDuplicated: "project.duplicated",
   configVersionCreated: "config.version-created",
+  // ── فاز ۲ ──
+  parameterValueSaved: "param.value-saved",
+  formulaEvaluated: "formula.evaluated",
+  activityCreated: "activity.created",
+  activityUpdated: "activity.updated",
+  activityArchived: "activity.archived",
+  configImported: "config.imported",
   memberAdded: "member.added",
   memberRoleChanged: "member.role-changed",
   memberRemoved: "member.removed",

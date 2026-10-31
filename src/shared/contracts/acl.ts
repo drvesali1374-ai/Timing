@@ -27,6 +27,7 @@ export const PROJECT_ACTIONS = [
   "project:duplicate",
   "project:manage-members",
   "config:read",
+  "config:write",
   "audit:read",
 ] as const;
 export type ProjectAction = (typeof PROJECT_ACTIONS)[number];
@@ -39,9 +40,17 @@ export const ROLE_PERMISSIONS: Record<ProjectRole, readonly ProjectAction[]> = {
     "project:duplicate",
     "project:manage-members",
     "config:read",
+    "config:write",
     "audit:read",
   ],
-  editor: ["project:read", "project:update", "project:duplicate", "config:read", "audit:read"],
+  editor: [
+    "project:read",
+    "project:update",
+    "project:duplicate",
+    "config:read",
+    "config:write",
+    "audit:read",
+  ],
   // recorder: در فاز ۴ عملیات «observations:write» به این فهرست اضافه می‌شود
   recorder: ["project:read", "config:read"],
   viewer: ["project:read", "config:read"],

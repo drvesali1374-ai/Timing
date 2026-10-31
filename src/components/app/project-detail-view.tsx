@@ -12,6 +12,7 @@ import {
   Copy,
   FileClock,
   Pencil,
+  Settings2,
   UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ import type { MemberDto } from "@/shared/contracts/api";
 import { DemoBadge, ErrorState, FaDate, LoadingBlock, LoadingCards, PageHeader, ReadinessChips, Spinner, StatusBadge } from "./ui-bits";
 import { ProjectEditDialog } from "./project-edit-dialog";
 
-export function ProjectDetailView({ projectId, onBack, onTitle }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void }) {
+export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void }) {
   const projectQuery = useProject(projectId);
   const versionsQuery = useProjectVersions(projectId);
   const membersQuery = useProjectMembers(projectId);
@@ -110,6 +111,9 @@ export function ProjectDetailView({ projectId, onBack, onTitle }: { projectId: s
         description={`کد ${project.code} · ساخته‌شده توسط ${project.createdByName ?? "—"} · ${new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" }).format(new Date(project.createdAt))}`}
         actions={
           <>
+            <Button variant="outline" size="sm" className="gap-2" onClick={onOpenConfig}>
+              <Settings2 className="size-4" aria-hidden /> پیکربندی
+            </Button>
             {canUpdate ? (
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setEditOpen(true)}>
                 <Pencil className="size-4" aria-hidden /> ویرایش
@@ -167,6 +171,28 @@ export function ProjectDetailView({ projectId, onBack, onTitle }: { projectId: s
             </div>
           ) : null}
 
+          <Card className="border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Settings2 className="size-4 text-primary" aria-hidden /> کارگاه پیکربندی (فاز ۲)
+              </CardTitle>
+              <CardDescription>
+                خانواده‌ها و پارامترها · فرمول‌نویسی با اعتبارسنجی زنده و آزمون · فرم ثبت مقادیر · نتایج محاسبه · فعالیت‌ها
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <Badge variant="secondary" className="gap-1 font-mono" dir="ltr">
+                  v{project.currentConfigVersion?.semver ?? "—"}
+                </Badge>
+                <span>نسخه فعال پیکربندی · هر تغییر ساختاری نسخه جدید append-only می‌سازد</span>
+              </div>
+              <Button className="gap-2" onClick={onOpenConfig}>
+                <Settings2 className="size-4" aria-hidden /> ورود به کارگاه پیکربندی
+              </Button>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">
@@ -208,12 +234,12 @@ export function ProjectDetailView({ projectId, onBack, onTitle }: { projectId: s
                   <Badge variant="secondary">نسخه فعال {project.currentConfigVersion?.semver ?? "—"}</Badge>
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  تغییرات ساختاری آینده (خانواده‌ها، پارامترها، فرمول‌ها) در فاز ۲ به‌صورت نسخه‌های جدید append-only ثبت
-                  می‌شوند؛ نسخه‌های قبلی برای بازتولید نتایج حفظ می‌شوند.
+                  تغییرات ساختاری (خانواده‌ها، پارامترها، فرمول‌ها) در کارگاه پیکربندی به‌صورت نسخه‌های جدید
+                  append-only ثبت می‌شوند؛ نسخه‌های قبلی برای بازتولید نتایج حفظ می‌شوند.
                 </p>
                 <div className="rounded-lg border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
-                  بخش‌های بعدی محصول روی همین پروژه ساخته می‌شوند: کارگاه پیکربندی پویا (فاز ۲)، نمودارهای OPC/FPC
-                  (فاز ۳)، کرنومتر (فاز ۴)، تحلیل (فاز ۵) و بالانس خط (فاز ۶).
+                  بخش‌های بعدی محصول روی همین پروژه ساخته می‌شوند: نمودارهای OPC/FPC (فاز ۳)، کرنومتر (فاز ۴)، تحلیل
+                  (فاز ۵) و بالانس خط (فاز ۶).
                 </div>
               </CardContent>
             </Card>

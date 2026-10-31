@@ -63,9 +63,12 @@ model Project {
   currentConfigVersionId String? @unique
   currentConfigVersion   ConfigVersion? @relation("CurrentConfigVersion", fields: [currentConfigVersionId], references: [id])
 
-  memberships    ProjectMembership[]
-  configVersions ConfigVersion[]
-  auditLogs      AuditLog[]
+  memberships        ProjectMembership[]
+  configVersions     ConfigVersion[]
+  auditLogs          AuditLog[]
+  parameterValues    ParameterValue[]
+  calculationResults CalculationResult[]
+  activities         Activity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -160,4 +163,106 @@ model AuditLog {
   @@index([projectId])
   @@index([userId])
   @@index([entityType, entityId])
+}
+
+// ─────────────────── فاز ۲: مقدار پارامتر (جدای از تعریف — B2/DATA_DICTIONARY §۲٫۶) ───────────────────
+
+model ParameterValue {
+  id        String @id
+  projectId String
+
+  // شناسه فنی پایدار پارامتر (stableKey در snapshot پیکربندی)
+  stableKey String
+
+  // نسخه تعریف پارامتر لحظه ثبت — مقدار به نسخه تعریف گره خورده؛ تبدیل پنهانی ممنوع
+  defVersion Int
+
+  // دامنه مقدار: project (فاز ۲) · session/cycle/observation/activity (فاز ۴+)
+  scopeType String @default("project")
+
+  // شناسه رکورد دامنه؛ برای دامنه project از رشته خالی استفاده می‌شود (یکتایی SQLite با NULL برقرار نمی‌شود)
+  scopeId  String  @default("")
+
+  // مقدار نوع‌دار + واحد: {"value": ..., "unit": ...}
+  valueJson   String
+  recordedBy  String
+  recordedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, stableKey, scopeType, scopeId])
+  @@index([projectId, scopeType])
+}
+
+// ─────────────────── فاز ۲: نتیجه محاسبه فرمول (نسخه‌دار — A7/DATA_DICTIONARY §۲٫۱۶) ───────────────────
+
+model CalculationResult {
+  id        String @id
+  projectId String
+
+  // کلید فرمول در snapshot پیکربندی (مثل TS-011 یا f.custom)
+  formulaKey      String
+  formulaSemver   String
+  configVersionId String
+
+  scopeType String @default("project")
+  scopeId   String @default("")
+
+  // {"value": ..., "unit": ...} — فقط وقتی valid/incomplete
+  valueJson String?
+
+  // valid | invalid | incomplete
+  status     String
+  errorsJson String?
+  traceJson  String
+  // شناسه ورودی‌های مصرف‌شده (stableKey پارامترها/فرمول‌ها)
+  inputRefsJson String
+
+  computedBy String
+  computedAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, formulaKey])
+  @@index([projectId, computedAt])
+}
+
+// ─────────────────── فاز ۲: فعالیت/عنصر کاری (مدل مشترک B5 — مصرف‌کننده: نمودار فاز ۳، کرنومتر فاز ۴، بالانس فاز ۶) ───────────────────
+
+model Activity {
+  id        String  @id
+  projectId String
+
+  // شناسه فنی پایدار — یکتا در فضای پروژه
+  stableKey   String
+  name        String
+  description String?
+
+  // نوع کار (B5 — توسعه‌پذیر): operatorManual | machineAuto | waiting | transport | inspection | setupChangeover | overlap
+  workType String @default("operatorManual")
+
+  // طبقه‌بندی ارزش — فقط با تأیید صریح کاربر (nullable): valueAdded | nonValueAdded | essentialNonVA
+  vaClassification String?
+
+  // محدودیت‌های تخصیص (ایستگاه مجاز/تجهیز اختصاصی/مهارت) — JSON
+  constraintsJson String?
+
+  stationHint   String?
+  skillRequired String?
+
+  // منبع زمان: measured | estimated | referenced
+  sourceOfTime String @default("measured")
+
+  order     Int
+  archived Boolean @default(false)
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, stableKey])
+  @@index([projectId, archived])
 }

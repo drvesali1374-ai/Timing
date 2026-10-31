@@ -13,6 +13,7 @@
     "db:reset": "prisma migrate reset",
     "seed": "bun scripts/seed.ts",
     "test:phase1": "node scripts/test-phase1.mjs",
+    "test:phase2": "node scripts/test-phase2.mjs",
     "check:boundaries": "node scripts/check-module-boundaries.mjs"
   },
   "dependencies": {

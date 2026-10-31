@@ -11,7 +11,7 @@ import type { ProfileDefinition } from "@/modules/profiles/domain/profile";
 
 export const continuousTiming = {
   id: "profile.continuous-timing",
-  semver: "1.0.0",
+  semver: "1.1.0",
   nameFa: "زمان‌سنجی پیوسته",
   description:
     "روش ثبت پیوسته کرنومتر: عقربه در طول چرخه متوقف نمی‌شود و قرائت هر مرز عنصر به‌ترتیب ثبت می‌شود؛ تفکیک مدت عناصر پس از ثبت با تفاضل قرائت‌های متوالی انجام می‌گیرد. قاعده اعتبارسنجی «جمع عناصر = مدت چرخه ± تلورانس» سازگاری ثبت هر چرخه را کنترل می‌کند.",
@@ -290,7 +290,7 @@ export const continuousTiming = {
       {
         id: "TS-001",
         nameFa: "میانگین عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "میانگین حسابی مشاهدات معتبر عنصر: x̄ = Σxᵢ ÷ n — ریاضی محض.",
@@ -298,7 +298,7 @@ export const continuousTiming = {
       {
         id: "TS-002",
         nameFa: "میانه عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "مقدار میانه مشاهدات مرتب‌شده عنصر؛ نیازمند حداقل یک مشاهده معتبر — ریاضی محض.",
@@ -306,7 +306,7 @@ export const continuousTiming = {
       {
         id: "TS-003",
         nameFa: "تفکیک قرائت پیوسته",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "observation",
         status: "active",
         descriptionFa:
@@ -315,7 +315,7 @@ export const continuousTiming = {
       {
         id: "TS-004",
         nameFa: "زمان چرخه مشاهده‌شده",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "cycle",
         status: "active",
         descriptionFa:
@@ -324,7 +324,7 @@ export const continuousTiming = {
       {
         id: "TS-005",
         nameFa: "تلورانس جمع عناصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "cycle",
         status: "active",
         descriptionFa:
@@ -333,7 +333,7 @@ export const continuousTiming = {
       {
         id: "TS-010",
         nameFa: "زمان نرمال عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -342,7 +342,7 @@ export const continuousTiming = {
       {
         id: "TS-011",
         nameFa: "زمان استاندارد (مجاز on-normal)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -351,7 +351,7 @@ export const continuousTiming = {
       {
         id: "TS-012",
         nameFa: "زمان استاندارد (مجاز on-standard)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -360,7 +360,7 @@ export const continuousTiming = {
       {
         id: "ST-001",
         nameFa: "انحراف معیار نمونه",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "انحراف معیار نمونه با مخرج n−1 — ریاضی محض.",
@@ -368,7 +368,7 @@ export const continuousTiming = {
       {
         id: "ST-002",
         nameFa: "ضریب تغییرات",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "ضریب تغییرات: CV = s ÷ x̄؛ نسبت با نمایش درصدی — ریاضی محض.",
@@ -376,7 +376,7 @@ export const continuousTiming = {
       {
         id: "ST-010",
         nameFa: "کفایت نمونه (تقریب نرمال)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:

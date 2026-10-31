@@ -11,7 +11,7 @@ import type { ProfileDefinition } from "@/modules/profiles/domain/profile";
 
 export const snapbackTiming = {
   id: "profile.snapback-timing",
-  semver: "1.0.0",
+  semver: "1.1.0",
   nameFa: "زمان‌سنجی بازگشت به صفر (عنصری)",
   description:
     "روش ثبت عنصری: هر عنصر به‌صورت مستقل و پس از بازگشت کرنومتر به صفر اندازه‌گیری می‌شود و مدت آن مستقیم ثبت می‌شود. به‌جای کنترل «جمع عناصر = مدت چرخه»، هم‌خوانی تعداد مشاهده هر عنصر با طرح مطالعه کنترل می‌شود و عناصر خیلی کوتاه هشدار می‌گیرند.",
@@ -282,7 +282,7 @@ export const snapbackTiming = {
       {
         id: "TS-001",
         nameFa: "میانگین عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "میانگین حسابی مشاهدات معتبر عنصر: x̄ = Σxᵢ ÷ n — ریاضی محض.",
@@ -290,7 +290,7 @@ export const snapbackTiming = {
       {
         id: "TS-002",
         nameFa: "میانه عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "مقدار میانه مشاهدات مرتب‌شده عنصر؛ نیازمند حداقل یک مشاهده معتبر — ریاضی محض.",
@@ -298,7 +298,7 @@ export const snapbackTiming = {
       {
         id: "TS-010",
         nameFa: "زمان نرمال عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -307,7 +307,7 @@ export const snapbackTiming = {
       {
         id: "TS-011",
         nameFa: "زمان استاندارد (مجاز on-normal)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -316,7 +316,7 @@ export const snapbackTiming = {
       {
         id: "TS-012",
         nameFa: "زمان استاندارد (مجاز on-standard)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -325,7 +325,7 @@ export const snapbackTiming = {
       {
         id: "ST-001",
         nameFa: "انحراف معیار نمونه",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "انحراف معیار نمونه با مخرج n−1 — ریاضی محض.",
@@ -333,7 +333,7 @@ export const snapbackTiming = {
       {
         id: "ST-002",
         nameFa: "ضریب تغییرات",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "ضریب تغییرات: CV = s ÷ x̄؛ نسبت با نمایش درصدی — ریاضی محض.",
@@ -341,7 +341,7 @@ export const snapbackTiming = {
       {
         id: "ST-010",
         nameFa: "کفایت نمونه (تقریب نرمال)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:

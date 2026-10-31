@@ -50,6 +50,7 @@ import {
   getProfileTemplateNames,
   instantiateProfileSnapshot,
 } from "@/modules/profiles/application/profile-service";
+import { instantiateActivityTemplates } from "@/modules/activities/application/activity-service";
 import { AUDIT_ACTIONS, recordAudit } from "@/modules/audit/application/audit-service";
 import { getProjectAuditTrail } from "@/modules/audit/application/audit-service";
 
@@ -75,6 +76,15 @@ async function authorize(
   return { role };
 }
 
+/** مجوزسنجی پروژه برای routes ماژول‌های دیگر (فاز ۲+) — همان قاعده ۴۰۴/۴۰۳. */
+export async function authorizeProjectAction(
+  projectId: string,
+  userId: string,
+  action: ProjectAction,
+): Promise<{ role: ProjectRole }> {
+  return authorize(projectId, userId, action);
+}
+
 // ─────────────────────────── تبدیل DTO ───────────────────────────
 
 function toProjectDto(row: ProjectRow, templateNames: Map<string, string>, requestingUserId: string): ProjectDto {
@@ -97,7 +107,7 @@ function toProjectDto(row: ProjectRow, templateNames: Map<string, string>, reque
     isDemo: row.isDemo,
     readiness: computeReadiness({
       hasConfigVersion: row.currentConfigVersion !== null,
-      activityCount: 0, // فاز ۲ — جدول فعالیت‌ها هنوز وجود ندارد
+      activityCount: row._count?.activities ?? 0, // فاز ۲ — فعالیت‌های فعال پروژه
       observationCount: 0, // فاز ۴
       standardTimeResultCount: 0, // فاز ۵
     }),
@@ -212,6 +222,24 @@ export async function createProject(
     });
     await updateProjectById(tx, projectId, { currentConfigVersionId: configVersionId });
   });
+
+  // نمونه‌سازی قالب‌های عنصر پروفایل به فعالیت‌های مستقل پروژه (B5 — فاز ۲)
+  const elementTemplates = snapshot.content?.activityModel?.elementTemplates ?? [];
+  if (Array.isArray(elementTemplates) && elementTemplates.length > 0) {
+    await instantiateActivityTemplates({
+      projectId,
+      createdBy: userId,
+      templates: elementTemplates as Array<{ stableKey: string; nameFa: string; workType: string; description?: string; vaClassification?: string }>,
+    });
+    await recordAudit({
+      userId,
+      action: AUDIT_ACTIONS.activityCreated,
+      entityType: "Activity",
+      entityId: projectId,
+      projectId,
+      after: { instantiatedFromTemplate: template.id, count: elementTemplates.length },
+    });
+  }
 
   log.info("project created", { projectId, userId, templateId: template.id });
   await recordAudit({

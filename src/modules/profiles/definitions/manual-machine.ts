@@ -11,7 +11,7 @@ import type { ProfileDefinition } from "@/modules/profiles/domain/profile";
 
 export const manualMachine = {
   id: "profile.manual-machine",
-  semver: "1.0.0",
+  semver: "1.1.0",
   nameFa: "مطالعه فعالیت دستی–ماشین",
   description:
     "پروفایل مطالعه چرخه‌های ترکیبی اپراتور–ماشین با تفکیک انواع زمان فعالیت: دستی، خودکار ماشین، انتظار و هم‌پوشانی. چرخه دستی–ماشین با بیشینه کار اپراتور (با لحاظ هم‌پوشانی) و زمان خودکار ماشین محاسبه می‌شود و نسبت بار اپراتور گزارش می‌گردد.",
@@ -271,6 +271,36 @@ export const manualMachine = {
       notesFa:
         "ثبت پیوسته برای پوشش هم‌زمانی کار دستی و ماشین توصیه می‌شود؛ رویدادهای شروع/پایان کار خودکار ماشین جداگانه علامت‌گذاری می‌شوند تا هم‌پوشانی مدل شود.",
     },
+    activityModel: {
+      notesFa:
+        "مدل فعالیت دستی–ماشین با انواع زمان B5؛ قالب‌های عنصر زیر ساختار قابل ویرایش ارائه می‌دهند — آنها را با عناصر واقعی ایستگاه خود جایگزین/ویرایش کنید.",
+      elementTemplates: [
+        {
+          stableKey: "el.manual-segment",
+          nameFa: "بخش کار دستی اپراتور",
+          workType: "operatorManual",
+          description: "کار انجام‌شده توسط اپراتور در طول چرخه — قابل تفکیک به چند عنصر ریزتر.",
+        },
+        {
+          stableKey: "el.machine-auto",
+          nameFa: "کار خودکار ماشین",
+          workType: "machineAuto",
+          description: "بخشی از چرخه که ماشین بدون دخالت اپراتور اجرا می‌کند.",
+        },
+        {
+          stableKey: "el.waiting",
+          nameFa: "انتظار اپراتور در حین کار ماشین",
+          workType: "waiting",
+          description: "زمانی که اپراتور منتظر پایان کار خودکار ماشین است (کاندید بهبود).",
+        },
+        {
+          stableKey: "el.overlap",
+          nameFa: "بخش هم‌پوشان دستی–ماشین",
+          workType: "overlap",
+          description: "کاری که اپراتور هم‌زمان با اجرای خودکار ماشین انجام می‌دهد؛ در جمع ساده دوباره‌شماری می‌شود.",
+        },
+      ],
+    },
     analysisChain: [
       {
         step: 1,
@@ -318,7 +348,7 @@ export const manualMachine = {
       {
         id: "TS-001",
         nameFa: "میانگین عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "میانگین حسابی مشاهدات معتبر عنصر/فعالیت: x̄ = Σxᵢ ÷ n — ریاضی محض.",
@@ -326,7 +356,7 @@ export const manualMachine = {
       {
         id: "TS-002",
         nameFa: "میانه عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "مقدار میانه مشاهدات مرتب‌شده عنصر/فعالیت؛ نیازمند حداقل یک مشاهده معتبر — ریاضی محض.",
@@ -334,7 +364,7 @@ export const manualMachine = {
       {
         id: "TS-010",
         nameFa: "زمان نرمال عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -343,7 +373,7 @@ export const manualMachine = {
       {
         id: "TS-011",
         nameFa: "زمان استاندارد (مجاز on-normal)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -352,7 +382,7 @@ export const manualMachine = {
       {
         id: "TS-012",
         nameFa: "زمان استاندارد (مجاز on-standard)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -361,7 +391,7 @@ export const manualMachine = {
       {
         id: "TS-020",
         nameFa: "چرخه دستی–ماشین",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "cycle",
         status: "active",
         descriptionFa:
@@ -370,7 +400,7 @@ export const manualMachine = {
       {
         id: "TS-021",
         nameFa: "نسبت بار اپراتور",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "cycle",
         status: "active",
         descriptionFa: "نسبت بار اپراتور: L_op = جمع دستی ÷ C؛ خروجی درصدی — تعریف محصول.",
@@ -378,7 +408,7 @@ export const manualMachine = {
       {
         id: "ST-001",
         nameFa: "انحراف معیار نمونه",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "انحراف معیار نمونه با مخرج n−1 — ریاضی محض.",
@@ -386,7 +416,7 @@ export const manualMachine = {
       {
         id: "ST-002",
         nameFa: "ضریب تغییرات",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "ضریب تغییرات: CV = s ÷ x̄؛ نسبت با نمایش درصدی — ریاضی محض.",
@@ -394,7 +424,7 @@ export const manualMachine = {
       {
         id: "ST-010",
         nameFa: "کفایت نمونه (تقریب نرمال)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:

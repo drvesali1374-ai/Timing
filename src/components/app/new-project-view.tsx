@@ -491,7 +491,7 @@ function ProfileComponents({
           </p>
           <p className="mt-1">
             <span className="font-medium">فرمول‌های نسخه‌دار:</span>{" "}
-            {detail.content.formulas.map((f) => `${f.id} (${f.nameFa})`).join(" · ") || "—"}
+            {detail.content.formulas.map((f) => `${f.key} (${f.nameFa})`).join(" · ") || "—"}
           </p>
           <p className="mt-1">
             {detail.licenseNote}
@@ -594,8 +594,8 @@ function ProfilePreviewDialog({ profileId, onClose }: { profileId: string; onClo
                 <h4 className="mb-1 font-semibold">فرمول‌های نسخه‌دار</h4>
                 <ul className="space-y-1 text-sm text-muted-foreground">
                   {detail.data.content.formulas.map((f) => (
-                    <li key={f.id} className="flex items-start gap-2">
-                      <Badge variant="secondary" className="mt-0.5 shrink-0 font-mono text-[10px]" dir="ltr">{f.id}</Badge>
+                    <li key={f.key} className="flex items-start gap-2">
+                      <Badge variant="secondary" className="mt-0.5 shrink-0 font-mono text-[10px]" dir="ltr">{f.key}</Badge>
                       <span>{f.nameFa} — {f.descriptionFa}</span>
                     </li>
                   ))}

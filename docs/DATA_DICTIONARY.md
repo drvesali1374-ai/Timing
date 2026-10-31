@@ -1,6 +1,6 @@
 # فرهنگ داده و مدل مفهومی (DATA DICTIONARY)
 
-**نسخه:** ۱٫۰ اولیه (فاز صفر) — **تاریخ:** ۲۹ اکتبر ۲۰۲۶
+**نسخه:** ۱٫۱ (پیاده‌سازی فاز ۲ — بند ۷) — **تاریخ آخرین به‌روزرسانی:** ۳۱ اکتبر ۲۰۲۶
 **هدف:** تعریف موجودیت‌ها، روابط، ناوردایی‌ها (invariants) و مرجع حقیقت هر داده؛ مبنای پیاده‌سازی Prisma در فاز ۱.
 **قاعده:** تعریف پارامتر از مقدار پارامتر جداست؛ داده خام از داده مشتق‌شده جداست؛ هر نتیجه به نسخه روش قابل ارجاع است.
 
@@ -136,9 +136,9 @@ User: `id, name, email, authProvider`; Role: `owner,editor,recorder,viewer,admin
 | داده | مرجع حقیقت | مشتق/کش |
 |---|---|---|
 | رویدادها و مشاهدات خام | جدول TimingEvent/Observation (سرور پس از همگام‌سازی؛ IndexedDB = بافر آفلاین) | فقط کش |
-| تعریف پارامتر/فرمول/تنظیمات | ConfigVersion (append-only) | — |
-| مقادیر پارامتر | ParameterValue (سرور) | بافر آفلاین |
-| زمان‌های نماینده/نرمال/استاندارد | CalculationResult (نسخه‌دار) | — |
+| تعریف پارامتر/فرمول/تنظیمات | **ConfigVersion (append-only — snapshot v2** با خانواده/پارامتر B2 کامل/فرمول با عبارت اجرایی — بند ۷٫۲) | — |
+| مقادیر پارامتر | **ParameterValue** (جدول اجراشده فاز ۲ — مقدار جدا از تعریف، گره‌خورده به defVersion؛ بند ۷٫۱) | بافر آفلاین (فاز ۳/۴) |
+| زمان‌های نماینده/نرمال/استاندارد و نتایج فرمول | **CalculationResult** (جدول اجراشده فاز ۲ — append-only با نسخه فرمول/پیکربندی/trace؛ بند ۷٫۱) | — |
 | خلاصه نمودار | از DiagramNode بازسازی | summaryCache = کش |
 | سناریو بالانس | BalanceScenario | — |
 
@@ -161,5 +161,80 @@ User: `id, name, email, authProvider`; Role: `owner,editor,recorder,viewer,admin
 | موضوع | وضعیت |
 |---|---|
 | تفکیک فیزیکی جدول‌ها در SQLite به‌ازای موجودیت | نهایی در فاز ۱ همراه اولین Prisma schema اجرایی |
-| فرمت دقیق `traceJson` | در فاز ۲ همراه موتور فرمول |
+| فرمت دقیق `traceJson` | ✅ قفل شد در فاز ۲: گام‌های `{nodeId, op, value, unit}` با سقف ۲۵۶ گام (بند ۷٫۱) |
 | ساختار `solutionJson` بالانس | در فاز ۶ همراه الگوریتم‌ها |
+
+## ۷. فاز ۲ — پیاده‌سازی (۳۱ اکتبر ۲۰۲۶)
+
+> سه جدول جدید با Prisma Migrate (نه db push) در مهاجرت `20261031072638_phase2_params_results_activities` ساخته شد. این بند ساختار **مطابق اجرا** را ثبت می‌کند؛ تعاریف مفهومی بندهای ۲٫۶ / ۲٫۷ / ۲٫۱۶ همچنان معتبرند.
+
+### ۷٫۱. جدول‌های اجراشده
+
+#### ParameterValue — مقدار پارامتر (بند ۲٫۶ اجرا شد)
+
+| فیلد | نوع/پیش‌فرض | توضیح |
+|---|---|---|
+| `id` | UUIDv7 | شناسه پایدار |
+| `projectId` | ref → Project | جداسازی پروژه (Cascade) |
+| `stableKey` | متن | شناسه فنی پارامتر در snapshot پیکربندی (بدون FK به جدول تعریف — تعریف در snapshot زندگی می‌کند) |
+| `defVersion` | int | نسخه تعریف لحظه ثبت — مقدار به آن گره خورده؛ تبدیل پنهانی ممنوع (ADR-005/010) |
+| `scopeType` | متن، پیش‌فرض `"project"` | در فاز ۲ فقط دامنه `project` فعال است؛ `session/cycle/observation/activity` در ساختار آماده‌اند (فاز ۴+) |
+| `scopeId` | متن، پیش‌فرض `""` | شناسه رکورد دامنه؛ برای `project` رشته خالی است (یکتایی SQLite با NULL برقرار نمی‌شود) |
+| `valueJson` | متن (JSON) | `{"value": …, "unit": …}` — مقدار نوع‌دار + واحد |
+| `recordedBy` / `recordedAt` / `updatedAt` | — | ثبت‌کننده و زمان ثبت/به‌روزرسانی |
+
+**یکتایی:** `@@unique([projectId, stableKey, scopeType, scopeId])` — یک مقدار به‌ازای (پارامتر × دامنه) در هر پروژه؛ ثبت مجدد همان مقدار را به `defVersion` جدید می‌کِشد (pin) و `recordedAt/updatedAt` را تازه می‌کند.
+
+#### CalculationResult — نتیجه محاسبه (بند ۲٫۱۶ اجرا شد)
+
+| فیلد | نوع/پیش‌فرض | توضیح |
+|---|---|---|
+| `id` | UUIDv7 | — |
+| `projectId` | ref → Project | — |
+| `formulaKey` / `formulaSemver` | متن | کلید و نسخه فرمول در snapshot (مثل `TS-011` یا `f.myFormula`) |
+| `configVersionId` | متن | نسخه پیکربندی مبنای محاسبه (ارجاع منطقی به ConfigVersion) |
+| `scopeType` / `scopeId` | متن، پیش‌فرض `"project"` / `""` | فاز ۲: فقط project |
+| `valueJson` | متن؟ (JSON) | `{"value": …, "unit": …}` — فقط وقتی `valid/incomplete` |
+| `status` | متن | `valid` \| `invalid` \| `incomplete` |
+| `errorsJson` | متن؟ (JSON) | فهرست `{code, messageFa}` |
+| `traceJson` | متن (JSON) | گام‌های `{nodeId, op, value, unit}` — سقف ۲۵۶ گام |
+| `inputRefsJson` | متن (JSON) | شناسه ورودی‌های مصرف‌شده (stableKey پارامترها/فرمول‌ها) |
+| `computedBy` / `computedAt` | — | محاسبه‌کننده و زمان |
+
+**ناوردایی:** **append-only** — هر «محاسبه» رکورد جدید است؛ رکورد قبلی جایگزین/حذف نمی‌شود و UI **آخرین نتیجه هر فرمول** را نمایش می‌دهد (تاریخچه از طریق کوئری باقی می‌ماند). ایندکس: `(projectId, formulaKey)` و `(projectId, computedAt)`.
+
+#### Activity — فعالیت/عنصر کاری (بند ۲٫۷ اجرا شد)
+
+| فیلد | نوع/پیش‌فرض | توضیح |
+|---|---|---|
+| `id` | UUIDv7 | — |
+| `projectId` | ref → Project | **`@@unique([projectId, stableKey])`** — یکتایی در فضای پروژه |
+| `stableKey` / `name` / `description` | متن | شناسه فنی پایدار / نام / توضیح اختیاری |
+| `workType` | متن، پیش‌فرض `"operatorManual"` | ۷ نوع (B5): `operatorManual` \| `machineAuto` \| `waiting` \| `transport` \| `inspection` \| `setupChangeover` \| `overlap` |
+| `vaClassification` | متن؟ | `valueAdded` \| `nonValueAdded` \| `essentialNonVA` — **nullable؛ فقط با تأیید صریح کاربر** ثبت می‌شود (UI انتخاب پیش‌فرض ندارد) |
+| `constraintsJson` | متن؟ (JSON) | محدودیت‌های تخصیص (ایستگاه مجاز/تجهیز/مهارت) |
+| `stationHint` / `skillRequired` | متن؟ | ایستگاه پیشنهادی / مهارت لازم |
+| `sourceOfTime` | متن، پیش‌فرض `"measured"` | `measured` \| `estimated` \| `referenced` |
+| `order` / `archived` | int / بولی | ترتیب نمایش / بایگانی منطقی (حذف فیزیکی ندارد) |
+| `createdBy` / `createdAt` / `updatedAt` | — | — |
+
+**تولید اولیه:** هنگام ایجاد پروژه، `elementTemplates` مدل فعالیت snapshot با `instantiateActivityTemplates` به رکوردهای مستقل کپی می‌شود (کپی مستقل — ADR-005).
+
+### ۷٫۲. Snapshot پیکربندی v2 (`ProjectConfigSnapshot`)
+
+قرارداد نوع در `src/shared/contracts/snapshot.ts` (مشترک بین‌ماژولی) و معناشناسی/اعتبارسنجی در `src/modules/config/domain/` (zod + ناوردایی‌ها). ساختار:
+
+| بخش | محتوا |
+|---|---|
+| `snapshotVersion` | `"2"` |
+| `meta` | `templateId/templateVersion/instantiatedAt` + `upgradedFromV1?` (نشانه ارتقای نمایندگی) + `excludedFamilies/parameterOverrides` (پریز ایجاد) |
+| `families[]` | خانواده با `stableKey/nameFa/order/archived` + **`parameters[]` کامل B2**: هر ۱۴ نوع داده، `defVersion`، `archived`، min/max/precision/rounding/unit/options، `visibilityCondition/requiredCondition` (عبارت DSL)، `computedFormulaKey`، `displayContexts`، `customAttrs` |
+| `formulas[]` | فرمول با `key/semver/scopeLevel/status` + **`expr` (عبارت DSL) + `ast` (سریال) + `inputContract`** + `origin: system\|custom` + `sourceRef/assumptionsFa/availabilityNoteFa` (برچسب صداقت مانند «نیازمند داده مشاهدات فاز ۴») |
+| `activityModel` | `workTypes[]` (۷ نوع) + `elementTemplates[]` (قالب عنصر لحظه ایجاد) + `notesFa` |
+| `timingMethod?` / `analysisChain[]` / `reportTemplates[]` | روش پیش‌فرض زمان‌سنجی / زنجیره تحلیل / قالب گزارش |
+
+### ۷٫۳. سیاست ارتقای v1→v2 (نمایندگی هنگام خواندن)
+
+- snapshotهای v1 فاز ۱ (پروفایل‌های instantiated) **در حافظه** با `readSnapshotAsV2` به نمای v2 خوانده می‌شوند: **فقط تغییر نمایندگی** — واحدهای legacy نرمال می‌شوند (مثل `%` → `percent`)، `defVersion = 1` فرض می‌شود، و فرمول‌های ارجاعی بدون عبارت اجرایی یادداشت صادقانه `availabilityNoteFa` («بدون عبارت اجرایی») می‌گیرند.
+- **هیچ مقداری تبدیل نمی‌شود**؛ مقادیر ثبت‌شده به `defVersion` لحظه ثبت گره می‌مانند (بدون تبدیل پنهانی).
+- **نوشتن همیشه نسخه جدید append-only می‌سازد** — snapshot v1 در DB هرگز بازنویسی نمی‌شود (مهاجرت انبوه انجام نشد؛ سازگار خوانده می‌شود — ADR-011).

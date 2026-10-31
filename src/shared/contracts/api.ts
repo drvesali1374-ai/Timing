@@ -80,7 +80,7 @@ export interface ProfileFamilyDto {
 }
 
 export interface ProfileFormulaRefDto {
-  id: string; // مثل "TS-010"
+  key: string; // مثل "TS-011"
   nameFa: string;
   semver: string;
   scopeLevel:
@@ -93,6 +93,11 @@ export interface ProfileFormulaRefDto {
     | "balanceScenario";
   status: "draft" | "active" | "deprecated";
   descriptionFa: string;
+  /** عبارت اجرایی DSL — خالی یعنی ارجاع بدون اجرا (با availabilityNoteFa) */
+  expr?: string;
+  origin?: "system" | "custom";
+  outputUnit?: string;
+  availabilityNoteFa?: string;
 }
 
 export interface ProfileAnalysisChainStepDto {
@@ -113,11 +118,26 @@ export interface ProfileReportTemplateDto {
   descriptionFa?: string;
 }
 
+export interface ProfileActivityModelDto {
+  workTypes: Array<
+    "operatorManual" | "machineAuto" | "waiting" | "transport" | "inspection" | "setupChangeover" | "overlap"
+  >;
+  notesFa?: string;
+  elementTemplates: Array<{
+    stableKey: string;
+    nameFa: string;
+    workType: string;
+    description?: string;
+    vaClassification?: string;
+  }>;
+}
+
 export interface ProfileContentDto {
   families: ProfileFamilyDto[];
   timingMethod?: ProfileTimingMethodDto;
   analysisChain: ProfileAnalysisChainStepDto[];
   formulas: ProfileFormulaRefDto[];
+  activityModel?: ProfileActivityModelDto;
   reportTemplates: ProfileReportTemplateDto[];
 }
 

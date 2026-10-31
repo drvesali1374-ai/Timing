@@ -206,3 +206,64 @@ src/
 | snapshot | ساختار `ProfileSnapshot` (meta+content) — فاز ۲ همان را ویرایش/نسخه می‌کند |
 | نمایش myRole | محاسبه در DTO بر اساس عضویت «کاربر درخواست‌کننده» (نه اولین عضو) |
 | UUIDv7 | تولید در Application (RFC 9562) برای همه موجودیت‌ها |
+
+---
+
+## ۱۰. وضعیت پیاده‌سازی فاز ۲ (به‌روزرسانی ۳۱ اکتبر ۲۰۲۶)
+
+### ۱۰٫۱. ساختار اجراشده
+
+```
+src/
+├── app/                        # page.tsx + api/** (۲۴ route — از ۱۳ در فاز ۱)
+│   └── api/
+│       ├── formula/functions           # GET فهرست ۲۲ تابع DSL (UI)
+│       └── projects/[id]/
+│           ├── config                  # GET پیکربندی جاری (snapshot v2)
+│           ├── config/versions         # GET تاریخچه نسخه‌ها
+│           ├── config/formulas/validate# POST اعتبارسنجی زنده عبارت
+│           ├── config/export|import    # خروجی/درون‌ریزی JSON (dryRun → apply)
+│           ├── values                  # GET/PUT مقدار پارامتر (دامنه project)
+│           ├── formulas/evaluate       # POST محاسبه + ذخیره نتیجه نسخه‌دار
+│           ├── formulas/results        # GET نتایج (آخرین هر فرمول)
+│           └── activities(+[id])       # CRUD فعالیت (B5)
+├── modules/
+│   ├── identity/ projects/ profiles/ audit/    # ✅ فاز ۱ — بدون تغییر ساختاری
+│   ├── config/                 # ✅ فاز ۲ — domain (snapshot/operations/validation-zod) · application (config-service: عملیات ۱۴گانه + نسخه append-only + import/export) · infrastructure (config-repo)
+│   ├── params/                 # ✅ فاز ۲ — domain (value) · application (value-service: ثبت مقدار + ارزیابی + CalculationResult) · infrastructure (value-repo)
+│   └── activities/             # ✅ فاز ۲ — domain (activity) · application (activity-service + instantiateActivityTemplates) · infrastructure (activity-repo)
+├── shared/
+│   ├── formula/                # ✅ فاز ۲ — هسته مشترک خالص موتور فرمول (۹ فایل: ast/lexer/parser/units/functions/evaluator/static-analysis/engine + آزمون ۴۴گانه) — ADR-011
+│   ├── contracts/snapshot.ts   # ✅ فاز ۲ — قرارداد نوع snapshot v2 بین‌ماژولی + formulaResultSymbol
+│   └── contracts/config.ts     # ✅ فاز ۲ — DTOهای کارگاه پیکربندی UI ↔ API
+└── components/app/config/**    # ✅ فاز ۲ — UI کارگاه (۱۶ فایل: ۵ تب + دیالوگ‌ها) + hooks/use-config.ts
+```
+
+### ۱۰٫۲. هسته مشترک موتور فرمول (ADR-011)
+
+قرارداد «domain→domain بین ماژول‌ها ممنوع» (§۱٫۲/§۹٫۲) جایی برای موتوری که هم سرور و هم کلاینت لازم دارند نمی‌گذاشت — بنا بر این موتور فرمول به‌عنوان **هسته مشترک خالص** در `src/shared/formula/` پیاده شد:
+
+- **خالص:** بدون DB/UI/زمان سیستم؛ قطعی و آزمون‌پذیر (۴۴ آزمون واحد).
+- **دو مصرف‌کننده:** ماژول‌های سرور (config/params از طریق application) و **فرم‌ساز UI** که شرط‌های `visibilityCondition/requiredCondition` پارامترها را سمت کاربر با همان موتور ارزیابی می‌کند — بدون رفت‌وبرگشت API و با **منبع واحد ارزیابی**.
+- قاعده مرزی مرتبط (قابل‌اجرا با `check-module-boundaries`): UI مجاز است فقط `@/shared/**` (و lib کلاینت) را import کند — هسته مشترک راه حقوقیِ import سمت کلاینت است، نه استثنا روی قاعده «منطق دامنه در UI ممنوع».
+- قرارداد نوع snapshot v2 هم در `shared/contracts/snapshot.ts` نشست (شکل قرارداد در shared، معناشناسی/اعتبارسنجی مالک ماژول config — ADR-011).
+
+### ۱۰٫۳. مرزها و یال‌های بین‌ماژولی (R1-4 در فاز ۲)
+
+- `bun run check:boundaries` (۱۶۶ فایل): **۰ نقض · ۰ چرخه** — شامل قاعده هسته مشترک (UI فقط `@/shared/**`) — شاهد: `docs/evidence/phase2-tests/boundaries.txt`.
+- **یال‌های جدید فاز ۲ (یک‌طرفه):** `projects→activities` (نمونه‌سازی قالب عنصر هنگام ایجاد پروژه) · `config→audit` · `params→config` · `params→audit` · `activities→audit`.
+- مجوز عملیات export/import در **ریشه ترکیب API** ترکیب می‌شود (route، `authorizeProjectAction` از application پروژه‌ها و `exportConfig/importConfig` از application پیکربندی را کنار هم می‌خواند) — یال مستقیم `projects→config` لازم نشد و گراف بدون چرخه ماند.
+- گراف کامل: `identity→audit · projects→identity · projects→profiles · projects→activities · projects→audit · config→audit · params→config · params→audit · activities→audit`.
+
+### ۱۰٫۴. تصمیم‌های ثبت‌شده فاز ۲
+
+| موضوع | تصمیم |
+|---|---|
+| snapshot پیکربندی | v2 typed (`shared/contracts/snapshot.ts`)؛ v1 در حافظه به v2 خوانده می‌شود (نمایندگی)؛ نوشتن = همیشه نسخه جدید append-only — ADR-011 |
+| عملیات کارگاه | ۱۴ عملیات تغییر (خانواده/پارامتر/فرمول/مدل فعالیت) در domain config؛ هر فراخوانی API = یک ConfigVersion جدید با semver و دلیل |
+| مقدار جدای از تعریف | جدول `ParameterValue` با defVersion pinning؛ ثبت مجدد مقدار = pin به نسخه جدید (ADR-010) |
+| نتایج فرمول | `CalculationResult` append-only؛ UI آخرین نتیجه هر فرمول را نمایش می‌دهد (A7) |
+| تراکنش‌های تعاملی | داخل callback تابع `$transaction` فقط با کلاینت `tx` کار می‌شود — کلاینت سراسری `db` داخل callback روی SQLite قفل می‌دهد (درس عملی — ADR-011 بند تصمیم ۴) |
+| نماد نتیجه فرمول | `f.camelCase` برای کلید سفارشی؛ ارجاع در عبارت با `<کلید>.result` و خط تیره→زیرخط (`TS_011.result`) — چون گرامر DSL خط تیره ندارد |
+| پروفایل‌های v2 | ۷ پروفایل با semver 1.1.0 (کتابخانه ۲۲ فرمول سیستمی اجرایی + مدل فعالیت) — seed |
+| ارزیابی شرط فرم سمت کاربر | همان موتور خالص `shared/formula` در UI (بدون منطق دامنه موازی) — ADR-011 |

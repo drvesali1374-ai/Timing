@@ -10,8 +10,8 @@ import type {
   ProfileSummaryDto,
 } from "@/shared/contracts/api";
 import type { ProfileComponentsInput } from "@/shared/validation/project";
-import type { ProfileSnapshot, ProfileDefinition } from "../domain/profile";
-import { instantiateSnapshot } from "../domain/profile";
+import type { ProfileSnapshot, ProfileDefinition, V2Content } from "../domain/profile";
+import { buildV2Content, instantiateSnapshot } from "../domain/profile";
 import { PROFILE_DEFINITIONS } from "../definitions";
 
 const log = getLogger("profiles");
@@ -37,6 +37,7 @@ export interface ProfileTemplateRow {
 /** همگام‌سازی idempotent تعریف‌های کد → ProfileTemplate (بر اساس id). */
 export async function ensureProfileTemplatesSeeded(): Promise<number> {
   for (const def of PROFILE_DEFINITIONS) {
+    const contentV2 = buildV2Content(def);
     await db.profileTemplate.upsert({
       where: { id: def.id },
       update: {
@@ -51,7 +52,7 @@ export async function ensureProfileTemplatesSeeded(): Promise<number> {
         assumptionsJson: JSON.stringify(def.assumptions),
         limitationsJson: JSON.stringify(def.limitations),
         licenseNote: def.licenseNote,
-        contentJson: JSON.stringify(def.content),
+        contentJson: JSON.stringify(contentV2),
         isDefault: def.isDefault ?? false,
         isActive: true,
       },
@@ -68,7 +69,7 @@ export async function ensureProfileTemplatesSeeded(): Promise<number> {
         assumptionsJson: JSON.stringify(def.assumptions),
         limitationsJson: JSON.stringify(def.limitations),
         licenseNote: def.licenseNote,
-        contentJson: JSON.stringify(def.content),
+        contentJson: JSON.stringify(contentV2),
         isDefault: def.isDefault ?? false,
         isActive: true,
       },
@@ -165,17 +166,25 @@ export async function getProfileTemplateNames(ids: string[]): Promise<Map<string
   return new Map(rows.map((r) => [r.id, r.nameFa]));
 }
 
-/** ساخت snapshot مستقل از الگو بر اساس اجزای انتخابی کاربر (پل به ماژول پروژه‌ها). */
+/** ساخت snapshot مستقل از الگو بر اساس اجزای انتخابی کاربر (پل به ماژول پروژه‌ها) — محتوای الگو v2 است. */
 export function instantiateProfileSnapshot(
   template: ProfileTemplateRow,
   components: ProfileComponentsInput,
 ): ProfileSnapshot {
-  const def = {
-    id: template.id,
-    semver: template.semver,
-    content: parseContent(template) as ProfileDefinition["content"],
-  };
-  return instantiateSnapshot(def, {
+  const parsed = parseContent(template);
+  if (parsed?.snapshotVersion === "2") {
+    return instantiateSnapshot(
+      { id: template.id, semver: template.semver, content: parsed as unknown as V2Content },
+      {
+        excludedFamilies: components.excludedFamilies ?? [],
+        parameterOverrides: components.parameterOverrides ?? [],
+      },
+    );
+  }
+  // الگوهای قدیمی فاز ۱ (v1) — حالت انتقال: ارتقای نمایندگی به v2
+  const legacyContent = parsed as unknown as ProfileDefinition["content"];
+  const v2 = buildV2Content({ content: legacyContent });
+  return instantiateSnapshot({ id: template.id, semver: template.semver, content: v2 }, {
     excludedFamilies: components.excludedFamilies ?? [],
     parameterOverrides: components.parameterOverrides ?? [],
   });

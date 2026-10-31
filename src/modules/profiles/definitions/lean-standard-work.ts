@@ -11,7 +11,7 @@ import type { ProfileDefinition } from "@/modules/profiles/domain/profile";
 
 export const leanStandardWork = {
   id: "profile.lean-standard-work",
-  semver: "1.0.0",
+  semver: "1.1.0",
   nameFa: "کار استاندارد و Yamazumi",
   description:
     "پروفایل کار استاندارد Lean: زمان‌های نماینده/استاندارد عناصر با تاکت (تقاضا ÷ زمان خالص در دسترس) مقایسه می‌شوند و توازن ایستگاه‌ها/اپراتورها با نمودار ستونی Yamazumi، خط تاکت و شاخص‌های توازن گزارش می‌شود. زمان‌ها یا از مطالعه زمان پیشین تأمین می‌شوند یا مستقیم وارد می‌شوند.",
@@ -187,7 +187,7 @@ export const leanStandardWork = {
       {
         id: "TS-013",
         nameFa: "تاکت‌تایم",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "project",
         status: "active",
         descriptionFa:
@@ -196,7 +196,7 @@ export const leanStandardWork = {
       {
         id: "LB-001",
         nameFa: "بار ایستگاه",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "balanceScenario",
         status: "active",
         descriptionFa: "بار ایستگاه: S_k = جمع زمان عناصر تخصیص‌یافته به ایستگاه k — تعریف محصول.",
@@ -204,7 +204,7 @@ export const leanStandardWork = {
       {
         id: "LB-010",
         nameFa: "راندمان بالانس",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "balanceScenario",
         status: "active",
         descriptionFa:
@@ -213,7 +213,7 @@ export const leanStandardWork = {
       {
         id: "LB-011",
         nameFa: "تأخیر بالانس",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "balanceScenario",
         status: "active",
         descriptionFa: "تأخیر بالانس: d = 1 − E — روش رایج.",
@@ -221,7 +221,7 @@ export const leanStandardWork = {
       {
         id: "LB-020",
         nameFa: "حداقل نظری ایستگاه‌ها",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "balanceScenario",
         status: "active",
         descriptionFa:
@@ -230,7 +230,7 @@ export const leanStandardWork = {
       {
         id: "LB-021",
         nameFa: "زمان بیکاری ایستگاه",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "balanceScenario",
         status: "active",
         descriptionFa: "زمان بیکاری ایستگاه روی تاکت: I_k = TT − S_k — تعریف محصول.",
@@ -238,7 +238,7 @@ export const leanStandardWork = {
       {
         id: "LB-022",
         nameFa: "گلوگاه",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "balanceScenario",
         status: "active",
         descriptionFa: "گلوگاه: ایستگاه با بیشترین بار (k* = argmax S_k) — تعریف محصول.",
@@ -246,7 +246,7 @@ export const leanStandardWork = {
       {
         id: "LB-030",
         nameFa: "نیروی نظری",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "balanceScenario",
         status: "active",
         descriptionFa:

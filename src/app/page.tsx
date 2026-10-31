@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * ریشه برنامه (SPA تک‌صفحه‌ای فاز ۱) — مسیرها به‌صورت نما:
- *  ورود/ثبت‌نام → داشبورد پروژه‌ها → ایجاد پروژه → جزئیات پروژه.
+ * ریشه برنامه (SPA تک‌صفحه‌ای) — مسیرها به‌صورت نما:
+ *  ورود/ثبت‌نام → داشبورد پروژه‌ها → ایجاد پروژه → جزئیات پروژه → کارگاه پیکربندی.
  * ناوبری داخلی با state (محیط پیش‌نمایش تک-مسیر).
  */
 import { useCallback, useState } from "react";
@@ -12,6 +12,7 @@ import { AppShell, type ViewName } from "@/components/app/app-shell";
 import { DashboardView } from "@/components/app/dashboard-view";
 import { NewProjectView } from "@/components/app/new-project-view";
 import { ProjectDetailView } from "@/components/app/project-detail-view";
+import { ConfigWorkshopView } from "@/components/app/config/config-workshop-view";
 import { useSession } from "@/hooks/use-api";
 import { LoadingBlock } from "@/components/app/ui-bits";
 
@@ -27,7 +28,7 @@ function AppRoot() {
 
   const navigate = useCallback((view: ViewName, projectId?: string) => {
     setRoute({ name: view, projectId });
-    if (view !== "project") setProjectTitle(null);
+    if (view !== "project" && view !== "project-config") setProjectTitle(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }, []);
 
@@ -59,7 +60,18 @@ function AppRoot() {
           onCancel={() => navigate("dashboard")}
         />
       ) : route.name === "project" && route.projectId ? (
-        <ProjectDetailView projectId={route.projectId} onBack={() => navigate("dashboard")} onTitle={setProjectTitle} />
+        <ProjectDetailView
+          projectId={route.projectId}
+          onBack={() => navigate("dashboard")}
+          onTitle={setProjectTitle}
+          onOpenConfig={() => navigate("project-config", route.projectId)}
+        />
+      ) : route.name === "project-config" && route.projectId ? (
+        <ConfigWorkshopView
+          projectId={route.projectId}
+          onBack={() => navigate("project", route.projectId)}
+          onTitle={setProjectTitle}
+        />
       ) : null}
     </AppShell>
   );

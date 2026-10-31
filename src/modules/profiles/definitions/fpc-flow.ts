@@ -13,7 +13,7 @@ import type { ProfileDefinition } from "@/modules/profiles/domain/profile";
 
 export const fpcFlow = {
   id: "profile.fpc-flow",
-  semver: "1.0.0",
+  semver: "1.1.0",
   nameFa: "تحلیل جریان فرایند (FPC)",
   description:
     "پروفایل تحلیل جریان فرایند با نمادهای پنج‌گانه (عملیات، حمل، بازرسی، تأخیر، انبارش) برای موضوع مطالعه ماده، فرد یا تجهیزات. خلاصه خودکار تعداد هر نوع نماد و مجموع مسافت/زمان تولید می‌شود و روش فعلی با نسخه پیشنهادی (دو نسخه نمودار) مقایسه می‌گردد.",

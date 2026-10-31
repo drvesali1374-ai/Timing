@@ -11,7 +11,7 @@ import type { ProfileDefinition } from "@/modules/profiles/domain/profile";
 
 export const serviceOperations = {
   id: "profile.service-operations",
-  semver: "1.0.0",
+  semver: "1.1.0",
   nameFa: "عملیات خدماتی و اداری (غیرتولیدی)",
   description:
     "همان هسته مطالعه زمان برای واحدهای غیرتولیدی با واحد شمارش خدمت (پرونده/مشتری/درخواست/…): ثبت مشاهدات، تجمیع و شاخص‌های کیفیت نمونه. فرمول‌های تولیدی (مجاز و تاکت) فقط با فعال نگه‌داشتن خانواده‌های مربوط اعمال می‌شوند و قابل غیرفعال‌سازی‌اند.",
@@ -326,7 +326,7 @@ export const serviceOperations = {
       {
         id: "TS-001",
         nameFa: "میانگین عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "میانگین حسابی مشاهدات معتبر وظیفه: x̄ = Σxᵢ ÷ n — ریاضی محض.",
@@ -334,7 +334,7 @@ export const serviceOperations = {
       {
         id: "TS-002",
         nameFa: "میانه عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "مقدار میانه مشاهدات مرتب‌شده وظیفه؛ نیازمند حداقل یک مشاهده معتبر — ریاضی محض.",
@@ -342,7 +342,7 @@ export const serviceOperations = {
       {
         id: "TS-010",
         nameFa: "زمان نرمال عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -351,7 +351,7 @@ export const serviceOperations = {
       {
         id: "TS-011",
         nameFa: "زمان استاندارد (مجاز on-normal)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -360,7 +360,7 @@ export const serviceOperations = {
       {
         id: "TS-012",
         nameFa: "زمان استاندارد (مجاز on-standard)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -369,7 +369,7 @@ export const serviceOperations = {
       {
         id: "TS-013",
         nameFa: "تاکت‌تایم",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "project",
         status: "active",
         descriptionFa:
@@ -378,7 +378,7 @@ export const serviceOperations = {
       {
         id: "ST-001",
         nameFa: "انحراف معیار نمونه",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "انحراف معیار نمونه با مخرج n−1 — ریاضی محض.",
@@ -386,7 +386,7 @@ export const serviceOperations = {
       {
         id: "ST-002",
         nameFa: "ضریب تغییرات",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "ضریب تغییرات: CV = s ÷ x̄؛ نسبت با نمایش درصدی — ریاضی محض.",
@@ -394,7 +394,7 @@ export const serviceOperations = {
       {
         id: "ST-010",
         nameFa: "کفایت نمونه (تقریب نرمال)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:

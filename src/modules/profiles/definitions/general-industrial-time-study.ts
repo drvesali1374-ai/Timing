@@ -10,7 +10,7 @@ import type { ProfileDefinition } from "@/modules/profiles/domain/profile";
 
 export const generalIndustrialTimeStudy = {
   id: "profile.general-industrial-time-study",
-  semver: "1.0.0",
+  semver: "1.1.0",
   nameFa: "مطالعه عمومی زمان صنعتی",
   description:
     "پروفایل پیش‌فرض برای مطالعه زمان چرخه‌ای کارهای تولیدی و غیرتولیدی با کرنومتر (دستی یا دیجیتال): تفکیک عناصر، ثبت مشاهدات، ارزیابی عملکرد اختیاری و تعیین زمان نرمال و استاندارد بر پایه مجازهای توافق‌شده سازمان. زنجیره تحلیل کامل «مشاهده‌شده ← نماینده ← نرمال ← استاندارد ← استاندارد چرخه» به‌همراه شاخص‌های کیفیت نمونه از ابتدای ایجاد پروژه فعال است.",
@@ -259,7 +259,7 @@ export const generalIndustrialTimeStudy = {
       {
         id: "TS-001",
         nameFa: "میانگین عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "میانگین حسابی مشاهدات معتبر عنصر: x̄ = Σxᵢ ÷ n — ریاضی محض.",
@@ -267,7 +267,7 @@ export const generalIndustrialTimeStudy = {
       {
         id: "TS-002",
         nameFa: "میانه عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "مقدار میانه مشاهدات مرتب‌شده عنصر؛ نیازمند حداقل یک مشاهده معتبر — ریاضی محض.",
@@ -275,7 +275,7 @@ export const generalIndustrialTimeStudy = {
       {
         id: "TS-010",
         nameFa: "زمان نرمال عنصر",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -284,7 +284,7 @@ export const generalIndustrialTimeStudy = {
       {
         id: "TS-011",
         nameFa: "زمان استاندارد (مجاز on-normal)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -293,7 +293,7 @@ export const generalIndustrialTimeStudy = {
       {
         id: "TS-012",
         nameFa: "زمان استاندارد (مجاز on-standard)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:
@@ -302,7 +302,7 @@ export const generalIndustrialTimeStudy = {
       {
         id: "ST-001",
         nameFa: "انحراف معیار نمونه",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "انحراف معیار نمونه با مخرج n−1 — ریاضی محض.",
@@ -310,7 +310,7 @@ export const generalIndustrialTimeStudy = {
       {
         id: "ST-002",
         nameFa: "ضریب تغییرات",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa: "ضریب تغییرات: CV = s ÷ x̄؛ نسبت با نمایش درصدی — ریاضی محض.",
@@ -318,7 +318,7 @@ export const generalIndustrialTimeStudy = {
       {
         id: "ST-010",
         nameFa: "کفایت نمونه (تقریب نرمال)",
-        semver: "1.0.0",
+        semver: "1.1.0",
         scopeLevel: "element",
         status: "active",
         descriptionFa:

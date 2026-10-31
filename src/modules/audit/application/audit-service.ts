@@ -34,6 +34,10 @@ export const AUDIT_ACTIONS = {
   diagramRevisionSaved: "diagram.revision-saved",
   diagramConfirmed: "diagram.confirmed",
   diagramArchived: "diagram.archived",
+  // ── فاز ۴ ──
+  sessionCreated: "timing.session-created",
+  sessionFinalized: "timing.session-finalized",
+  eventCorrected: "timing.event-corrected",
 } as const;
 
 export interface AuditInput {

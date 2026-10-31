@@ -74,6 +74,8 @@ interface DiagramValidationReport {
 
 ## ۳. موتور کرنومتر (فاز ۴)
 
+> **پیاده‌سازی:** فاز ۴ — `src/shared/timing` (سازگار با این قرارداد؛ رویداد `note` اضافه شد؛ `cycleStart`/`element`/`lap` در پیاده‌سازی) | ✅
+
 ### ورودی/رابط (خالص، بدون DOM)
 ```ts
 interface Clock { now(): { perfMs: number; wall: Date } }   // تزریقی برای آزمون

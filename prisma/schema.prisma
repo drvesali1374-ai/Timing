@@ -70,6 +70,7 @@ model Project {
   calculationResults CalculationResult[]
   activities         Activity[]
   diagrams           Diagram[]
+  timingSessions     TimingSession[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -337,4 +338,139 @@ model Activity {
 
   @@unique([projectId, stableKey])
   @@index([projectId, archived])
+}
+
+// ─────────────────── فاز ۴: کرنومتر و مشاهدات (B8 — ADR-004 · DATA_DICTIONARY §۲٫۱۱–۲٫۱۴) ───────────────────
+
+// جلسه زمان‌سنجی — داده پروژه (نه پیکربندی). اسنپ‌شات عناصر برای پایداری تاریخی رکورد.
+model TimingSession {
+  id        String  @id
+  projectId String
+
+  // روش ثبت: continuous | snapback | laps (پیش‌فرض از پروفایل پروژه؛ قابل انتخاب هنگام ایجاد)
+  method String
+
+  // running | paused | stopped | finalized — بازتاب آخرین رویداد وضعیت (مشتق‌پذیر از رویدادها)
+  status String @default("running")
+
+  // ناظر (نام/کد ثبت‌شده هنگام ایجاد — پیش‌فرض نام کاربر)
+  observer String
+
+  // اسنپ‌شات عناصر جلسه: [{key, name, activityStableKey?, order}]
+  // رکورد اندازه‌گیری باید تاریخی پایدار بماند؛ ارجاع فعالیت + نام لحظه ثبت (بدون کپی داده فعالیت)
+  elementsJson String
+
+  // حرکت میان عناصر: manual | auto (تنظیم کاربر)
+  elementAdvanceMode String @default("manual")
+
+  // تلورانس کنترل جمع چرخه TS-005 (درصد) — اسنپ‌شات از پیکربندی لحظه ایجاد (پیش‌فرض ۵)
+  tolerancePct Float @default(5)
+
+  // منبع عناصر: activities | diagram | manual (ردیابی انتخاب کاربر)
+  elementSource  String  @default("activities")
+  diagramRefId   String?
+  diagramRefNote String?
+
+  // پرچم‌های یکپارچگی تجمیعی (از رویدادها — ADR-004)
+  integrityFlagsJson String?
+
+  notes String?
+
+  startedAtWall DateTime?
+  endedAtWall   DateTime?
+
+  // فراداده دستگاه ثبت‌کننده (userAgent خلاصه‌شده — بدون داده شخصی اضافی)
+  deviceMetaJson String?
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  events   TimingEvent[]
+  cycles   TimingCycle[]
+
+  @@index([projectId, status])
+  @@index([projectId, createdAt])
+}
+
+// رویداد کرنومتر — append-only؛ هرگز ویرایش/حذف فیزیکی نمی‌شود (ADR-004).
+// اصلاح = رویداد correction با correctionOf. clientEventId idempotent → retry/کلیک تکراری دوباره‌شماری نمی‌کند.
+model TimingEvent {
+  id String @id // UUIDv7 سرور
+
+  sessionId String
+  session   TimingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // شناسه idempotent کاربر (UUIDv7) — یکتا در کل جدول
+  clientEventId String @unique
+
+  // ترتیب دقیق درون جلسه — اکیداً صعودی (یکتا در جلسه)
+  seq Int
+
+  // start | cycleStart | reading | element | lap | pause | resume | stop | note | correction | finalize
+  type        String
+  elementId   String?
+  cycleNo     Int      @default(0)
+
+  // زمان سپری‌شده فعال یکنواخت (ms) — «قرائت کرنومتر» (ADR-004)
+  elapsedActiveMs Float
+  // بازه از مرز قبلی (snapback/split)
+  splitMs Float?
+
+  // زمان دیواری — ممیزی/گزارش انسانی (جدا از monotonic)
+  wallClock DateTime
+
+  note               String?
+  interruptionReason String?
+
+  // فقط correction: ارجاع هدف + مقدار جدید + دلیل
+  correctionOf     String?
+  correctedValueMs Float?
+  correctionReason String?
+
+  // پرچم‌های یکپارچگی لحظه ثبت (JSON array)
+  integrityJson String?
+
+  // منبع دریافت: normal | offline-synced (از صف آفلاین رسیده)
+  origin     String   @default("normal")
+  receivedBy String
+  receivedAt DateTime @default(now())
+
+  @@unique([sessionId, seq])
+  @@unique([sessionId, clientEventId])
+  @@index([sessionId, seq])
+  @@index([sessionId, type])
+}
+
+// چرخه مشتق‌شده — در نهایی‌سازی جلسه ذخیره می‌شود (ثبات ورودی تحلیل فاز ۵).
+// پیش از نهایی‌سازی، چرخه‌ها به‌صورت زنده از رویدادها با همان هسته مشترک مشتق می‌شوند.
+model TimingCycle {
+  id        String @id
+  sessionId String
+  session   TimingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  seq Int // ۱-مبنا
+
+  // valid | suspect | incomplete | recovered (مشتق — TS-005/پرچم‌ها)
+  status String
+
+  startedAtEventId String
+  endedAtEventId   String?
+
+  startedElapsedMs Float
+  endedElapsedMs   Float?
+  cycleTimeMs      Float?
+  elementsSumMs    Float
+  deviationPct     Float?
+
+  // مشاهدات عناصر: [{elementKey, elementName, durationMs, readingEventId, readingMode, flags, corrected}]
+  elementsJson      String
+  interruptionsJson String
+  flagsJson         String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, seq])
+  @@index([sessionId, status])
 }

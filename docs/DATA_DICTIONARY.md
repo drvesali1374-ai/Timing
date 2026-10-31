@@ -1,6 +1,6 @@
 # فرهنگ داده و مدل مفهومی (DATA DICTIONARY)
 
-**نسخه:** ۱٫۱ (پیاده‌سازی فاز ۲ — بند ۷) — **تاریخ آخرین به‌روزرسانی:** ۳۱ اکتبر ۲۰۲۶
+**نسخه:** ۱٫۲ (پیاده‌سازی فاز ۴ — بندهای ۲٫۱۱–۲٫۱۴ به‌روزشده + بند ۹) — **تاریخ آخرین به‌روزرسانی:** ۳۱ اکتبر ۲۰۲۶
 **هدف:** تعریف موجودیت‌ها، روابط، ناوردایی‌ها (invariants) و مرجع حقیقت هر داده؛ مبنای پیاده‌سازی Prisma در فاز ۱.
 **قاعده:** تعریف پارامتر از مقدار پارامتر جداست؛ داده خام از داده مشتق‌شده جداست؛ هر نتیجه به نسخه روش قابل ارجاع است.
 
@@ -26,13 +26,13 @@ erDiagram
     DiagramNode ||--o{ DiagramEdge : "from/to"
     Project ||--o{ TimingSession : runs
     TimingSession ||--o{ TimingEvent : records
-    TimingSession ||--o{ Cycle : produces
-    Cycle ||--o{ Observation : contains
-    Observation }o--|| Activity : "element measured"
-    Observation }o--|| ParameterValue : "context values"
+    TimingSession ||--o{ TimingCycle : "produces (stored at finalize)"
+    TimingCycle ||--o{ ElementObservation : "contains (elementsJson)"
+    ElementObservation }o--|| Activity : "element measured (ref)"
+    ElementObservation }o--|| ParameterValue : "context values"
     ConfigVersion ||--o{ Formula : versions
     Formula ||--o{ CalculationResult : evaluates
-    Observation }o--o{ CalculationResult : "input of"
+    ElementObservation }o--o{ CalculationResult : "input of"
     Project ||--o{ BalanceScenario : analyzes
     BalanceScenario }o--o{ Activity : allocates
     Project ||--o{ Report : generates
@@ -101,18 +101,20 @@ Edge: `id`, `diagramId`, `fromNodeId`, `toNodeId`, `waypointsJson`, `directed=tr
 **اعتبارسنجی:** گام بدون اتصال، اتصال نامعتبر، شناسه تکراری، ترتیب ناسازگار (فاز ۳).
 
 ### ۲.۱۱. TimingSession — جلسه زمان‌سنجی
-`id`, `projectId`, `method` (`continuous,snapback,laps`), `status` (`running,paused,stopped,recovered`), `observer`, `startedAtWall/endedAtWall` (زمان دیواری)، `perfOriginRef` (مرجع `performance.now()` شروع)، `elementAdvanceMode` (`manual,auto`), `deviceMeta`, `integrityFlags[]` (`visibilityLoss,sleepSuspected,clockRecovery,…`).
+`id`, `projectId`, `method` (`continuous,snapback,laps`), `status` (`running,paused,stopped,finalized`), `observer` (نام ناظر — متن آزاد), `elementsJson` (**اسنپ‌شات عناصر جلسه**: `{key, name, activityStableKey?, order}[]` — هنگام ایجاد ثابت می‌شود؛ پایداری تاریخی رکورد), `elementAdvanceMode` (`manual,auto`), `tolerancePct` (تلورانس TS-005 — فقط روش پیوسته), `elementSource` (`activities|diagram|manual`) + `diagramRefId/diagramRefNote` (ارجاع منبع عناصر در صورت نمودار), `integrityFlagsJson` (پرچم‌های تجمیعی یکپارچگی), `notes`, `startedAtWall/endedAtWall` (زمان دیواری), `deviceMetaJson`, `createdBy`, `createdAt/updatedAt`.
+**ناوردایی:** عناصر جلسه پس از ایجاد بازنویسی نمی‌شوند؛ پرچم‌های یکپارچگی فقط انباشته می‌شوند (حذف ندارند).
 
 ### ۲.۱۲. TimingEvent — رویداد (append-only)
-`id` (UUIDv7 + `clientEventId` idempotent), `sessionId`, `type` (enum: `start,reading,pause,resume,stop,elementAdvance,correction,finalize`), `elementId?`, `cycleNo`, `perfElapsedMs` (monotonic درون جلسه), `wallClock` (ISO), `note`, `interruptionReason?`, `correctionOf?` (اصلاح به رویداد قبول‌شده، بدون حذف).
-**ناوردایی:** رویدادها هرگز فیزیکی حذف/ویرایش نمی‌شوند؛ اصلاح = رویداد جدید با ارجاع (ADR-004).
+`id` (UUIDv7 سرور) + `clientEventId` (UUIDv7 کلاینت — **idempotent، یکتا**), `sessionId`, `seq` (ترتیب اکیداً صعودی، یکتا در جلسه), `type` (enum: `start,cycleStart,reading,element,lap,pause,resume,stop,note,correction,finalize`), `elementId?`, `cycleNo`, `elapsedActiveMs` (**زمان فعال یکنواخت** — «قرائت کرنومتر»؛ مکث‌ها جزو آن نیستند), `splitMs?` (بازه از مرز قبلی — snapback/نمایش split), `wallClock` (ISO — صرفاً ممیزی/گزارش), `note`, `interruptionReason?` (علت وقفه در pause), `correctionOf?/correctedValueMs?/correctionReason?` (اصلاح به رویداد قبلی + **دلیل الزامی**، بدون حذف), `integrityJson` (پرچم‌های لحظه ثبت همین رویداد), `origin` (`normal|offline-synced`), `receivedBy/receivedAt`.
+**ناوردایی:** رویدادها هرگز فیزیکی حذف/ویرایش نمی‌شوند؛ اصلاح = رویداد جدید با ارجاع (ADR-004). یکتایی: `clientEventId` (جهانی) و `(sessionId, seq)`.
 
-### ۲.۱۳. Cycle — چرخه
-`id`, `sessionId`, `seq`, `status` (`valid,incomplete,recovered,suspect`), `startedAtEventId/endedAtEventId`.
+### ۲.۱۳. TimingCycle — چرخه (مشتق؛ ذخیره فقط در نهایی‌سازی)
+`id`, `sessionId`, `seq` (یکتا در جلسه), `status` (`valid,suspect,incomplete,recovered`), `startedAtEventId/endedAtEventId`, `startedElapsedMs/endedElapsedMs`, `cycleTimeMs` (زمان چرخه مشاهده‌شده — TS-004), `elementsSumMs`, `deviationPct` (TS-005 — فقط پیوسته؛ در snapback مقدار ندارد), `elementsJson` (مشاهدات عنصر — بند ۲.۱۴), `interruptionsJson` (وقفه‌های pause→resume), `flagsJson`.
+**قاعده:** ردیف‌ها **فقط در نهایی‌سازی جلسه** نوشته می‌شوند (پیش از آن «مشتق زنده» از رویدادها هستند)؛ منبع همیشه TimingEvent است و چرخه ذخیره‌شده projection بازتولیدپذیر است (ADR-013).
 
-### ۲.۱۴. Observation — مشاهده
-`id`, `cycleId`, `activityId`, `observedMs` (زمان مشاهده‌شده)، `readingMode` (`continuous,snapback,lap`), `ratingFactor?`, `validity` (`valid,flagged,rejected+reason`), `flags[]` (`outlierSuspect,recovered`), `note`.
-**قاعده:** علامت‌گذاری پرت ≠ حذف؛ حذف از محاسبه فقط با قاعده انتخابی و ثبت علت.
+### ۲.۱۴. ElementObservation — مشاهده عنصر (درون `elementsJson` چرخه)
+`elementKey/elementName` (اسنپ‌شات جلسه), `durationMs` (TS-003: تفاضل قرائت‌ها در پیوسته؛ مقدار مستقیم در snapback), `readingEventId` (رویداد قرائت مبنای ردیابی), `readingMode` (`continuous,snapback,laps`), `flags[]` (پرچم‌های یکپارچگی), `corrected` (رویداد correction روی قرائت مبنا اثر کرده).
+**قاعده:** علامت‌گذاری پرت ≠ حذف؛ مشاهدات فقط همراه چرخه در نهایی‌سازی ذخیره می‌شوند. فیلدهای تحلیلی مفهومی (`ratingFactor`, `validity` با علت رد) در فاز ۵ به مشتق تحلیل اضافه می‌شوند (تصمیم باز §۶).
 
 ### ۲.۱۵. Formula — فرمول
 `id`, `configVersionId`, `stableKey`, `semver`, `nameFa`, `exprAst` (AST سریال‌شده DSL)، `scopeLevel` (`observation,element,cycle,cycleSet,group,project,balanceScenario`), `inputContract` (نام‌ها/انواع/واحدها)، `outputUnit`, `status` (`draft,active,deprecated`), `sourceRef`, `assumptions`.
@@ -135,7 +137,8 @@ User: `id, name, email, authProvider`; Role: `owner,editor,recorder,viewer,admin
 
 | داده | مرجع حقیقت | مشتق/کش |
 |---|---|---|
-| رویدادها و مشاهدات خام | جدول TimingEvent/Observation (سرور پس از همگام‌سازی؛ IndexedDB = بافر آفلاین) | فقط کش |
+| رویدادهای خام زمان‌سنجی | **TimingEvent** (سرور — append-only/idempotent با `clientEventId`)؛ در حین آفلاین: ژورنال + صف IndexedDB «timing-chrono» صرفاً **بافر** تا همگام‌سازی (ADR-013) | مشتق زنده چرخه/عنصر/وقفه از هسته مشترک `src/shared/timing` (کلاینت ∪ سرور) |
+| چرخه‌ها و مشاهدات مشتق | **TimingCycle** — فقط ردیف‌های نوشته‌شده در نهایی‌سازی؛ پیش از آن همیشه مشتق زنده از TimingEvent (ADR-013) | — |
 | تعریف پارامتر/فرمول/تنظیمات | **ConfigVersion (append-only — snapshot v2** با خانواده/پارامتر B2 کامل/فرمول با عبارت اجرایی — بند ۷٫۲) | — |
 | مقادیر پارامتر | **ParameterValue** (جدول اجراشده فاز ۲ — مقدار جدا از تعریف، گره‌خورده به defVersion؛ بند ۷٫۱) | بافر آفلاین (فاز ۳/۴) |
 | زمان‌های نماینده/نرمال/استاندارد و نتایج فرمول | **CalculationResult** (جدول اجراشده فاز ۲ — append-only با نسخه فرمول/پیکربندی/trace؛ بند ۷٫۱) | — |
@@ -163,6 +166,7 @@ User: `id, name, email, authProvider`; Role: `owner,editor,recorder,viewer,admin
 | تفکیک فیزیکی جدول‌ها در SQLite به‌ازای موجودیت | نهایی در فاز ۱ همراه اولین Prisma schema اجرایی |
 | فرمت دقیق `traceJson` | ✅ قفل شد در فاز ۲: گام‌های `{nodeId, op, value, unit}` با سقف ۲۵۶ گام (بند ۷٫۱) |
 | ساختار `solutionJson` بالانس | در فاز ۶ همراه الگوریتم‌ها |
+| فیلدهای تحلیلی مشاهده (`ratingFactor`, `validity` با علت رد) | فاز ۵ — روی TimingCycle/ElementObservation در مشتق تحلیل |
 
 ## ۷. فاز ۲ — پیاده‌سازی (۳۱ اکتبر ۲۰۲۶)
 
@@ -263,3 +267,72 @@ User: `id, name, email, authProvider`; Role: `owner,editor,recorder,viewer,admin
 ### ۸٫۴. داده سمت کاربر (خارج از DB سرور)
 
 - `IndexedDB «timing-diagrams»` — فروشگاه‌های `drafts` (پیش‌نویس نمودار فعال برای بازیابی پس از reload) و `queue` (صف ذخیره آفلاین با کلید `clientOpId` idempotent) — ADR-006/012.
+
+---
+
+## ۹. فاز ۴ — پیاده‌سازی (۳۱ اکتبر ۲۰۲۶)
+
+> سه جدول با Prisma Migrate (نه db push) در مهاجرت `20261031140432_phase4_timing_sessions_events_cycles` ساخته شد. بندهای ۲.۱۱–۲.۱۴ بالا مطابق اجرا به‌روز شدند؛ این بند جزئیات اجرا، داده سمت کاربر و ممیزی را ثبت می‌کند. معناشناسی/اعتبارسنجی در `src/modules/timing/domain`، قواعد مشتق در هسته مشترک `src/shared/timing/` (ADR-004/013).
+
+### ۹٫۱. جدول‌های اجراشده
+
+#### TimingSession — جلسه زمان‌سنجی (بند ۲.۱۱ اجرا شد)
+
+| فیلد | نوع/پیش‌فرض | توضیح |
+|---|---|---|
+| `id` | UUIDv7 | شناسه پایدار |
+| `projectId` | ref → Project | جداسازی پروژه (Cascade) — ایندکس `(projectId,status)` و `(projectId,createdAt)` |
+| `method` | متن | `continuous` \| `snapback` \| `laps` (TimingMethod — هسته مشترک) |
+| `status` | متن، پیش‌فرض `"running"` | `running` \| `paused` \| `stopped` \| `finalized` (قفل پس از نهایی‌سازی) |
+| `observer` | متن | نام ناظر (متن آزاد) |
+| `elementsJson` | متن (JSON) | اسنپ‌شات عناصر جلسه: `{key, name, activityStableKey?, order}[]` — هنگام ایجاد ثابت (پایداری تاریخی) |
+| `elementAdvanceMode` | متن، پیش‌فرض `"manual"` | `manual` (انتخاب عنصر در هر ثبت) \| `auto` (پیش‌روی خودکار به ترتیب) |
+| `tolerancePct` | REAL، پیش‌فرض `5` | تلورانس TS-005 — فقط روش پیوسته |
+| `elementSource` | متن، پیش‌فرض `"activities"` | `activities` \| `diagram` \| `manual` + `diagramRefId/diagramRefNote?` (ارجاع، نه کپی) |
+| `integrityFlagsJson` | متن؟ (JSON) | پرچم‌های تجمیعی یکپارچگی جلسه |
+| `notes` / `startedAtWall` / `endedAtWall` / `deviceMetaJson` | — | یادداشت / زمان دیواری شروع و پایان / فراداده دستگاه |
+| `createdBy` / `createdAt` / `updatedAt` | — | — |
+
+#### TimingEvent — رویداد (append-only — بند ۲.۱۲ اجرا شد)
+
+| فیلد | نوع/پیش‌فرض | توضیح |
+|---|---|---|
+| `id` | UUIDv7 (سرور) | — |
+| `sessionId` | ref → TimingSession | ایندکس `(sessionId,seq)` و `(sessionId,type)` |
+| `clientEventId` | متن | UUIDv7 تولید کلاینت (RFC 9562) — **یکتای جهانی = idempotency** (هم‌زمان یکتا در جلسه) |
+| `seq` | int | ترتیب درون جلسه — **یکتا `(sessionId,seq)`** |
+| `type` | متن | `start` \| `cycleStart` \| `reading` \| `element` \| `lap` \| `pause` \| `resume` \| `stop` \| `note` \| `correction` \| `finalize` |
+| `elementId?` / `cycleNo` | متن؟ / int | عنصر مرتبط / شماره چرخه جاری (۰ = پیش از چرخه اول) |
+| `elapsedActiveMs` | REAL | زمان فعال یکنواخت (ADR-004) — مکث‌ها جزو آن نیست |
+| `splitMs?` | REAL؟ | بازه از مرز قبلی (cycleStart/element/lap) |
+| `wallClock` | DATETIME | زمان دیواری — صرفاً ممیزی/گزارش |
+| `note` / `interruptionReason?` | متن؟ | یادداشت / علت وقفه (pause) |
+| `correctionOf?` / `correctedValueMs?` / `correctionReason?` | متن؟ / REAL؟ / متن؟ | اصلاح رویداد قبلی با مقدار و **دلیل الزامی** — بدون حذف |
+| `integrityJson?` | متن؟ (JSON) | پرچم‌های یکپارچگی لحظه ثبت (`visibilityLoss/sleepSuspected/clockRecovery`) |
+| `origin` | متن، پیش‌فرض `"normal"` | `normal` \| `offline-synced` (ردپای همگام‌سازی آفلاین — ADR-013) |
+| `receivedBy` / `receivedAt` | — | پذیرنده و زمان پذیرش در سرور |
+
+#### TimingCycle — چرخه مشتق (بند ۲.۱۳ اجرا شد)
+
+| فیلد | نوع/پیش‌فرض | توضیح |
+|---|---|---|
+| `id` | UUIDv7 | — |
+| `sessionId` | ref → TimingSession | **یکتا `(sessionId,seq)`** + ایندکس `(sessionId,status)` |
+| `seq` | int | شماره چرخه (۱-مبنا) |
+| `status` | متن | `valid` \| `suspect` (تلورانس TS-005) \| `incomplete` \| `recovered` |
+| `startedAtEventId` / `endedAtEventId?` | متن | رویدادهای مرز چرخه (ردیابی) |
+| `startedElapsedMs` / `endedElapsedMs?` / `cycleTimeMs?` | REAL | مرزهای فعال / زمان چرخه مشاهده‌شده (TS-004) |
+| `elementsSumMs` / `deviationPct?` | REAL / REAL؟ | جمع مدت عناصر / انحراف TS-005 (فقط پیوسته؛ snapback = null) |
+| `elementsJson` | متن (JSON) | `ElementObservation[]` (بند ۲.۱۴) |
+| `interruptionsJson` | متن (JSON) | وقفه‌های چرخه (`reason`, `durationMs|null`, `durationUnknown`, پرچم‌ها) |
+| `flagsJson?` | متن؟ (JSON) | پرچم‌های یکپارچگی چرخه |
+
+**قاعده ذخیره:** فقط در `finalize` (که خود فقط پس از `stop` مجاز است) نوشته می‌شود؛ پس از آن جلسه قفل است (رویداد جدید → 409) — ADR-013.
+
+### ۹٫۲. داده سمت کاربر (خارج از DB سرور)
+
+- `IndexedDB «timing-chrono»` — سه فروشگاه: `sessions` (فراداده + عناصر برای بازکردن آفلاین)، `events` (ژورنال append-only، کلید `clientEventId`)، `queue` (صف همگام‌سازی؛ flush batch حداکثر ۲۰۰ رویداد) — ADR-006/013. بازیابی پس از reload از **اجتماع (رویدادهای سرور ∪ ژورنال محلی)** با `reconstruct()` انجام می‌شود.
+
+### ۹٫۳. ممیزی (فاز ۴)
+
+- فقط سه اکشن: `timing.session-created`، `timing.session-finalized`، `timing.event-corrected` — رویدادهای معمول قرائت ممیزی نمی‌شوند (تصمیم ADR-013؛ خود TimingEvent رکورد تغییرناپذیر با `receivedBy/receivedAt` است).

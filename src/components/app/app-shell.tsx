@@ -23,7 +23,7 @@ import type { SessionUserDto } from "@/shared/contracts/api";
 import { useLogout } from "@/hooks/use-api";
 import { Spinner } from "./ui-bits";
 
-export type ViewName = "dashboard" | "new-project" | "project" | "project-config" | "project-diagrams";
+export type ViewName = "dashboard" | "new-project" | "project" | "project-config" | "project-diagrams" | "project-timing";
 
 export interface AppShellProps {
   user: SessionUserDto;
@@ -61,7 +61,8 @@ function NavList({ view, onNavigate, onPick }: { view: ViewName; onNavigate: (v:
         const Icon = item.icon;
         const active =
       view === item.key ||
-      (item.key === "dashboard" && (view === "project" || view === "project-config" || view === "project-diagrams"));
+      (item.key === "dashboard" &&
+            (view === "project" || view === "project-config" || view === "project-diagrams" || view === "project-timing"));
         return (
           <Button
             key={item.key}
@@ -79,7 +80,7 @@ function NavList({ view, onNavigate, onPick }: { view: ViewName; onNavigate: (v:
       })}
       <div className="mt-2 rounded-lg border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
         <p className="mb-1 font-medium">فازهای بعدی محصول:</p>
-        <p>کرنومتر و ثبت مشاهدات (فاز ۴) · تحلیل زمان (فاز ۵) · بالانس خط (فاز ۶)</p>
+        <p>تحلیل زمان (فاز ۵) · بالانس خط (فاز ۶)</p>
       </div>
     </nav>
   );
@@ -119,7 +120,7 @@ export function AppShell({ user, view, onNavigate, children, projectTitle }: App
               <Timer className="size-4" aria-hidden />
             </span>
             <span className="hidden text-sm sm:inline">زمان‌سنجی صنعتی</span>
-            <Badge variant="secondary" className="hidden font-mono text-[10px] sm:inline-flex">فاز ۳</Badge>
+            <Badge variant="secondary" className="hidden font-mono text-[10px] sm:inline-flex">فاز ۴</Badge>
           </button>
 
           <div className="flex-1" />
@@ -177,7 +178,8 @@ export function AppShell({ user, view, onNavigate, children, projectTitle }: App
 
         {/* محتوا */}
         <main className="min-w-0 flex-1" aria-live="polite">
-          {projectTitle && (view === "project" || view === "project-config" || view === "project-diagrams") ? (
+          {projectTitle &&
+          (view === "project" || view === "project-config" || view === "project-diagrams" || view === "project-timing") ? (
             <nav aria-label="مسیر" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
               <button className="hover:text-foreground hover:underline" onClick={() => onNavigate("dashboard")}>
                 پروژه‌ها
@@ -196,6 +198,12 @@ export function AppShell({ user, view, onNavigate, children, projectTitle }: App
                   <span className="font-medium text-foreground">طراح نمودارهای فرایندی</span>
                 </>
               ) : null}
+              {view === "project-timing" ? (
+                <>
+                  <span aria-hidden>›</span>
+                  <span className="font-medium text-foreground">کارگاه زمان‌سنجی</span>
+                </>
+              ) : null}
             </nav>
           ) : null}
           {children}
@@ -205,10 +213,10 @@ export function AppShell({ user, view, onNavigate, children, projectTitle }: App
       {/* فوتر چسبان */}
       <footer className="mt-auto border-t bg-background">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-muted-foreground">
-          <span>زمان‌سنجی صنعتی — نسخه ۰٫۴٫۰ (فاز ۳: طراح OPC/FPC و دستیار آفلاین)</span>
+          <span>زمان‌سنجی صنعتی — نسخه ۰٫۵٫۰ (فاز ۴: کرنومتر و ثبت مشاهدات)</span>
           <span className="flex items-center gap-2">
             <span className="inline-block size-1.5 rounded-full bg-emerald-500" aria-hidden />
-            داده‌ها روی سرور ذخیره می‌شوند؛ پیش‌نویس نمودار برای کار آفلاین روی دستگاه می‌ماند
+            داده‌ها روی سرور ذخیره می‌شوند؛ رویدادهای زمان‌سنجی ابتدا روی دستگاه ثبت و سپس همگام می‌شوند
           </span>
         </div>
       </footer>

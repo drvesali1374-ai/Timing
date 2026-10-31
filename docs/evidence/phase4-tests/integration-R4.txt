@@ -1,0 +1,58 @@
+════════ آزمون‌های یکپارچگی فاز ۴ ════════
+
+[۱] R4-1 — سناریوی مرجع کامل با داده مورد انتظار
+  ✓ ایجاد جلسه → 201 + method/observer/تلورانس
+  ✓ دریافت batch رویدادها → 12 ingested — ingested=12
+  ✓ وضعیت جلسه پس از توقف → stopped
+  ✓ جزئیات: ۱۲ رویداد + ۲ چرخه
+  ✓ چرخه ۱: مدت عناصر TS-003 دقیق (2000/1500/1000ms) — [2000,1500,1000]
+  ✓ چرخه ۱: C = 4500 (TS-004) + status valid (TS-005)
+  ✓ چرخه ۲: C = 4700 + valid
+  ✓ R4-3 وقفه: علت «خرابی فیکسچر» + مدت ~30000ms از ساعت دیواری — durationMs=30000
+  ✓ زمان فعال کل = 9200 (بدون مکث)
+  ✓ R4-4 اصلاح: رویداد correction پذیرفته (1 ingested)
+  ✓ R4-4 اعمال اصلاح: عنصر act-2 → 1200ms (آخرین اصلاح برنده) — durationMs=1200
+  ✓ R4-4 رویداد اصلی حفظ می‌شود (append-only — ۱۳ رویداد)
+  ✓ پس از اصلاح، تلورانس با C=4500 همچنان سازگار (valid) — Σ=4500
+  ✓ R4-5 ارسال دوباره همان ۱۲ رویداد → duplicates=12 بدون ingested — duplicates=12, ingested=0
+  ✓ R4-5 دوباره‌شماری نشد — eventCount هنوز ۱۳ — count=13
+  ✓ R4-10 عنصر تعریف‌نشده در جلسه → rejected (400 یا rejected>0) — status=400, rejected=0
+  ✓ R4-10 خروجی خام JSON: session + events قابل بازیابی — events=14
+  ✓ R4-6 نهایی‌سازی → finalized + ۲ چرخه کامل — {"cycles":2,"completed":2}
+  ✓ R4-6 قفل: رویداد جدید پس از نهایی‌سازی → 409 — status=409
+  ✓ R4-6 چرخه‌های ذخیره‌شده از جدول TimingCycle
+
+[۲] R4-7 — بازیابی جلسه running پس از بارگذاری مجدد
+  ✓ جلسه running با ۳ رویداد
+  ✓ رویداد بازیابی (pause + clockRecovery) پذیرفته
+  ✓ پرچم جلسه clockRecovery تجمیع شد
+  ✓ چرخه بازیابی‌شده → status=recovered + وقفه durationUnknown — status=recovered
+  ✓ چرخه با وجود پرچم، مدت عناصر را دارد (۲۰۰۰/۱۵۰۰/۱۰۰۰)
+
+[۳] R4-8 — روش بازگشت به صفر (عنصری)
+  ✓ batch عنصری پذیرفته (۶ رویداد)
+  ✓ مدت‌های مستقیم splitMs (1200/800/1000) — بدون تفاضل — [1200,800,1000]
+  ✓ snapback: بدون کنترل تلورانس (deviationPct=null) + valid
+  ✓ readingMode عناصر = snapback
+
+[۴] R4-9 — کنترل دسترسی
+  ✓ بدون نشست → 401 — status=401
+  ✓ پروژه دیگران → 404 — status=404
+  ✓ viewer: observations:read مجاز
+  ✓ viewer: observations:write → 403 — status=403
+  ✓ افزودن عضو recorder → 201 — status=201
+  ✓ recorder: ایجاد جلسه مجاز (observations:write) — status=201
+  ✓ viewer: manage-members → 403
+
+[۵] ممیزی و فهرست جلسات
+  ✓ ممیزی: timing.session-created ثبت شد
+  ✓ ممیزی: timing.session-finalized ثبت شد
+  ✓ ممیزی: timing.event-corrected ثبت شد
+  ✓ رویدادهای معمول قرائت ممیزی نمی‌شوند (فقط چرخه عمر/اصلاح) — count=6
+  ✓ فهرست جلسات: ≥۴ جلسه با پرچم‌ها/شمارش — count=4
+  ✓ جلسه نهایی‌شده در فهرست با completedCycles
+
+════════ جمع‌بندی فاز ۴ ════════
+قبول: 42 · رد: 0
+همه آزمون‌های فاز ۴ قبول شد ✓
+exit=0

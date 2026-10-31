@@ -80,8 +80,14 @@ $ bun run seed             → ۷ پروفایل · demo@timing.local · DEMO-10
 
 ### ۷. وضعیت تحویل به مخزن گیت‌هاب
 
-- کامیت فاز ۱ + push به `github.com/drvesali1374-ai/Timing` با توکن کارفرما — نتیجه پس از اجرا در انتهای همین بخش به‌روز می‌شود.
-- `.env` از ردیابی git حذف شد (رمز NextAuth هرگز وارد مخزن نمی‌شود)؛ الگوی `.env.example` جایگزین شد.
+- کامیت فاز ۱ ساخته شد: `c9b37e0 feat(phase-1): core platform, project management and isolation` (۸۰ فایل، +۸۷۵۰ خط) — آماده push.
+- `.env` از ردیابی git حذف شد (رمز NextAuth هرگز وارد مخزن نمی‌شود)؛ الگوی `.env.example` جایگزین شد. اسکن رازها روی diff کامیت انجام شد: هیچ `github_pat`/رازی در فایل‌های مخزن نیست.
+- **push انجام نشد — مانع واقعی:** توکن ارسالی کارفرما از سمت GitHub رد می‌شود:
+  - `GET api.github.com/user` با `Authorization: Bearer <token>` → **401 «Bad credentials»** (در حالی که درخواست بی‌توکن پیام متفاوت «Requires authentication» می‌گیرد؛ پس هدر درست ارسال شده و خود توکن نامعتبر است).
+  - `git push https://x-access-token:<token>@github.com/drvesali1374-ai/Timing.git main:main` → «Invalid username or token».
+  - بررسی شد: توکن در هیچ فایل عمومی مخزن (Phase0/Phase1.txt فعلی) وجود ندارد؛ محتمل‌ترین علت‌ها: ابطال خودکار توسط Secret Scanning گیت‌هاب (اگر جای دیگری افشا شده باشد)، انقضا، یا خطای کپی. همان الگوی توکن فاز صفر (مستند در §۷ فاز صفر).
+- **داده ورودی لازم برای تکمیل تحویل:** توکن معتبر Fine-grained PAT جدید با دسترسی `Contents: Read and write` روی مخزن Timing — پس از دریافت، push یک fast-forward تمیز است (`git push <remote> main:main`).
+- طبق منشور (بخش فاز ۷ سند جامع): استقرار انجام‌نشده موفق معرفی نمی‌شود؛ وضعیت صادقانه همین است.
 
 ---
 

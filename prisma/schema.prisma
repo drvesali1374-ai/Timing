@@ -1,8 +1,10 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// پلتفرم زمان‌سنجی صنعتی — اسکیمای فاز ۱ (هسته و جداسازی پروژه‌ها)
+// مرجع: docs/DATA_DICTIONARY.md · ADR-005 (نسخه‌بندی snapshot) · ADR-009 (RBAC پروژه‌محور)
+// قواعد:
+//  - همه شناسه‌ها UUIDv7 تولیدشده در لایه Application (shared/ids) — نه uuid خودکار.
+//  - SQLite از enum پشتیبانی نمی‌کند → مقادیر محدود با zod در دامنه اعتبارسنجی می‌شوند (نقش‌ها قابل توسعه).
+//  - ConfigVersion فقط الحاقی (append-only) است؛ هرگز ویرایش/حذف نمی‌شود.
+//  - حذف فیزیکی پروژه وجود ندارد؛ بایگانی = تغییر status.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +15,149 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─────────────────────────── هویت ───────────────────────────
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  id           String   @id
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  authProvider String   @default("credentials")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships           ProjectMembership[] @relation("UserMemberships")
+  createdProjects       Project[]           @relation("ProjectCreator")
+  createdConfigVersions ConfigVersion[]     @relation("ConfigVersionCreator")
+  auditLogs             AuditLog[]          @relation("AuditUser")
+}
+
+// ─────────────────────────── پروژه‌ها ───────────────────────────
+
+model Project {
+  id     String  @id
+  code   String
+  title  String
+  goal   String?
+  location    String?
+  department String?
+  line        String?
+  station     String?
+  product     String?
+  process     String?
+  responsible String?
+  shift       String?
+  notes       String?
+
+  status String  @default("active") // active | archived | completed (اعتبارسنجی در دامنه)
+  isDemo Boolean @default(false) // پروژه نمونه آموزشی — ایزوله از داده واقعی
+
+  // ارجاع به الگوی پروفایل لحظه ایجاد (کپی مستقل — ADR-005)
+  profileTemplateId      String?
+  profileSnapshotId      String?
+  profileTemplateVersion String?
+
+  createdById            String
+  createdBy              User           @relation("ProjectCreator", fields: [createdById], references: [id])
+  currentConfigVersionId String? @unique
+  currentConfigVersion   ConfigVersion? @relation("CurrentConfigVersion", fields: [currentConfigVersionId], references: [id])
+
+  memberships    ProjectMembership[]
+  configVersions ConfigVersion[]
+  auditLogs      AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdById])
+  @@index([status])
+  @@index([isDemo])
+}
+
+model ProjectMembership {
+  id        String   @id
+  projectId String
+  userId    String
+  role      String   @default("viewer") // owner | editor | recorder | viewer — منبع حقیقت: shared/contracts/acl.ts
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation("UserMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+// ─────────────────── نسخه پیکربندی (append-only) ───────────────────
+
+model ConfigVersion {
+  id        String @id
+  projectId String
+  semver    String // semver معتبر؛ یکتا در پروژه
+  snapshotJson String // snapshot کامل پیکربندی لحظه ایجاد (JSON)
+  reason    String?
+
+  profileTemplateId      String?
+  profileTemplateVersion String?
+
+  createdBy String
+  author    User @relation("ConfigVersionCreator", fields: [createdBy], references: [id])
+
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  currentForProject  Project? @relation("CurrentConfigVersion")
+
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, semver])
+  @@index([projectId])
+}
+
+// ─────────────────── الگوهای پروفایل روش‌شناختی ───────────────────
+
+model ProfileTemplate {
+  id       String @id // مثل "profile.general-industrial-time-study"
+  semver   String
+  nameFa   String
+  description String
+  scopeOfUse  String
+
+  sourceType    String // مثل "reference-method" | "common-practice"
+  sourceName    String
+  sourceVersion String
+  sourceUrl     String?
+
+  assumptionsJson String // آرایه JSON از فرض‌ها
+  limitationsJson String // آرایه JSON از محدودیت‌ها
+  licenseNote     String?
+  contentJson     String // ساختار کامل محتوا (خانواده‌ها/پارامترها/زنجیره تحلیل/فرمول‌ها)
+
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+// ─────────────────────────── ممیزی ───────────────────────────
+
+model AuditLog {
+  id         String  @id
+  userId     String?
+  action     String // مثل project.created | project.archived | member.added
+  entityType String
+  entityId   String
+  projectId  String?
+  beforeJson String?
+  afterJson  String?
+
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  user    User?    @relation("AuditUser", fields: [userId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([entityType, entityId])
 }

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Vazirmatn } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
 
 const vazir = Vazirmatn({
   variable: "--font-vazir",
@@ -10,9 +9,9 @@ const vazir = Vazirmatn({
 });
 
 export const metadata: Metadata = {
-  title: "زمان‌سنجی صنعتی | فاز صفر — نمونه اولیه",
+  title: "زمان‌سنجی صنعتی | مدیریت پروژه‌های مطالعه کار",
   description:
-    "پلتفرم ماژولار زمان‌سنجی صنعتی، مطالعه کار، نمودارهای فرایندی OPC/FPC و بالانس خط تولید — نمونه اولیه قابل بررسی فاز صفر (وایرفریم تعاملی ۸ صفحه اصلی).",
+    "پلتفرم ماژولار زمان‌سنجی صنعتی، مطالعه کار، نمودارهای فرایندی OPC/FPC و بالانس خط تولید — فاز ۱: هسته نرم‌افزار، مدیریت پروژه‌ها و جداسازی داده‌ها.",
   keywords: [
     "زمان‌سنجی",
     "مطالعه کار",
@@ -34,7 +33,6 @@ export default function RootLayout({
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body className={`${vazir.variable} font-sans antialiased bg-background text-foreground`}>
         {children}
-        <Toaster />
       </body>
     </html>
   );

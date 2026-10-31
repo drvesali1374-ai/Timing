@@ -163,3 +163,46 @@ interface SyncQueue { enqueue(op: IdempotentOp): void; flush(): Promise<SyncRepo
 | تعارض همگام‌سازی در ثبت طولانی آفلاین | از دست رفتن داده | کلید idempotent + صف + تصمیم صریح کاربر |
 | WebGPU در دسترس نبودن | لایه دستیار | مسیر جایگزین قواعد-محور (لایه الف) |
 | RTL در کتابخانه‌های نمودار | جهت معکوس | تست RTL اختصاصی + اجزای سفارشی Yamazumi |
+
+---
+
+## ۹. وضعیت پیاده‌سازی فاز ۱ (به‌روزرسانی ۳۱ اکتبر ۲۰۲۶)
+
+### ۹٫۱. ساختار اجراشده
+
+```
+src/
+├── app/                    # page.tsx (SPA تک‌نما) + api/** (۱۳ route)
+├── modules/
+│   ├── identity/           # ✅ فاز ۱ — auth-service، session، nextauth، user-repo
+│   ├── projects/           # ✅ فاز ۱ — project-service (CRUD/بایگانی/تکثیر/اعضا)، repo، domain
+│   ├── profiles/           # ✅ فاز ۱ — domain + definitions (۷ پروفایل) + service
+│   ├── audit/              # ✅ فاز ۱ — audit-service + repo
+│   └── (parameters/formula/process/…)  # ⏳ فازهای ۲ به بعد
+├── shared/
+│   ├── contracts/acl.ts    # منبع واحد نقش/مجوز (سرور + UI)
+│   ├── contracts/api.ts    # DTOهای فاز ۱
+│   ├── validation/project.ts # zod — مشترک UI/سرور
+│   ├── errors.ts · logger.ts · http.ts · ids.ts (UUIDv7)
+└── components/app/**       # UI فاز ۱ (بدون منطق دامنه)
+```
+
+### ۹٫۲. اجرای قواعد مرزها (R1-4)
+
+قواعد §۱٫۲ با اسکریپت `scripts/check-module-boundaries.mjs` قفل شد (اجرای CI/dev):
+- domain → فقط shared؛ application → ماژول خودش + application ماژول‌های دیگر + `lib/db` (تراکنش)؛
+- infrastructure → فقط ماژول خودش + shared + `lib/db`؛ دسترسی بین‌ماژولی به زیرساخت دیگر ممنوع؛
+- UI → فقط shared + lib کلاینت (هیچ import از modules)؛ API → فقط application (+ استثنای مستند آداپتور NextAuth برای route احراز هویت)؛
+- کشف چرخه در سطح فایل و ماژول با DFS.
+- **یال‌های بین‌ماژولی فعلی:** identity→audit · projects→identity · projects→profiles · projects→audit (یک‌طرفه).
+
+### ۹٫۳. تصمیم‌های ثبت‌شده فاز ۱
+
+| موضوع | تصمیم |
+|---|---|
+| نسخه‌بندی اجرا | Prisma Migrate (`db push` ممنوع) — پوشه `prisma/migrations/` بخشی از مخزن |
+| تراکنش‌ها | `db.$transaction` در لایه Application (ریپوها کلاینت tx می‌پذیرند) — ثبت شد در §۹٫۲ |
+| تکثیر پروژه | ساختار+پیکربندی کپی، اعضا نه؛ ممیزی روی هر دو پروژه (مبدأ/مقصد) |
+| snapshot | ساختار `ProfileSnapshot` (meta+content) — فاز ۲ همان را ویرایش/نسخه می‌کند |
+| نمایش myRole | محاسبه در DTO بر اساس عضویت «کاربر درخواست‌کننده» (نه اولین عضو) |
+| UUIDv7 | تولید در Application (RFC 9562) برای همه موجودیت‌ها |

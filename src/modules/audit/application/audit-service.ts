@@ -28,6 +28,12 @@ export const AUDIT_ACTIONS = {
   memberAdded: "member.added",
   memberRoleChanged: "member.role-changed",
   memberRemoved: "member.removed",
+  // ── فاز ۳ ──
+  diagramCreated: "diagram.created",
+  diagramUpdated: "diagram.updated",
+  diagramRevisionSaved: "diagram.revision-saved",
+  diagramConfirmed: "diagram.confirmed",
+  diagramArchived: "diagram.archived",
 } as const;
 
 export interface AuditInput {

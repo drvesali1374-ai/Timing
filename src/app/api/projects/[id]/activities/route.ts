@@ -31,6 +31,7 @@ const createSchema = z.object({
   stationHint: z.string().nullable().optional(),
   skillRequired: z.string().nullable().optional(),
   sourceOfTime: z.string().optional(),
+  predecessors: z.array(z.string()).optional(),
 });
 
 /** POST /api/projects/[id]/activities — ایجاد فعالیت/عنصر کاری. */
@@ -51,6 +52,7 @@ export const POST = withApi<Ctx>(async (req: NextRequest, ctx: Ctx) => {
       stationHint: body.stationHint ?? null,
       skillRequired: body.skillRequired ?? null,
       sourceOfTime: body.sourceOfTime,
+      predecessors: body.predecessors,
     }),
     201,
   );

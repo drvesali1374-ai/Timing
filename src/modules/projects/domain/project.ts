@@ -41,9 +41,11 @@ export function computeReadiness(input: {
   activityCount: number;
   observationCount: number;
   standardTimeResultCount: number;
+  diagramCount: number;
 }): ProjectReadinessDto {
   return {
     configReady: input.hasConfigVersion,
+    diagramReady: input.diagramCount > 0, // فاز ۳ — نمودار OPC/FPC فعال
     measurementReady: input.activityCount > 0,
     analysisReady: input.observationCount > 0,
     approvalReady: input.standardTimeResultCount > 0,

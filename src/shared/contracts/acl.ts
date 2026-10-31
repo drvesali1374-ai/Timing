@@ -29,6 +29,9 @@ export const PROJECT_ACTIONS = [
   "config:read",
   "config:write",
   "audit:read",
+  // فاز ۳ — نمودارهای فرایندی OPC/FPC
+  "diagrams:read",
+  "diagrams:write",
 ] as const;
 export type ProjectAction = (typeof PROJECT_ACTIONS)[number];
 
@@ -42,6 +45,8 @@ export const ROLE_PERMISSIONS: Record<ProjectRole, readonly ProjectAction[]> = {
     "config:read",
     "config:write",
     "audit:read",
+    "diagrams:read",
+    "diagrams:write",
   ],
   editor: [
     "project:read",
@@ -50,10 +55,12 @@ export const ROLE_PERMISSIONS: Record<ProjectRole, readonly ProjectAction[]> = {
     "config:read",
     "config:write",
     "audit:read",
+    "diagrams:read",
+    "diagrams:write",
   ],
   // recorder: در فاز ۴ عملیات «observations:write» به این فهرست اضافه می‌شود
-  recorder: ["project:read", "config:read"],
-  viewer: ["project:read", "config:read"],
+  recorder: ["project:read", "config:read", "diagrams:read"],
+  viewer: ["project:read", "config:read", "diagrams:read"],
 };
 
 export function isProjectRole(value: unknown): value is ProjectRole {

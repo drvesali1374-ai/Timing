@@ -175,6 +175,7 @@ export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
 export interface ProjectReadinessDto {
   configReady: boolean;
+  diagramReady: boolean; // فاز ۳ — نمودار فرایندی فعال
   measurementReady: boolean;
   analysisReady: boolean;
   approvalReady: boolean;

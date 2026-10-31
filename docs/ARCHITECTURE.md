@@ -267,3 +267,52 @@ src/
 | نماد نتیجه فرمول | `f.camelCase` برای کلید سفارشی؛ ارجاع در عبارت با `<کلید>.result` و خط تیره→زیرخط (`TS_011.result`) — چون گرامر DSL خط تیره ندارد |
 | پروفایل‌های v2 | ۷ پروفایل با semver 1.1.0 (کتابخانه ۲۲ فرمول سیستمی اجرایی + مدل فعالیت) — seed |
 | ارزیابی شرط فرم سمت کاربر | همان موتور خالص `shared/formula` در UI (بدون منطق دامنه موازی) — ADR-011 |
+
+---
+
+## ۱۱. وضعیت پیاده‌سازی فاز ۳ (به‌روزرسانی ۳۱ اکتبر ۲۰۲۶)
+
+### ۱۱٫۱. ساختار اجراشده
+
+```
+src/
+├── app/                        # page.tsx + api/** (۳۱ route — از ۲۴ در فاز ۲)
+│   └── api/projects/[id]/diagrams/
+│       ├── route.ts                    # GET فهرست / POST ایجاد
+│       └── [diagramId]/
+│           ├── route.ts                # GET جزئیات / PUT revision (idempotent) / PATCH وضعیت
+│           ├── revisions/route.ts      # GET تاریخچه append-only
+│           ├── validate/route.ts       # POST اعتبارسنجی (نسخه ذخیره‌شده یا doc ارسالی)
+│           ├── restore/route.ts        # POST بازیابی نسخه (revision جدید)
+│           └── compare/route.ts        # GET مقایسه variant فعلی/پیشنهادی
+├── modules/
+│   ├── identity/ projects/ profiles/ audit/ config/ params/ activities/   # ✅ فاز ۱/۲
+│   └── diagrams/               # ✅ فاز ۳ — domain (zod/قواعد وضعیت) · application (سرویس کامل) · infrastructure (repo)
+├── shared/
+│   ├── formula/                # ✅ فاز ۲ — هسته مشترک موتور فرمول (ADR-011)
+│   ├── diagrams/               # ✅ فاز ۳ — هسته مشترک خالص نمودار (۶ فایل: types/validation/layout/diff/svg + آزمون ۳۰گانه)
+│   └── assistant/              # ✅ فاز ۳ — هسته مشترک دستیار آفلاین (parser/rules/knowledge + آزمون ۲۵گانه) — ADR-012
+├── lib/
+│   ├── diagram-local-store.ts  # ✅ فاز ۳ — IndexedDB: پیش‌نویس + صف ذخیره idempotent + flush
+│   └── local-model.ts          # ✅ فاز ۳ — تشخیص قابلیت WebGPU (لایه ب صادقانه)
+└── components/app/diagrams/    # ✅ فاز ۳ — UI کارگاه (۱۲ فایل: canvas/nodes/store/پنل‌ها/دیالوگ/خروجی)
+```
+
+### ۱۱٫۲. تصمیم‌های ثبت‌شده فاز ۳ (ADR-012)
+
+| موضوع | تصمیم |
+|---|---|
+| نسخه‌بندی نمودار | `Diagram` + `DiagramRevision` append-only؛ هر ذخیره = revision جدید؛ بازیابی = revision جدید با محتوای قدیم |
+| بازنویسی تأییدشده | ذخیره روی confirmed → status به draft برمی‌گردد (ساختاراً بی‌اجازه ناممکن) |
+| variant مقایسه | current/proposed با variantOfId؛ دیف خلاصه‌ها در سرویس compare |
+| مکان دستیار | هسته مشترک خالص در shared/assistant (تعمیم ADR-011) — نه ماژول سرورمحور؛ ماژول assistant حذف شد |
+| آفلاین کلاینت | lib/ (IndexedDB + صف + تشخیص WebGPU) — UI فقط shared/lib طبق قاعده |
+| ACL | اکشن‌های جدید diagrams:read/diagrams:write (جدا از config:write) |
+| B5 | predecessorsJson روی Activity + اعتبارسنجی ارجاع/خودارجاعی/چرخه در دامنه خالص |
+
+### ۱۱٫۳. مرزها و یال‌های بین‌ماژولی (R1-4 در فاز ۳)
+
+- `bun run check:boundaries` (۱۸۵ فایل): **۰ نقض · ۰ چرخه** — شاهد: `docs/evidence/phase3-tests/boundaries.txt`.
+- **یال‌های جدید فاز ۳ (یک‌طرفه):** `diagrams→audit` · `diagrams→activities` (application→application).
+- گراف کامل: `identity→audit · projects→identity · projects→profiles · projects→activities · projects→audit · config→audit · params→config · params→audit · activities→audit · diagrams→audit · diagrams→activities`.
+- هسته‌های مشترک جدید (shared/diagrams + shared/assistant) همان حقوق import قانونی UI را دارند که shared/formula داشت (ADR-011/012).

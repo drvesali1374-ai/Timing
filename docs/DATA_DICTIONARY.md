@@ -238,3 +238,28 @@ User: `id, name, email, authProvider`; Role: `owner,editor,recorder,viewer,admin
 - snapshotهای v1 فاز ۱ (پروفایل‌های instantiated) **در حافظه** با `readSnapshotAsV2` به نمای v2 خوانده می‌شوند: **فقط تغییر نمایندگی** — واحدهای legacy نرمال می‌شوند (مثل `%` → `percent`)، `defVersion = 1` فرض می‌شود، و فرمول‌های ارجاعی بدون عبارت اجرایی یادداشت صادقانه `availabilityNoteFa` («بدون عبارت اجرایی») می‌گیرند.
 - **هیچ مقداری تبدیل نمی‌شود**؛ مقادیر ثبت‌شده به `defVersion` لحظه ثبت گره می‌مانند (بدون تبدیل پنهانی).
 - **نوشتن همیشه نسخه جدید append-only می‌سازد** — snapshot v1 در DB هرگز بازنویسی نمی‌شود (مهاجرت انبوه انجام نشد؛ سازگار خوانده می‌شود — ADR-011).
+
+---
+
+## ۸. فاز ۳ — پیاده‌سازی نمودارها (۳۱ اکتبر ۲۰۲۶)
+
+### ۸٫۱. موجودیت‌های جدید
+
+| موجودیت | جدول | شرح | کلیدها |
+|---|---|---|---|
+| **Diagram** | `Diagram` | سند نمودار فرایندی OPC/FPC یک پروژه | `id` (UUIDv7) · `projectId` · `kind` (opc/fpc) · `variant` (current/proposed) · `variantOfId` (ارجاع نسخه فعلی برای proposed) · `subject` (فقط FPC: material/person/equipment) · `status` (draft/confirmed/archived) · `currentRev` |
+| **DiagramRevision** | `DiagramRevision` | نسخه append-only سند — هر ذخیره یک رکورد | `diagramId+revNo` (یکتا) · `docJson` (مدل معنایی DiagramDoc) · `layoutJson` (چیدمان — جدا از معنا) · `validationJson` (گزارش لحظه ذخیره) · `appliedSuggestionsJson` (ردیابی پیشنهادهای دستیار) · `origin` (normal/offline-synced) · `clientOpId` (idempotency آفلاین) |
+
+### ۸٫۲. تکمیل موجودیت Activity (B5)
+
+فیلد جدید: `predecessorsJson` — آرایه stableKey فعالیت‌های مقدم (تقدم/تأخر). اعتبارسنجی در دامنه خالص: ارجاع موجود + بدون خودارجاعی/تکرار + بدون چرخه (DFS). مصرف‌کننده اصلی: بالانس خط فاز ۶.
+
+### ۸٫۳. مرجع حقیقت و ردیابی (A7)
+
+- هر نتیجه اعتبارسنجی/خلاصه → از `docJson` نسخه مشخص revision قابل بازتولید (`validationJson` شاهد ذخیره‌شده).
+- مرجع فعالیت گره نمودار = `activityStableKey` (ارجاع، نه کپی) — تغییر فعالیت در نمودار反映 نمی‌شود مگر با ارجاع زنده نمایشی.
+- پیشنهادهای اعمال‌شده دستیار در `appliedSuggestionsJson` هر revision با شناسه/نسخه/عنوان ثبت می‌شوند (قابلیت ردیابی B7).
+
+### ۸٫۴. داده سمت کاربر (خارج از DB سرور)
+
+- `IndexedDB «timing-diagrams»` — فروشگاه‌های `drafts` (پیش‌نویس نمودار فعال برای بازیابی پس از reload) و `queue` (صف ذخیره آفلاین با کلید `clientOpId` idempotent) — ADR-006/012.

@@ -110,6 +110,7 @@ function toProjectDto(row: ProjectRow, templateNames: Map<string, string>, reque
       activityCount: row._count?.activities ?? 0, // فاز ۲ — فعالیت‌های فعال پروژه
       observationCount: 0, // فاز ۴
       standardTimeResultCount: 0, // فاز ۵
+      diagramCount: row._count?.diagrams ?? 0, // فاز ۳ — نمودارهای فعال
     }),
     profile: {
       templateId: row.profileTemplateId,

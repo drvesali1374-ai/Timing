@@ -17,6 +17,7 @@ export interface ActivityRow {
   skillRequired: string | null;
   sourceOfTime: string;
   order: number;
+  predecessorsJson: string | null;
   archived: boolean;
   createdBy: string;
   createdAt: Date;
@@ -51,6 +52,7 @@ export async function insertActivityRow(input: {
   skillRequired: string | null;
   sourceOfTime: string;
   order: number;
+  predecessorsJson: string | null;
   createdBy: string;
 }): Promise<void> {
   await db.activity.create({ data: input });
@@ -96,6 +98,7 @@ export async function instantiateActivityTemplates(input: {
       skillRequired: null,
       sourceOfTime: "measured",
       order,
+      predecessorsJson: null,
       createdBy: input.createdBy,
     });
   }

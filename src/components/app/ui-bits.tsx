@@ -40,6 +40,7 @@ export function DemoBadge() {
 export function ReadinessChips({ readiness, compact = false }: { readiness: ProjectReadinessDto; compact?: boolean }) {
   const items: Array<{ key: keyof ProjectReadinessDto; label: string; hint: string }> = [
     { key: "configReady", label: "پیکربندی", hint: "نسخه پیکربندی فعال وجود دارد" },
+    { key: "diagramReady", label: "نمودار", hint: "نمودار فرایندی OPC/FPC فعال وجود دارد — فاز ۳" },
     { key: "measurementReady", label: "اندازه‌گیری", hint: "منتظر تعریف فعالیت‌ها — فاز ۲ و ۴" },
     { key: "analysisReady", label: "تحلیل", hint: "منتظر ثبت مشاهدات — فاز ۴ و ۵" },
     { key: "approvalReady", label: "تأیید", hint: "منتظر زمان استاندارد — فاز ۵" },

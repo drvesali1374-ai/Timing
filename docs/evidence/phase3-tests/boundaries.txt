@@ -1,0 +1,11 @@
+$ node scripts/check-module-boundaries.mjs
+════════ بررسی مرزهای ماژول‌ها (R1-4) ════════
+فایل‌های بررسی‌شده: 199
+یال‌های بین‌ماژولی: activities→audit  config→audit  diagrams→audit  diagrams→activities  identity→audit  params→config  params→audit  projects→identity  projects→profiles  projects→activities  projects→audit
+
+✓ هیچ نقض قاعده لایه‌بندی وجود ندارد.
+
+✓ هیچ وابستگی حلقوی ماژولی وجود ندارد.
+✓ هیچ وابستگی حلقوی در سطح فایل وجود ندارد.
+
+نتیجه: قبول — ساختار ماژول‌ها سالم و بدون چرخه است ✓

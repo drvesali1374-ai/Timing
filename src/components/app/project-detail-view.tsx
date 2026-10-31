@@ -11,6 +11,7 @@ import {
   BookOpen,
   Copy,
   FileClock,
+  Network,
   Pencil,
   Settings2,
   UserPlus,
@@ -51,7 +52,7 @@ import type { MemberDto } from "@/shared/contracts/api";
 import { DemoBadge, ErrorState, FaDate, LoadingBlock, LoadingCards, PageHeader, ReadinessChips, Spinner, StatusBadge } from "./ui-bits";
 import { ProjectEditDialog } from "./project-edit-dialog";
 
-export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void }) {
+export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, onOpenDiagrams }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void; onOpenDiagrams: () => void }) {
   const projectQuery = useProject(projectId);
   const versionsQuery = useProjectVersions(projectId);
   const membersQuery = useProjectMembers(projectId);
@@ -189,6 +190,25 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig }: 
               </div>
               <Button className="gap-2" onClick={onOpenConfig}>
                 <Settings2 className="size-4" aria-hidden /> ورود به کارگاه پیکربندی
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Network className="size-4 text-primary" aria-hidden /> طراح نمودارهای فرایندی (فاز ۳)
+              </CardTitle>
+              <CardDescription>
+                OPC/FPC با ویرایشگر بصری · اعتبارسنجی زنده · مقایسه روش فعلی/پیشنهادی · دستیار آفلاین قاعده‌محور
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <ReadinessChips readiness={project.readiness} compact />
+              </div>
+              <Button className="gap-2" onClick={onOpenDiagrams}>
+                <Network className="size-4" aria-hidden /> ورود به طراح نمودارها
               </Button>
             </CardContent>
           </Card>

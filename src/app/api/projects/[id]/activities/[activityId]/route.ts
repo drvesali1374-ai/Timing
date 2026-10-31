@@ -17,6 +17,7 @@ const patchSchema = z.object({
   stationHint: z.string().nullable().optional(),
   skillRequired: z.string().nullable().optional(),
   sourceOfTime: z.string().optional(),
+  predecessors: z.array(z.string()).optional(),
   archived: z.boolean().optional(),
 });
 
@@ -43,6 +44,7 @@ export const PATCH = withApi<Ctx>(async (req: NextRequest, ctx: Ctx) => {
     stationHint: body.stationHint,
     skillRequired: body.skillRequired,
     sourceOfTime: body.sourceOfTime,
+    predecessors: body.predecessors,
   });
   return jsonOk(result);
 });

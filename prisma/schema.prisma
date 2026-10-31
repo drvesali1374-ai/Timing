@@ -69,6 +69,7 @@ model Project {
   parameterValues    ParameterValue[]
   calculationResults CalculationResult[]
   activities         Activity[]
+  diagrams           Diagram[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -228,7 +229,75 @@ model CalculationResult {
   @@index([projectId, computedAt])
 }
 
-// ─────────────────── فاز ۲: فعالیت/عنصر کاری (مدل مشترک B5 — مصرف‌کننده: نمودار فاز ۳، کرنومتر فاز ۴، بالانس فاز ۶) ───────────────────
+// ─────────────────── فاز ۳: نمودارهای فرایندی OPC/FPC (B6 — مدل معنایی جدا از چیدمان) ───────────────────
+
+// هر ردیف Diagram یک سند نمودار است؛ revisions آن append-only است (نسخه‌بندی نمودار — ENGINE_CONTRACTS قید ۵)
+model Diagram {
+  id        String  @id
+  projectId String
+
+  kind    String // opc | fpc
+  variant String  @default("current") // current | proposed — مقایسه روش فعلی/پیشنهادی (B6)
+  // برای variant=proposed: نمودار «فعلی» مرجع مقایسه
+  variantOfId String?
+
+  title       String
+  description String?
+
+  // فقط FPC — موضوع مطالعه (B6): material | person | equipment
+  subject String?
+
+  // فقط FPC — واحد مسافت نمایشی (ذخیره بر حسب متر)
+  distanceUnit String? @default("m")
+
+  // draft | confirmed | archived — ویرایش، وضعیت تأییدشده را بی‌اجازه بازنویسی نمی‌کند
+  status     String @default("draft")
+
+  // شماره revision جاری (۱ مبنا)
+  currentRev Int    @default(0)
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisions  DiagramRevision[]
+  variantOf  Diagram?           @relation("DiagramVariantOf", fields: [variantOfId], references: [id])
+  variants   Diagram[]         @relation("DiagramVariantOf")
+
+  @@index([projectId, status])
+  @@index([projectId, kind])
+}
+
+// هر ذخیره = یک revision جدید append-only (docJson معنایی + layoutJson چیدمان + گزارش اعتبارسنجی لحظه ذخیره)
+model DiagramRevision {
+  id        String  @id
+  diagramId String
+  revNo     Int
+  reason    String?
+
+  // مدل معنایی DiagramDoc (ENGINE_CONTRACTS §۲) — اعتبارسنجی مستقل از چیدمان
+  docJson     String
+  // چیدمان (مختصات گره‌ها) — جدا از مدل معنایی
+  layoutJson  String
+  // گزارش اعتبارسنجی لحظه ذخیره (شواهد قابل بازتولید)
+  validationJson String
+
+  // پیشنهادهای دستیار اعمال‌شده در این نسخه (ردیابی — B7): [{id, version, title}]
+  appliedSuggestionsJson String?
+
+  // وضعیت چرخه ذخیره: normal | offline-synced (این revision از صف آفلاین رسیده)
+  origin     String  @default("normal")
+  clientOpId String? // کلید idempotent ذخیره آفلاین (ADR-006)
+
+  createdBy String
+  createdAt DateTime @default(now())
+
+  diagram Diagram @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+
+  @@unique([diagramId, revNo])
+  @@index([diagramId, createdAt])
+}
 
 model Activity {
   id        String  @id
@@ -250,6 +319,9 @@ model Activity {
 
   stationHint   String?
   skillRequired String?
+
+  // B5 — پیش‌نیازها (تقدم/تأخر): آرایه JSON از stableKey فعالیت‌های مقدم؛ مصرف‌کننده اصلی: بالانس فاز ۶
+  predecessorsJson String?
 
   // منبع زمان: measured | estimated | referenced
   sourceOfTime String @default("measured")

@@ -14,7 +14,7 @@ export type ProjectRow = Prisma.ProjectGetPayload<{
     memberships: { include: { user: { select: { id: true; email: true; name: true } } } };
     currentConfigVersion: { select: { id: true; semver: true } };
     createdBy: { select: { name: true } };
-    _count: { select: { configVersions: true, activities: { where: { archived: false } } } };
+    _count: { select: { configVersions: true, activities: { where: { archived: false } }, diagrams: { where: { status: { not: "archived" } } } } };
   };
 }>;
 
@@ -22,7 +22,7 @@ const LIST_INCLUDE = {
   memberships: { include: { user: { select: { id: true, email: true, name: true } } } },
   currentConfigVersion: { select: { id: true, semver: true } },
   createdBy: { select: { name: true } },
-  _count: { select: { configVersions: true, activities: { where: { archived: false } } } },
+  _count: { select: { configVersions: true, activities: { where: { archived: false } }, diagrams: { where: { status: { not: "archived" } } } } },
 } satisfies Prisma.ProjectInclude;
 
 export async function findMembershipsOfUser(userId: string) {

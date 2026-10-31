@@ -13,6 +13,7 @@ import { DashboardView } from "@/components/app/dashboard-view";
 import { NewProjectView } from "@/components/app/new-project-view";
 import { ProjectDetailView } from "@/components/app/project-detail-view";
 import { ConfigWorkshopView } from "@/components/app/config/config-workshop-view";
+import { DiagramWorkshopView } from "@/components/app/diagrams/diagram-workshop-view";
 import { useSession } from "@/hooks/use-api";
 import { LoadingBlock } from "@/components/app/ui-bits";
 
@@ -28,7 +29,7 @@ function AppRoot() {
 
   const navigate = useCallback((view: ViewName, projectId?: string) => {
     setRoute({ name: view, projectId });
-    if (view !== "project" && view !== "project-config") setProjectTitle(null);
+    if (view !== "project" && view !== "project-config" && view !== "project-diagrams") setProjectTitle(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }, []);
 
@@ -65,9 +66,16 @@ function AppRoot() {
           onBack={() => navigate("dashboard")}
           onTitle={setProjectTitle}
           onOpenConfig={() => navigate("project-config", route.projectId)}
+          onOpenDiagrams={() => navigate("project-diagrams", route.projectId)}
         />
       ) : route.name === "project-config" && route.projectId ? (
         <ConfigWorkshopView
+          projectId={route.projectId}
+          onBack={() => navigate("project", route.projectId)}
+          onTitle={setProjectTitle}
+        />
+      ) : route.name === "project-diagrams" && route.projectId ? (
+        <DiagramWorkshopView
           projectId={route.projectId}
           onBack={() => navigate("project", route.projectId)}
           onTitle={setProjectTitle}

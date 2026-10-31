@@ -10,8 +10,10 @@ import { AUDIT_ACTIONS, recordAudit } from "@/modules/audit/application/audit-se
 import {
   assertActivityStableKey,
   assertWorkType,
+  findPrecedenceCycle,
   isSourceOfTime,
   isVaClassification,
+  validatePredecessors,
 } from "../domain/activity";
 import {
   countActivities,
@@ -41,6 +43,8 @@ export interface ActivityDto {
   sourceOfTime: string;
   order: number;
   archived: boolean;
+  /** B5 — کلیدهای پیش‌نیاز (تقدم) */
+  predecessors: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -58,9 +62,20 @@ function toDto(row: ActivityRow): ActivityDto {
     sourceOfTime: row.sourceOfTime,
     order: row.order,
     archived: row.archived,
+    predecessors: parsePredecessors(row.predecessorsJson),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function parsePredecessors(json: string | null): string[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function listActivities(projectId: string, includeArchived = false): Promise<ActivityDto[]> {
@@ -79,6 +94,7 @@ export interface CreateActivityInput {
   stationHint?: string | null;
   skillRequired?: string | null;
   sourceOfTime?: string;
+  predecessors?: string[];
 }
 
 export async function createActivity(input: CreateActivityInput): Promise<ActivityDto> {
@@ -96,6 +112,14 @@ export async function createActivity(input: CreateActivityInput): Promise<Activi
   if (existing) {
     throw ApiError.conflict(`فعالیت با شناسه «${stableKey}» از قبل وجود دارد.`);
   }
+  // B5 — اعتبارسنجی پیش‌نیازها (ارجاع موجود، بدون خودارجاعی/تکرار)
+  const predecessors = input.predecessors ?? [];
+  if (predecessors.length > 0) {
+    const rows = await listActivityRows(projectId, true);
+    const knownKeys = rows.map((r) => r.stableKey);
+    const v = validatePredecessors(stableKey, predecessors, knownKeys);
+    if (!v.ok) throw ApiError.badRequest(v.messageFa);
+  }
 
   const id = uuidv7();
   const order = (await maxActivityOrder(projectId)) + 1;
@@ -112,6 +136,7 @@ export async function createActivity(input: CreateActivityInput): Promise<Activi
     skillRequired: input.skillRequired?.trim() || null,
     sourceOfTime: input.sourceOfTime ?? "measured",
     order,
+    predecessorsJson: predecessors.length > 0 ? JSON.stringify(predecessors) : null,
     createdBy: userId,
   });
   await recordAudit({
@@ -120,7 +145,7 @@ export async function createActivity(input: CreateActivityInput): Promise<Activi
     entityType: "Activity",
     entityId: id,
     projectId,
-    after: { stableKey, name: input.name, workType },
+    after: { stableKey, name: input.name, workType, predecessors },
   });
   log.info("activity created", { projectId, stableKey });
   const row = await findActivityById(projectId, id);
@@ -139,6 +164,7 @@ export interface UpdateActivityInput {
   stationHint?: string | null;
   skillRequired?: string | null;
   sourceOfTime?: string;
+  predecessors?: string[];
 }
 
 export async function updateActivity(input: UpdateActivityInput): Promise<ActivityDto> {
@@ -204,6 +230,31 @@ export async function updateActivity(input: UpdateActivityInput): Promise<Activi
       before.sourceOfTime = row.sourceOfTime;
       after.sourceOfTime = input.sourceOfTime;
       data.sourceOfTime = input.sourceOfTime;
+    }
+  }
+  if (input.predecessors !== undefined) {
+    const rows = await listActivityRows(projectId, true);
+    const knownKeys = rows.map((r) => r.stableKey);
+    const v = validatePredecessors(row.stableKey, input.predecessors, knownKeys);
+    if (!v.ok) throw ApiError.badRequest(v.messageFa);
+    // بررسی چرخه در سطح کل پروژه (شامل این تغییر) — B5
+    const edges: Array<[string, string]> = [];
+    for (const r of rows) {
+      for (const p of parsePredecessors(r.predecessorsJson)) {
+        edges.push([p, r.stableKey]);
+      }
+    }
+    // جایگزینی یال‌های این فعالیت با مقدار جدید
+    const filtered = edges.filter(([, after]) => after !== row.stableKey);
+    for (const p of input.predecessors) filtered.push([p, row.stableKey]);
+    const cycle = findPrecedenceCycle(filtered);
+    if (cycle) {
+      throw ApiError.badRequest(`چرخه تقدم تشکیل می‌شود: ${cycle.join(" ← ")}`);
+    }
+    if (JSON.stringify(input.predecessors) !== JSON.stringify(parsePredecessors(row.predecessorsJson))) {
+      before.predecessors = parsePredecessors(row.predecessorsJson);
+      after.predecessors = input.predecessors;
+      data.predecessorsJson = input.predecessors.length > 0 ? JSON.stringify(input.predecessors) : null;
     }
   }
 

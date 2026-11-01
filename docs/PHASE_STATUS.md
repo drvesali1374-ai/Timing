@@ -86,7 +86,10 @@
 
 ### ۸. وضعیت تحویل به مخزن گیت‌هاب
 
-- کامیت فاز ۷ (PWA + سخت‌سازی + آزمون‌ها + مستندات + نسخه ۱٫۰٫۰) با توکن push شد — شناسه کامیت و راستی‌آزمایی fetch/API پس از push در این بخش تکمیل می‌شود.
+- **تحویل تأییدشده:** کامیت `ffe9c7f` (feat(phase-7) — نسخه پایدار ۱٫۰٫۰ · ۶۱ فایل تغییر) در ۱ نوامبر ۲۰۲۶ با توکن push شد.
+- راستی‌آزمایی سه‌مسیری: `git fetch` → `3ffb5e7..ffe9c7f main -> origin/main` · `git rev-parse HEAD origin/main` یکتا (۱) · API گیت‌هاب sha `ffe9c7fc9dbf…` روی main.
+- راستی‌آزمایی محتوای remote: sw.js · test-phase7.mjs · DEPLOYMENT_FA.md · backup-db.mjs · pwa-register.tsx · manifest.webmanifest · PHASE_STATUS.md همگی HTTP 200 از raw.githubusercontent.com.
+- گارد فایل پیش از کامیت: exit 0 (هیچ سورسی ignore/حذف‌شده).
 
 ---
 

@@ -41,6 +41,12 @@ export const AUDIT_ACTIONS = {
   // ── فاز ۵ ──
   analysisMarkSaved: "analysis.mark-saved",
   analysisSessionContextSaved: "analysis.session-context-saved",
+  // ── فاز ۶ ──
+  balanceScenarioCreated: "balance.scenario-created",
+  balanceScenarioUpdated: "balance.scenario-updated",
+  balanceSolved: "balance.solved",
+  balanceManualSaved: "balance.manual-saved",
+  balanceExported: "balance.exported",
   analysisExported: "analysis.exported",
 } as const;
 

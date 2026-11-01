@@ -16,6 +16,7 @@ import { ConfigWorkshopView } from "@/components/app/config/config-workshop-view
 import { DiagramWorkshopView } from "@/components/app/diagrams/diagram-workshop-view";
 import { TimingWorkshopView } from "@/components/app/timing/timing-workshop-view";
 import { AnalysisWorkshopView } from "@/components/app/analysis/analysis-workshop-view";
+import { BalanceWorkshopView } from "@/components/app/balance/balance-workshop-view";
 import { useSession } from "@/hooks/use-api";
 import { LoadingBlock } from "@/components/app/ui-bits";
 
@@ -31,7 +32,7 @@ function AppRoot() {
 
   const navigate = useCallback((view: ViewName, projectId?: string) => {
     setRoute({ name: view, projectId });
-    if (view !== "project" && view !== "project-config" && view !== "project-diagrams" && view !== "project-timing" && view !== "project-analysis") setProjectTitle(null);
+    if (view !== "project" && view !== "project-config" && view !== "project-diagrams" && view !== "project-timing" && view !== "project-analysis" && view !== "project-balance") setProjectTitle(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }, []);
 
@@ -71,6 +72,7 @@ function AppRoot() {
           onOpenDiagrams={() => navigate("project-diagrams", route.projectId)}
           onOpenTiming={() => navigate("project-timing", route.projectId)}
           onOpenAnalysis={() => navigate("project-analysis", route.projectId)}
+          onOpenBalance={() => navigate("project-balance", route.projectId)}
         />
       ) : route.name === "project-config" && route.projectId ? (
         <ConfigWorkshopView
@@ -96,6 +98,13 @@ function AppRoot() {
           onBack={() => navigate("project", route.projectId)}
           onTitle={setProjectTitle}
           onOpenTiming={() => navigate("project-timing", route.projectId)}
+        />
+      ) : route.name === "project-balance" && route.projectId ? (
+        <BalanceWorkshopView
+          projectId={route.projectId}
+          onBack={() => navigate("project", route.projectId)}
+          onTitle={setProjectTitle}
+          onOpenAnalysis={() => navigate("project-analysis", route.projectId)}
         />
       ) : null}
     </AppShell>

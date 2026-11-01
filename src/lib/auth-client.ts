@@ -71,8 +71,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const message =
       (payload as { error?: { message?: string } })?.error?.message ??
       `خطای سرور (${res.status})`;
-    const err = new Error(message) as Error & { status?: number };
+    const err = new Error(message) as Error & { status?: number; details?: unknown };
     err.status = res.status;
+    err.details = (payload as { error?: { details?: unknown } })?.error?.details;
     throw err;
   }
   return payload as T;

@@ -351,3 +351,35 @@ User: `id, name, email, authProvider`; Role: `owner,editor,recorder,viewer,admin
 | `markedBy` / `createdAt` | — | هر تغییر حالت = ردیف جدید (append-only؛ آخرین = جاری؛ تاریخچه کامل + AuditLog) |
 
 **قواعد:** علامت‌گذاری ≠ حذف خودکار (B9) · دورخوانی تحلیل از آخرین حالت · ممیزی `analysis.mark-saved` با before/after.
+
+
+## ۱۲. فاز ۶ — بالانس خط و نیروی کار (انتهای B10 — ۱ نوامبر ۲۰۲۶)
+
+### BalanceScenario
+سناریوی بالانس پروڔه — مجموعه ورودی‌های B10 به‌صورت اسنپ‌شات کامل (inputsJson):
+
+| فیلد | نوع | توضیح |
+|---|---|---|
+| id | UUIDv7 | شناسه |
+| projectId | FK Project | جداسازی (Cascade) |
+| name / status / notes | — | نام ۱۲۰حرف / active‌بایگانی / یادداشت |
+| inputsJson | JSON | timeBasis (observed/representative/normal/standard/override) · takt {taktMs یا demandUnits+netAvailableMsPerShift+shiftsPerPeriod} · maxStations · objectives {minimizeStations, smoothLoad, minChanges ۰..۱} · activityTimeOverrides {stableKey: ms} · referenceAssignment {stableKey: ایستگاه ۱مبنا} |
+| createdBy / createdAt / updatedAt | — | ردیابی |
+
+### BalanceResult
+نتیجه بالانس — **append-only**: هر اجرای الگوریتم یا ثبت تخصیص دستی = ردیف تازه؛ آخرین ردیف = وضعیت جاری؛ تاریخچه کامل برای مقایسه قبل/بعد:
+
+| فیلد | نوع | توضیح |
+|---|---|---|
+| algorithm | String | lcr · rpw · kilbridge-wester · manual |
+| algorithmVersion | String | semver الگوریتم |
+| status | String | solved · solved-with-flags · infeasible-flagged |
+| assignmentsJson | JSON | {stableKey: ایستگاه ۱مبنا} |
+| stationsJson | JSON | بار هر ایستگاه با تفکیک اپراتور/ماشین/انتطار/هم‌پوشان |
+| metricsJson | JSON | شاخص‌های مستند (FORMULA_CATALOG §BAL) |
+| violationsJson | JSON | قیود نقض‌شده با دلیل فارسی |
+| notesJson | JSON | یادداشت‌های صداقت روش |
+| objectiveValue / runMs | Float | تابع هدف وزنی / زمان اجرا |
+
+مصرف‌کننده‌ها: UI کارگاه بالانس (۸ تب) · گزارش‌های مقایسه‌ای · فاز ۷ (مسیر انتهابه‌انتهای).
+پیوند مصرف: زمان‌ها از حلقه B4 فاز ۵ با ۵ مبنا؛ فعالیت‌ها و پیش‌نیازها از B5؛ قیود ناسازگاری از constraintsJson فعالیت.

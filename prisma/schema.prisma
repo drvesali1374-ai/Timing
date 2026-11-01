@@ -71,6 +71,7 @@ model Project {
   activities         Activity[]
   diagrams           Diagram[]
   timingSessions     TimingSession[]
+  balanceScenarios   BalanceScenario[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -501,4 +502,57 @@ model TimingCycle {
 
   @@unique([sessionId, seq])
   @@index([sessionId, status])
+}
+
+// ─────────────────── فاز ۶: بالانس خط و نیروی کار (B10) ───────────────────
+
+// سناریوی بالانس — ورودی‌های B10 به‌صورت اسنپ‌شات کامل در inputsJson:
+// مبنای زمان، تاکت (مستقیم/تقاضا)، سقف ایستگاه، وزن اهداف، بازتنظیم زمان
+// فعالیت‌ها و تخصیص وضع موجود (مرجع مقایسه).
+model BalanceScenario {
+  id        String  @id
+  projectId String
+
+  name   String
+  status String @default("active") // active | archived
+
+  inputsJson String
+  notes      String?
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  results BalanceResult[]
+
+  @@index([projectId, status])
+}
+
+// نتیجه بالانس — append-only: هر اجرای الگوریتم/ثبت تخصیص دستی = ردیف تازه
+// (تاریخچه کامل → مقایسه قبل/بعد و بازگشت). آخرین ردیف = وضعیت جاری.
+model BalanceResult {
+  id         String @id
+  scenarioId String
+  scenario   BalanceScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  // lcr | rpw | kilbridge-wester | manual
+  algorithm       String
+  algorithmVersion String
+  // solved | solved-with-flags | infeasible-flagged
+  status          String
+
+  assignmentsJson String
+  stationsJson    String
+  metricsJson     String
+  violationsJson  String
+  notesJson       String?
+
+  objectiveValue Float?
+  runMs          Float
+
+  createdBy String
+  createdAt DateTime @default(now())
+
+  @@index([scenarioId, createdAt])
 }

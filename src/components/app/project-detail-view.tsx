@@ -15,6 +15,7 @@ import {
   Pencil,
   Settings2,
   BarChart3,
+  Scale,
   Timer,
   UserPlus,
 } from "lucide-react";
@@ -54,7 +55,7 @@ import type { MemberDto } from "@/shared/contracts/api";
 import { DemoBadge, ErrorState, FaDate, LoadingBlock, LoadingCards, PageHeader, ReadinessChips, Spinner, StatusBadge } from "./ui-bits";
 import { ProjectEditDialog } from "./project-edit-dialog";
 
-export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, onOpenDiagrams, onOpenTiming, onOpenAnalysis }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void; onOpenDiagrams: () => void; onOpenTiming: () => void; onOpenAnalysis: () => void }) {
+export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, onOpenDiagrams, onOpenTiming, onOpenAnalysis, onOpenBalance }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void; onOpenDiagrams: () => void; onOpenTiming: () => void; onOpenAnalysis: () => void; onOpenBalance: () => void }) {
   const projectQuery = useProject(projectId);
   const versionsQuery = useProjectVersions(projectId);
   const membersQuery = useProjectMembers(projectId);
@@ -249,6 +250,25 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
               </div>
               <Button className="gap-2" onClick={onOpenAnalysis}>
                 <BarChart3 className="size-4" aria-hidden /> ورود به کارگاه تحلیل
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Scale className="size-4 text-primary" aria-hidden /> کارگاه بالانس خط و نیروی کار (فاز ۶)
+              </CardTitle>
+              <CardDescription>
+                سناریوهای B10 · الگوریتم‌های LCR / RPW / کیلبریج–وستر + تخصیص دستی · نمودار یامازومی با خط تاکت · گراف تقدم · شاخص‌های E/d/mMin با فرمول مستند · برآورد نیروی نظری/عملیاتی · مقایسه قبل/بعد
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span>ورودی: فعالیت‌های B5 با پیش‌نیازها + زمان‌های تحلیل فاز ۵ (یا بازتنظیم دستی)</span>
+              </div>
+              <Button className="gap-2" onClick={onOpenBalance}>
+                <Scale className="size-4" aria-hidden /> ورود به کارگاه بالانس
               </Button>
             </CardContent>
           </Card>

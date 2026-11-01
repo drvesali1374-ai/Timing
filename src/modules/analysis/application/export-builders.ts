@@ -8,11 +8,12 @@
  *  - JSON: در سرویس ساخته می‌شود — ردیابی کامل.
  */
 
-import type { ReportColumn, ReportRow, ReportTemplate } from "@/shared/contracts/analysis";
+import type { ReportColumn, ReportRow } from "@/shared/contracts/analysis";
 
-/** شکل گزارش برای سازنده‌های خروجی — از دامنه (بدون چرخه فایل). */
+/** شکل گزارش برای سازنده‌های خروجی — از دامنه (بدون چرخه فایل).
+ * template رشته‌ای آزاد است تا قالب‌های فاز ۶ (بالانس) هم بدون چرخه مصرف شوند. */
 export interface ReportExportShape {
-  template: ReportTemplate;
+  template: string;
   templateLabelFa: string;
   columns: ReportColumn[];
   rows: ReportRow[];

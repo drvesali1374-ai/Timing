@@ -45,6 +45,8 @@ export interface ActivityDto {
   archived: boolean;
   /** B5 — کلیدهای پیش‌نیاز (تقدم) */
   predecessors: string[];
+  /** B5/B10 — قیود تخصیص تجزیه‌شده (ناسازگاری وظایف — مصرف‌کننده: بالانس فاز ۶) */
+  constraints: { incompatibleWith: string[] };
   createdAt: string;
   updatedAt: string;
 }
@@ -63,9 +65,25 @@ function toDto(row: ActivityRow): ActivityDto {
     order: row.order,
     archived: row.archived,
     predecessors: parsePredecessors(row.predecessorsJson),
+    constraints: parseConstraints(row.constraintsJson),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/** تجزیه constraintsJson — فرمت معتبر: { incompatibleWith?: string[] } */
+function parseConstraints(json: string | null): { incompatibleWith: string[] } {
+  if (!json) return { incompatibleWith: [] };
+  try {
+    const parsed = JSON.parse(json) as { incompatibleWith?: unknown };
+    return {
+      incompatibleWith: Array.isArray(parsed.incompatibleWith)
+        ? parsed.incompatibleWith.filter((v): v is string => typeof v === "string")
+        : [],
+    };
+  } catch {
+    return { incompatibleWith: [] };
+  }
 }
 
 function parsePredecessors(json: string | null): string[] {

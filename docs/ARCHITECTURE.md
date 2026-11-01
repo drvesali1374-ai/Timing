@@ -316,3 +316,11 @@ src/
 - **یال‌های جدید فاز ۳ (یک‌طرفه):** `diagrams→audit` · `diagrams→activities` (application→application).
 - گراف کامل: `identity→audit · projects→identity · projects→profiles · projects→activities · projects→audit · config→audit · params→config · params→audit · activities→audit · diagrams→audit · diagrams→activities`.
 - هسته‌های مشترک جدید (shared/diagrams + shared/assistant) همان حقوق import قانونی UI را دارند که shared/formula داشت (ADR-011/012).
+
+
+### ماژول balance (فاز ۶ — B10)
+
+- **هسته خالص** `src/shared/balance/` (ADR-015): types (BalanceProblem/Solution قرارداد ENGINE_CONTRACTS بند ۵) · graph (چرخه/تناقض/نامعتبر/غیرقابل‌دستیابی/ستون‌های توپولوژیک) · algorithms (LCR/RPW/KW/Manual + رجیستری افزونه) · metrics (شاخص‌ها + validateAssignment قیود سخت/نرم).
+- **لایه‌ها**: domain (zod: تاکت/سناریو/حل/تخصیص) · application (ساخت مسئله از فعالیت‌ها + تحلیل فاز ۵ از طریق application ماژول‌های دیگر — قاعده مرزها) · infrastructure (repo Prisma).
+- **API**: /api/projects/[id]/balance/** (۶ مسیر — CRUD/solve/assignment/results/export)؛ ACL: balance:read/write.
+- **UI**: کارگاه بالانس ۸ تبی (سناریو/یامازومی/گراف تقدم/ماتریس/شاخص‌ها/مقایسه/گزارش/راهنما) + hooks/use-balance.

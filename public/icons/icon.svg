@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- آیکون پلتفرم زمان‌سنجی صنعتی — کرنومتر روی زمینه تیره صنعتی -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#292524"/>
+      <stop offset="1" stop-color="#1c1917"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fafaf9"/>
+      <stop offset="1" stop-color="#e7e5e4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- زمینه (بدنه) -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="#57534e" stroke-width="6"/>
+
+  <!-- حلقه آویز کرنومتر -->
+  <rect x="216" y="42" width="80" height="46" rx="23" fill="none" stroke="#a8a29e" stroke-width="22"/>
+
+  <!-- تاج بالا -->
+  <rect x="236" y="70" width="40" height="42" rx="8" fill="#a8a29e"/>
+  <rect x="322" y="96" width="52" height="18" rx="9" fill="#a8a29e" transform="rotate(38 322 105)"/>
+
+  <!-- صفحه کرنومتر -->
+  <circle cx="256" cy="292" r="168" fill="url(#face)"/>
+  <circle cx="256" cy="292" r="168" fill="none" stroke="#57534e" stroke-width="10"/>
+  <circle cx="256" cy="292" r="150" fill="none" stroke="#d6d3d1" stroke-width="4"/>
+
+  <!-- نشانگرهای ساعت -->
+  <g stroke="#292524" stroke-width="12" stroke-linecap="round">
+    <line x1="256" y1="160" x2="256" y2="184"/>
+    <line x1="256" y1="400" x2="256" y2="424"/>
+    <line x1="124" y1="292" x2="148" y2="292"/>
+    <line x1="364" y1="292" x2="388" y2="292"/>
+  </g>
+  <g stroke="#78716c" stroke-width="8" stroke-linecap="round">
+    <line x1="163" y1="199" x2="176" y2="212"/>
+    <line x1="336" y1="199" x2="349" y2="212"/>
+    <line x1="163" y1="385" x2="176" y2="372"/>
+    <line x1="336" y1="385" x2="349" y2="372"/>
+  </g>
+
+  <!-- عقربه‌ها — زاویه ۱۰:۱۰ کلاسیک ساعت‌سازی -->
+  <line x1="256" y1="292" x2="256" y2="196" stroke="#292524" stroke-width="18" stroke-linecap="round"/>
+  <line x1="256" y1="292" x2="330" y2="340" stroke="#292524" stroke-width="18" stroke-linecap="round"/>
+  <!-- عقربه ثانیه‌شمار کهربایی — هویت رنگی محصول -->
+  <line x1="256" y1="292" x2="196" y2="204" stroke="#d97706" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- محور مرکزی -->
+  <circle cx="256" cy="292" r="20" fill="#292524"/>
+  <circle cx="256" cy="292" r="8" fill="#d97706"/>
+</svg>

@@ -151,7 +151,20 @@ export interface InsertEventInput {
 /**
  * درج idempotent یک رویداد — تکراری (clientEventId همان) skip؛
  * تداخل seq با شناسه متفاوت → رد با علت (قرارداد صریح).
+ *
+ * پنجره رقابت (فاز ۷): دو درخواست هم‌زمان ممکن است هر دو بررسی اولیه را رد کنند و
+ * به create برسند؛ قید یکتای دیتابیس (P2002) آخرین مدافع idempotency است و
+ * اینجا صریح مدیریت می‌شود — هرگز ۵۰۰.
  */
+function isUniqueViolation(err: unknown): string[] | null {
+  const e = err as { code?: string; meta?: { target?: unknown } };
+  if (e?.code !== "P2002") return null;
+  const target = e.meta?.target;
+  if (Array.isArray(target)) return target.map(String);
+  if (typeof target === "string") return [target];
+  return [];
+}
+
 export async function insertEventRow(
   input: InsertEventInput,
 ): Promise<{ outcome: "inserted" | "duplicate" } | { outcome: "seq-conflict"; existingClientEventId: string }> {
@@ -166,8 +179,25 @@ export async function insertEventRow(
     return { outcome: "seq-conflict", existingClientEventId: seqOwner.clientEventId };
   }
 
-  await db.timingEvent.create({ data: input });
-  return { outcome: "inserted" };
+  try {
+    await db.timingEvent.create({ data: input });
+    return { outcome: "inserted" };
+  } catch (err) {
+    const fields = isUniqueViolation(err);
+    if (fields === null) throw err;
+    const hit = fields.join(",");
+    // قید clientEventId → همان رویداد از مسیر موازی درج شده است → duplicate
+    if (hit.includes("clientEventId")) return { outcome: "duplicate" };
+    // قید seq در پنجره رقابت → مالک جدید seq را بگیر و به‌عنوان تعارض seq گزارش کن
+    const owner = await db.timingEvent.findFirst({
+      where: { sessionId: input.sessionId, seq: input.seq },
+      select: { clientEventId: true },
+    });
+    if (owner && owner.clientEventId !== input.clientEventId) {
+      return { outcome: "seq-conflict", existingClientEventId: owner.clientEventId };
+    }
+    return { outcome: "duplicate" };
+  }
 }
 
 // ─────────────────────── چرخه‌های نهایی‌شده ───────────────────────

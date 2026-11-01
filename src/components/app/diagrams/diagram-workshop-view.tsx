@@ -64,7 +64,10 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
   const projectQuery = useProject(projectId);
   const diagramsQuery = useDiagrams(projectId);
   const [selectedDiagramId, setSelectedDiagramId] = useState<string | null>(null);
-  const diagramQuery = useDiagram(projectId, selectedDiagramId);
+  // انتخاب مؤثر: انتخاب کاربر یا اولین نمودار — مشتق در رندر (بدون setState در effect)
+  const firstDiagramId = diagramsQuery.data?.[0]?.id ?? null;
+  const activeDiagramId = selectedDiagramId ?? firstDiagramId;
+  const diagramQuery = useDiagram(projectId, activeDiagramId);
   const activitiesQuery = useProjectActivities(projectId);
 
   const saveMutation = useSaveRevision(projectId);
@@ -87,32 +90,27 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
     if (project?.title) onTitle?.(project.title);
   }, [project?.title, onTitle]);
 
-  // انتخاب خودکار اولین نمودار
-  useEffect(() => {
-    if (!selectedDiagramId && diagramsQuery.data && diagramsQuery.data.length > 0) {
-      setSelectedDiagramId(diagramsQuery.data[0].id);
-    }
-  }, [selectedDiagramId, diagramsQuery.data]);
-
   // بارگذاری سند در store + بررسی پیش‌نویس محلی (بازیابی پس از reload)
   const loadedDiagramId = useEditorStore((s) => s.diagramId);
   useEffect(() => {
     const detail = diagramQuery.data;
     if (!detail || detail.id === loadedDiagramId) return;
     useEditorStore.getState().init(detail.id, detail.doc, detail.layout);
-    setSaveStatus("saved");
-    setDraftRecovery(null);
-    // پیش‌نویس محلی مقدم بر سند سرور (اگر هست)
+    // پیش‌نویس محلی مقدم بر سند سرور (اگر هست) — به‌روزرسانی وضعیت پس از await
     void (async () => {
       try {
         const draft = await getDraft(projectId, detail.id);
         if (draft && draft.savedAt > detail.updatedAt) {
+          setSaveStatus("saved");
           setDraftRecovery({ doc: draft.doc, layout: draft.layout, savedAt: draft.savedAt });
-        } else if (draft) {
-          await deleteDraft(projectId, detail.id);
+        } else {
+          if (draft) await deleteDraft(projectId, detail.id);
+          setSaveStatus("saved");
+          setDraftRecovery(null);
         }
       } catch {
-        /* IndexedDB در دسترس نیست — بی‌صدا رد می‌شود */
+        setSaveStatus("saved");
+        setDraftRecovery(null);
       }
     })();
   }, [diagramQuery.data, loadedDiagramId, projectId]);
@@ -211,7 +209,7 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
   }, []);
 
   const diagrams = diagramsQuery.data ?? [];
-  const currentDiagramMeta = diagrams.find((d) => d.id === selectedDiagramId) ?? null;
+  const currentDiagramMeta = diagrams.find((d) => d.id === activeDiagramId) ?? null;
 
   if (projectQuery.isLoading || diagramsQuery.isLoading) {
     return (
@@ -293,8 +291,8 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
             <Button
               size="sm"
               onClick={() => {
-                if (selectedDiagramId) {
-                  useEditorStore.getState().init(selectedDiagramId, draftRecovery.doc as never, draftRecovery.layout as never);
+                if (activeDiagramId) {
+                  useEditorStore.getState().init(activeDiagramId, draftRecovery.doc as never, draftRecovery.layout as never);
                   setDraftRecovery(null);
                   toast.success("پیش‌نویس محلی بازیابی شد — ذخیره را فراموش نکنید.");
                 }
@@ -306,7 +304,7 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
               size="sm"
               variant="outline"
               onClick={async () => {
-                if (selectedDiagramId) await deleteDraft(projectId, selectedDiagramId);
+                if (activeDiagramId) await deleteDraft(projectId, activeDiagramId);
                 setDraftRecovery(null);
               }}
             >
@@ -332,7 +330,7 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
               <DiagramListItem
                 key={d.id}
                 diagram={d}
-                active={d.id === selectedDiagramId}
+                active={d.id === activeDiagramId}
                 onClick={() => {
                   if (useEditorStore.getState().dirty) {
                     void saveNow("ذخیره پیش از تغییر نمودار");
@@ -347,11 +345,11 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
         {/* بوم + پنل */}
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="flex min-h-[520px] flex-col overflow-hidden rounded-xl border bg-card">
-            {diagramQuery.isLoading && selectedDiagramId ? (
+            {diagramQuery.isLoading && activeDiagramId ? (
               <div className="flex flex-1 items-center justify-center p-8">
                 <Spinner />
               </div>
-            ) : !selectedDiagramId || !doc ? (
+            ) : !activeDiagramId || !doc ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
                 <Workflow className="size-10 text-muted-foreground/40" aria-hidden />
                 <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
@@ -538,7 +536,7 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
 
           {/* پنل سمت چپ (در RTL) */}
           <div className="min-h-0 overflow-hidden rounded-xl border bg-card xl:max-h-[calc(100vh-220px)]">
-            {selectedDiagramId && doc ? (
+            {activeDiagramId && doc ? (
               <Tabs defaultValue={selectedNodeId ? "props" : "validation"} className="h-full">
                 <TabsList className="mx-3 mt-2 grid w-auto grid-cols-3">
                   <TabsTrigger value="props" className="text-xs">
@@ -567,7 +565,7 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
                   <AssistantPanel
                     kind={doc.kind}
                     knownActivityKeys={knownActivityKeys}
-                    onCreateProposedVariant={() => setNewProposedFrom(selectedDiagramId)}
+                    onCreateProposedVariant={() => setNewProposedFrom(activeDiagramId)}
                   />
                 </TabsContent>
               </Tabs>
@@ -578,16 +576,16 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
         </div>
 
         {/* تاریخچه نسخه‌ها + مقایسه — ردیف دوم */}
-        {selectedDiagramId && currentDiagramMeta ? (
+        {activeDiagramId && currentDiagramMeta ? (
           <div className="grid gap-4 xl:grid-cols-2 lg:col-span-2">
             <div className="overflow-hidden rounded-xl border bg-card">
-              <RevisionHistoryPanel projectId={projectId} diagramId={selectedDiagramId} currentRev={currentDiagramMeta.currentRev} />
+              <RevisionHistoryPanel projectId={projectId} diagramId={activeDiagramId} currentRev={currentDiagramMeta.currentRev} />
             </div>
             <div className="overflow-hidden rounded-xl border bg-card">
               {currentDiagramMeta.variant === "proposed" ? (
-                <VariantComparePanel projectId={projectId} diagramId={selectedDiagramId} kind={currentDiagramMeta.kind} />
+                <VariantComparePanel projectId={projectId} diagramId={activeDiagramId} kind={currentDiagramMeta.kind} />
               ) : (
-                <NoCompareHint onCreate={() => setNewProposedFrom(selectedDiagramId)} />
+                <NoCompareHint onCreate={() => setNewProposedFrom(activeDiagramId)} />
               )}
             </div>
           </div>

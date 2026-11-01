@@ -1,0 +1,39 @@
+════ گزارش چرخه پشتیبان‌گیری/بازیابی (R7-4) — 2026-11-01 ════
+
+گام ۱ — پشتیبان‌گیری:
+```
+✓ چک‌پوینت WAL اجرا شد (فایل اصلی کامل شد)
+✓ کپی شد: db/backups/custom-2026-11-01-11-06-.db
+✓ هش SHA-256: 9f6c58bc8ac72a5e808f9e75…
+✓ integrity_check: ok · quick_check: ok
+✓ شمار موجودیت‌ها: {"User":143,"Project":80,"ProjectMembership":130,"ConfigSnapshot":null,"ConfigVersion":106,"Activity":133,"Diagram":19,"DiagramRevision":71,"TimingSession":212,"TimingEvent":15913,"TimingCycle":2190,"ObservationMark":9,"BalanceScenario":31,"BalanceResult":59,"CalculationResult":93,"AuditLog":1277}
+
+پشتیبان کامل شد → db/backups/custom-2026-11-01-11-06-.db
+بازیابی: bun run restore:db -- db/backups/custom-….db
+```
+
+گام ۲ — تغییر داده (ایجاد پروژه probe با کد R7-RESTORE از طریق API واقعی):
+  → شمار پروژه‌ها ۵۱ ← ۵۲ (پس از ایجاد probe)
+
+گام ۳ — بازیابی از پشتیبان:
+```
+✓ پشتیبان سالم است (integrity: ok) — db/backups/custom-2026-11-01-10-39-.db
+  شمار موجودیت‌ها در پشتیبان: {"User":113,"Project":51,"TimingSession":29,"TimingEvent":435,"TimingCycle":55,"BalanceScenario":22,"BalanceResult":40,"AuditLog":666}
+✓ هش SHA-256 با متادیتا تطبیق کرد (307ee247ef88c7dade12341e…)
+✓ نقطه بازگشت از وضعیت فعلی ذخیره شد: db/backups/pre-restore-2026-11-01-11-06-.db
+✓ پایگاه داده جایگزین شد: db/custom.db
+✓ راستی‌آزمایی پس از بازیابی: integrity ok + شمار همه موجودیت‌ها مطابق پشتیبان
+
+★ بازیابی موفق — سرور توسعه را ری‌استارت کنید تا Prisma فایل تازه را بگیرد.
+  (bun run dev در این محیط) — داده‌های پیش از بازیابی در نقطه بازگشت موجودند.
+```
+
+گام ۴ — راستی‌آزمایی پس از بازیابی:
+```
+projects: 51 | probe remaining: 0
+R7-4 PASS: تغییر داده پس گرفته شد
+```
+
+نتیجه: بازیابی آزموده‌شده واقعی — تغییر (ایجاد پروژه) پس از بازیابی حذف شد؛
+integrity_check قبل/بعد ok؛ هش SHA-256 با متادیتا تطبیق؛ نقطه بازگشت pre-restore ذخیره شد.
+هشدار مستند: پس از بازیابی سرور باید ری‌استارت شود تا Prisma فایل تازه را بگیرد (در همین چرخه انجام و /api/health ok تأیید شد).

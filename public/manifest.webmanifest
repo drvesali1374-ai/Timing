@@ -1,0 +1,58 @@
+{
+  "name": "زمان‌سنجی صنعتی — مطالعه کار، OPC/FPC و بالانس خط",
+  "short_name": "زمان‌سنجی صنعتی",
+  "description": "پلتفرم ماژولار زمان‌سنجی صنعتی، مطالعه کار، نمودارهای فرایندی OPC/FPC، تحلیل زمان و بالانس خط تولید",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "dir": "rtl",
+  "lang": "fa",
+  "background_color": "#fafaf9",
+  "theme_color": "#1c1917",
+  "categories": ["productivity", "business", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-64.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "کارگاه زمان‌سنجی",
+      "short_name": "زمان‌سنجی",
+      "description": "کرنومتر و ثبت مشاهدات",
+      "url": "/?view=timing"
+    },
+    {
+      "name": "طراح نمودارها",
+      "short_name": "نمودار",
+      "description": "ویرایشگر OPC/FPC",
+      "url": "/?view=diagrams"
+    }
+  ]
+}

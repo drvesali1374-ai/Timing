@@ -120,7 +120,7 @@ export function TimingWorkshopView({ projectId, onBack, onTitle }: TimingWorksho
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
           {sessions.data?.map((s) => (
-            <Card key={s.id} className="py-0 transition-shadow hover:shadow-md">
+            <Card key={s.id} className="min-w-0 py-0 transition-shadow hover:shadow-md">
               <CardHeader className="flex-row items-start justify-between space-y-0 p-4 pb-2">
                 <div className="min-w-0 space-y-1.5">
                   <CardTitle className="flex flex-wrap items-center gap-2 text-sm">

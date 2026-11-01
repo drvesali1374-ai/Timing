@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>آفلاین — زمان‌سنجی صنعتی</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: Vazirmatn, Tahoma, "Segoe UI", sans-serif;
+    background: #fafaf9;
+    color: #292524;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+  .card {
+    max-width: 30rem;
+    width: 100%;
+    background: #fff;
+    border: 1px solid #e7e5e4;
+    border-radius: 1rem;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(41, 37, 36, 0.06);
+  }
+  .icon {
+    width: 4.5rem;
+    height: 4.5rem;
+    margin: 0 auto 1.25rem;
+    display: block;
+  }
+  h1 { font-size: 1.35rem; font-weight: 700; margin-bottom: 0.75rem; }
+  p { font-size: 0.95rem; line-height: 1.9; color: #57534e; margin-bottom: 0.75rem; }
+  ul { text-align: right; font-size: 0.875rem; line-height: 2.1; color: #57534e; list-style: none; margin: 1rem 0 1.5rem; padding: 1rem; background: #f5f5f4; border-radius: 0.75rem; }
+  ul li::before { content: "◄ "; color: #d97706; font-size: 0.7em; margin-left: 0.5rem; }
+  button {
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    background: #292524;
+    color: #fafaf9;
+    border: none;
+    border-radius: 0.6rem;
+    padding: 0.75rem 2rem;
+    cursor: pointer;
+    min-height: 44px;
+  }
+  button:hover { background: #1c1917; }
+  .badge { display: inline-block; margin-top: 1.25rem; font-size: 0.75rem; color: #a8a29e; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <svg class="icon" viewBox="0 0 512 512" aria-hidden="true">
+      <rect x="16" y="16" width="480" height="480" rx="96" fill="#292524"/>
+      <rect x="216" y="42" width="80" height="46" rx="23" fill="none" stroke="#a8a29e" stroke-width="22"/>
+      <circle cx="256" cy="292" r="168" fill="#fafaf9"/>
+      <circle cx="256" cy="292" r="168" fill="none" stroke="#57534e" stroke-width="10"/>
+      <line x1="256" y1="292" x2="256" y2="196" stroke="#292524" stroke-width="18" stroke-linecap="round"/>
+      <line x1="256" y1="292" x2="330" y2="340" stroke="#292524" stroke-width="18" stroke-linecap="round"/>
+      <line x1="256" y1="292" x2="196" y2="204" stroke="#d97706" stroke-width="10" stroke-linecap="round"/>
+      <circle cx="256" cy="292" r="20" fill="#292524"/>
+      <circle cx="256" cy="292" r="8" fill="#d97706"/>
+    </svg>
+    <h1>اتصال اینترنت برقرار نیست</h1>
+    <p>پوسته برنامه به‌صورت آفلاین بارگذاری شد؛ اما این صفحه نیازمند اتصال برای داده‌های تازه است.</p>
+    <ul>
+      <li>جلسه زمان‌سنجی بارگذاری‌شده به ثبت آفلاین در حافظه محلی ادامه می‌دهد و پس از اتصال، خودکار همگام می‌شود.</li>
+      <li>پیش‌نویس نمودار OPC/FPC در حافظه محلی ذخیره می‌ماند.</li>
+      <li>سایر بخش‌ها (پروژه‌ها، تحلیل، بالانس) نیازمند اتصال‌اند.</li>
+    </ul>
+    <button onclick="location.reload()" type="button">تلاش دوباره</button>
+    <span class="badge">زمان‌سنجی صنعتی — حالت آفلاین PWA</span>
+  </main>
+</body>
+</html>

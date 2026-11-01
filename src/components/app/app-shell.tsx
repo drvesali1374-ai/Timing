@@ -233,7 +233,7 @@ export function AppShell({ user, view, onNavigate, children, projectTitle }: App
       {/* فوتر چسبان */}
       <footer className="mt-auto border-t bg-background">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-muted-foreground">
-          <span>زمان‌سنجی صنعتی — نسخه ۰٫۷٫۰ (فاز ۶: بالانس خط و نیروی کار)</span>
+          <span>زمان‌سنجی صنعتی — نسخه ۱٫۰٫۰ (نسخه پایدار — فاز ۷: یکپارچه‌سازی و انتشار)</span>
           <span className="flex items-center gap-2">
             <span className="inline-block size-1.5 rounded-full bg-emerald-500" aria-hidden />
             داده‌ها روی سرور ذخیره می‌شوند؛ رویدادهای زمان‌سنجی ابتدا روی دستگاه ثبت و سپس همگام می‌شوند

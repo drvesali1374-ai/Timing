@@ -14,6 +14,7 @@ import {
   Network,
   Pencil,
   Settings2,
+  BarChart3,
   Timer,
   UserPlus,
 } from "lucide-react";
@@ -53,7 +54,7 @@ import type { MemberDto } from "@/shared/contracts/api";
 import { DemoBadge, ErrorState, FaDate, LoadingBlock, LoadingCards, PageHeader, ReadinessChips, Spinner, StatusBadge } from "./ui-bits";
 import { ProjectEditDialog } from "./project-edit-dialog";
 
-export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, onOpenDiagrams, onOpenTiming }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void; onOpenDiagrams: () => void; onOpenTiming: () => void }) {
+export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, onOpenDiagrams, onOpenTiming, onOpenAnalysis }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void; onOpenDiagrams: () => void; onOpenTiming: () => void; onOpenAnalysis: () => void }) {
   const projectQuery = useProject(projectId);
   const versionsQuery = useProjectVersions(projectId);
   const membersQuery = useProjectMembers(projectId);
@@ -229,6 +230,25 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
               </div>
               <Button className="gap-2" onClick={onOpenTiming}>
                 <Timer className="size-4" aria-hidden /> ورود به کارگاه زمان‌سنجی
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BarChart3 className="size-4 text-primary" aria-hidden /> کارگاه تحلیل مهندسی زمان (فاز ۵)
+              </CardTitle>
+              <CardDescription>
+                آمار B9 · زنجیره نماینده ← نرمال ← استاندارد با دو قرارداد مجاز · مدیریت داده ناقص/پرت (علامت/حذف جدا) · کیفیت نمونه · گزارش‌ها و خروجی CSV/Excel/JSON/PDF
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <span>ورودی: جلسات نهایی‌شده و موتور فرمول نسخه‌دار — بدون داده نمایشی جعلی</span>
+              </div>
+              <Button className="gap-2" onClick={onOpenAnalysis}>
+                <BarChart3 className="size-4" aria-hidden /> ورود به کارگاه تحلیل
               </Button>
             </CardContent>
           </Card>

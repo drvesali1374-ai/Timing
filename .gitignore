@@ -42,13 +42,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 local-*
+!src/lib/local-model.ts
 .claude
 .z-ai-config
 *.log
 dev.log
 dev.out.log
-test
-prompt
+/test
+/prompt
 
 server.log
 # Skills directory

@@ -10,7 +10,8 @@ import type { ProfileDefinition } from "@/modules/profiles/domain/profile";
 
 export const generalIndustrialTimeStudy = {
   id: "profile.general-industrial-time-study",
-  semver: "1.1.0",
+  // 1.2.0 (فاز ۵): افزودن agg.outlierRule برای قاعده صریح پرت (B9 — حذف بر اساس قاعده انتخاب‌شده)
+  semver: "1.2.0",
   nameFa: "مطالعه عمومی زمان صنعتی",
   description:
     "پروفایل پیش‌فرض برای مطالعه زمان چرخه‌ای کارهای تولیدی و غیرتولیدی با کرنومتر (دستی یا دیجیتال): تفکیک عناصر، ثبت مشاهدات، ارزیابی عملکرد اختیاری و تعیین زمان نرمال و استاندارد بر پایه مجازهای توافق‌شده سازمان. زنجیره تحلیل کامل «مشاهده‌شده ← نماینده ← نرمال ← استاندارد ← استاندارد چرخه» به‌همراه شاخص‌های کیفیت نمونه از ابتدای ایجاد پروژه فعال است.",
@@ -113,6 +114,21 @@ export const generalIndustrialTimeStudy = {
               { value: "outlierRule", labelFa: "حذف پرت‌ها بر قاعده" },
             ],
             helpFa: "«حذف پرت‌ها بر قاعده» یعنی مشاهدات خارج از قاعده تعریف‌شده پروژه حذف و سپس تجمیع انجام می‌شود.",
+            displayContexts: ["form", "report"],
+          },
+          {
+            // فاز ۵ — قاعده پرت برای agg.method=outlierRule (B9: حذف بر اساس قاعده انتخاب‌شده)
+            stableKey: "agg.outlierRule",
+            nameFa: "قاعده تشخیص داده پرت",
+            dataType: "singleSelect",
+            analysisRole: "variable",
+            defaultValue: "iqr-1.5",
+            options: [
+              { value: "iqr-1.5", labelFa: "IQR توکی (k=۱٫۵) — Tukey ۱۹۷۷" },
+              { value: "z-3", labelFa: "z-score سه‌سیگمایی (|z|>۳)" },
+            ],
+            helpFa:
+              "قاعده‌ای که با «حذف پرت‌ها بر قاعده» کنارگذاشتن مشکوک‌ها را تعیین می‌کند؛ تشخیص پرت ≠ حذف خودکار — علامت/حذف دستی همیشه جدا است. دو قاعده نتیجه یکسان نمی‌دهند.",
             displayContexts: ["form", "report"],
           },
         ],

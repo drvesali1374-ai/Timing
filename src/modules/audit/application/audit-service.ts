@@ -38,6 +38,10 @@ export const AUDIT_ACTIONS = {
   sessionCreated: "timing.session-created",
   sessionFinalized: "timing.session-finalized",
   eventCorrected: "timing.event-corrected",
+  // ── فاز ۵ ──
+  analysisMarkSaved: "analysis.mark-saved",
+  analysisSessionContextSaved: "analysis.session-context-saved",
+  analysisExported: "analysis.exported",
 } as const;
 
 export interface AuditInput {

@@ -340,7 +340,34 @@ model Activity {
   @@index([projectId, archived])
 }
 
-// ─────────────────── فاز ۴: کرنومتر و مشاهدات (B8 — ADR-004 · DATA_DICTIONARY §۲٫۱۱–۲٫۱۴) ───────────────────
+// ─────────────────── فاز ۵: تحلیل مهندسی زمان (B9/B4 — DATA_DICTIONARY §۲٫۱۵) ───────────────────
+
+// علامت مشاهده — append-only با تاریخچه: هر تغییر حالت = ردیف جدید؛
+// آخرین ردیف هر (sessionId, readingEventId) حالت جاری است (latest-wins + تاریخچه کامل).
+// علامت‌گذاری «داده پرت» و «حذف از محاسبه» دو عمل جدا هستند (بند ۲ فاز ۵) —
+// هر دو با علت ثبت‌شده؛ حذف بدون علت رد می‌شود (B9: حذف بر اساس قاعده/علت).
+model ObservationMark {
+  id        String @id
+  sessionId String
+  session   TimingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // هویت مشاهده: رویداد قرائت مبنای عنصر در چرخه (یکتا)
+  readingEventId String
+  cycleSeq       Int
+  elementKey     String
+
+  // عمل ۱: علامت «داده پرت/مشکوک» — فقط برچسب؛ اثبات پرت نیست
+  outlierMarked Boolean @default(false)
+  // عمل ۲: حذف از محاسبه — جدا از علامت؛ نیازمند علت
+  excluded Boolean @default(false)
+  reason   String?
+
+  markedBy String
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, readingEventId, createdAt])
+  @@index([sessionId, cycleSeq, elementKey])
+}
 
 // جلسه زمان‌سنجی — داده پروژه (نه پیکربندی). اسنپ‌شات عناصر برای پایداری تاریخی رکورد.
 model TimingSession {
@@ -389,6 +416,7 @@ model TimingSession {
   project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   events   TimingEvent[]
   cycles   TimingCycle[]
+  marks    ObservationMark[]
 
   @@index([projectId, status])
   @@index([projectId, createdAt])

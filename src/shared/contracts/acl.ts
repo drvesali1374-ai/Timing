@@ -35,6 +35,9 @@ export const PROJECT_ACTIONS = [
   // فاز ۴ — کرنومتر و مشاهدات
   "observations:read",
   "observations:write",
+  // فاز ۵ — تحلیل مهندسی زمان
+  "analysis:read",
+  "analysis:write",
 ] as const;
 export type ProjectAction = (typeof PROJECT_ACTIONS)[number];
 
@@ -52,6 +55,8 @@ export const ROLE_PERMISSIONS: Record<ProjectRole, readonly ProjectAction[]> = {
     "diagrams:write",
     "observations:read",
     "observations:write",
+    "analysis:read",
+    "analysis:write",
   ],
   editor: [
     "project:read",
@@ -64,10 +69,12 @@ export const ROLE_PERMISSIONS: Record<ProjectRole, readonly ProjectAction[]> = {
     "diagrams:write",
     "observations:read",
     "observations:write",
+    "analysis:read",
+    "analysis:write",
   ],
-  // recorder: ثبت‌کننده مشاهدات — نقش اصلی فاز ۴ (observations:write)
-  recorder: ["project:read", "config:read", "diagrams:read", "observations:read", "observations:write"],
-  viewer: ["project:read", "config:read", "diagrams:read", "observations:read"],
+  // recorder: ثبت‌کننده مشاهدات (فاز ۴) + خواندن تحلیل؛ تغییر علامت/تنظیم تحلیل = تحلیلگر (owner/editor)
+  recorder: ["project:read", "config:read", "diagrams:read", "observations:read", "observations:write", "analysis:read"],
+  viewer: ["project:read", "config:read", "diagrams:read", "observations:read", "analysis:read"],
 };
 
 export function isProjectRole(value: unknown): value is ProjectRole {

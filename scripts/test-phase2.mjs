@@ -216,7 +216,8 @@ async function main() {
   check("جداسازی: مقدار A در B ظاهر نمی‌شود", !bOven);
 
   // استقلال از الگو (بند ۸ فاز ۲): تغییر الگو نباید پروژه را تغییر دهد — با نسخه الگوی ثبت‌شده اثبات می‌شود
-  check("استقلال: snapshot A به نسخه الگوی لحظه ایجاد گره خورده", cfgA.body.snapshot.meta.templateVersion === "1.1.0" && cfgB.body.snapshot.meta.templateVersion === "1.1.0");
+  // فاز ۵: الگوی پیش‌فرض ۱٫۱٫۰ → ۱٫۲٫۰ (افزودن agg.outlierRule — ADR-014)؛ snapshot به نسخه لحظه ایجاد گره می‌خورد
+  check("استقلال: snapshot A به نسخه الگوی لحظه ایجاد گره خورده", cfgA.body.snapshot.meta.templateVersion === "1.2.0" && cfgB.body.snapshot.meta.templateVersion === "1.2.0");
 
   // ─── R2-2: قطعیت ───
   console.log("\n[۲] R2-2 — قطعیت و بازتولید نتیجه");

@@ -18,6 +18,10 @@ const db = new PrismaClient();
 // از مسیر ماژول با alias استفاده می‌کنیم (bun از tsconfig paths پشتیبانی می‌کند)
 import { PROFILE_DEFINITIONS } from "../src/modules/profiles/definitions";
 import { instantiateSnapshot, buildV2Content } from "../src/modules/profiles/domain/profile";
+import { ManualClock } from "../src/shared/timing/clock";
+import { ChronoEngine } from "../src/shared/timing/engine";
+import { deriveSession } from "../src/shared/timing/derive";
+import type { ChronoEvent, TimingElementRef } from "../src/shared/timing/types";
 
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -224,10 +228,182 @@ async function seedDemoActivities(projectId: string, demoUserId: string) {
   console.log(`[seed] demo activities: ${demoActivities.length} عنصر نمونه ثبت شد`);
 }
 
+// ─────────────── فاز ۵: جلسات نمونه نهایی‌شده برای پروژه isDemo ───────────────
+// داده نمونه آموزشی — فقط پروژه isDemo؛ با داده واقعی مخلوط نمی‌شود (قاعده بخش D).
+// مسیر تولید: همان هسته واقعی (ChronoEngine + ManualClock + deriveSession) — بدون جعل.
+
+async function seedDemoTimingSessions(projectId: string, demoUserId: string) {
+  const existing = await db.timingSession.count({ where: { projectId } });
+  if (existing > 0) {
+    console.log(`[seed] demo timing sessions exist: ${existing}`);
+    return;
+  }
+
+  const demoActs = await db.activity.findMany({ where: { projectId }, orderBy: { order: "asc" } });
+  if (demoActs.length === 0) return;
+
+  const elements: TimingElementRef[] = demoActs.map((a, i) => ({
+    key: a.stableKey,
+    name: a.name,
+    activityStableKey: a.stableKey,
+    order: i + 1,
+  }));
+
+  // سناریوی نمونه ۱: پیوسته — ۸ چرخه با پراکندگی واقع‌گرایانه + یک مشاهده پرت + یک وقفه
+  const baseCycle: Record<string, number> = {
+    "el.fetch-housing": 4100,
+    "el.insert-core": 6200,
+    "el.tighten-bolts": 8300,
+    "el.press-test": 12000,
+    "el.wait-press": 12000,
+    "el.final-inspect": 3100,
+  };
+  const jitter = (base: number, pct: number, rnd: () => number) => Math.round(base * (1 + (rnd() * 2 - 1) * pct));
+
+  // مولد شبه‌تصادفی قطعی (seed ثابت) — داده نمونه بازتولیدپذیر
+  let seedState = 42;
+  const rnd = () => {
+    seedState = (seedState * 1664525 + 1013904223) % 4294967296;
+    return seedState / 4294967296;
+  };
+
+  const buildSessionEvents = (sessionNo: number, cycles: number, opts: { outlierAt?: number; pauseAt?: number }): ChronoEvent[] => {
+    const clock = new ManualClock(0, Date.UTC(2026, 9, 31, 6, sessionNo * 2, 0));
+    let idc = 0;
+    const idGen = () => `demo${sessionNo}-${String((idc += 1)).padStart(4, "0")}`;
+    const engine = new ChronoEngine({ clock, sessionId: "demo", method: "continuous", elements, idGen });
+    engine.start();
+    for (let c = 1; c <= cycles; c += 1) {
+      engine.cycleStart();
+      for (const el of elements) {
+        const isOutlier = opts.outlierAt === c && el.key === "el.tighten-bolts";
+        const ms = isOutlier ? baseCycle[el.key] * 2 : jitter(baseCycle[el.key], 0.08, rnd);
+        clock.advance(ms);
+        engine.recordReading(el.key);
+      }
+      if (opts.pauseAt === c) {
+        engine.pause("کمبود قطعه — انتظار برای تأمین");
+        clock.advance(45_000);
+        engine.resume();
+      }
+    }
+    engine.stop("پایان جلسه نمونه");
+    return [...engine.events()];
+  };
+
+  const sessionsSpec = [
+    { no: 1, cycles: 8, opts: { outlierAt: 6, pauseAt: 4 }, observer: "مهندس مطالعه کار (نمونه)" },
+    { no: 2, cycles: 7, opts: {}, observer: "مهندس مطالعه کار (نمونه)" },
+    { no: 3, cycles: 6, opts: {}, observer: "کارشناس دوم (نمونه)" },
+  ];
+
+  for (const spec of sessionsSpec) {
+    const sessionId = uuidv7();
+    const events = buildSessionEvents(spec.no, spec.cycles, spec.opts);
+    const derived = deriveSession(events, elements, { method: "continuous", tolerancePct: 5 });
+
+    await db.timingSession.create({
+      data: {
+        id: sessionId,
+        projectId,
+        method: "continuous",
+        status: "finalized",
+        observer: spec.observer,
+        elementsJson: JSON.stringify(elements),
+        elementAdvanceMode: "manual",
+        tolerancePct: 5,
+        elementSource: "activities",
+        startedAtWall: derived.startedAtWall ? new Date(derived.startedAtWall) : null,
+        endedAtWall: derived.endedAtWall ? new Date(derived.endedAtWall) : null,
+        integrityFlagsJson: derived.flags.length > 0 ? JSON.stringify(derived.flags) : null,
+        notes: "جلسه نمونه آموزشی (isDemo) — از هسته واقعی ChronoEngine با ManualClock قطعی تولید شد؛ داده آموزشی است.",
+        createdBy: demoUserId,
+      },
+    });
+
+    // رویدادها — append-only با clientEventId یکتا
+    for (const ev of events) {
+      await db.timingEvent.create({
+        data: {
+          id: uuidv7(),
+          sessionId,
+          clientEventId: ev.clientEventId,
+          seq: ev.seq,
+          type: ev.type,
+          elementId: ev.elementId ?? null,
+          cycleNo: ev.cycleNo,
+          elapsedActiveMs: ev.elapsedActiveMs,
+          splitMs: ev.splitMs ?? null,
+          wallClock: new Date(ev.wallClock),
+          note: ev.note ?? null,
+          interruptionReason: ev.interruptionReason ?? null,
+          correctionOf: ev.correctionOf ?? null,
+          correctedValueMs: ev.correctedValueMs ?? null,
+          correctionReason: ev.correctionReason ?? null,
+          integrityJson: ev.integrity && ev.integrity.length > 0 ? JSON.stringify(ev.integrity) : null,
+          origin: "normal",
+          receivedBy: demoUserId,
+        },
+      });
+    }
+
+    // رویداد نهایی‌سازی (تولید سرور — قرارداد فاز ۴)
+    await db.timingEvent.create({
+      data: {
+        id: uuidv7(),
+        sessionId,
+        clientEventId: `finalize-${uuidv7()}`,
+        seq: events.length + 1,
+        type: "finalize",
+        elementId: null,
+        cycleNo: derived.currentCycleNo,
+        elapsedActiveMs: derived.activeMs,
+        splitMs: null,
+        wallClock: new Date(),
+        note: null,
+        interruptionReason: null,
+        correctionOf: null,
+        correctedValueMs: null,
+        correctionReason: null,
+        integrityJson: null,
+        origin: "normal",
+        receivedBy: demoUserId,
+      },
+    });
+
+    // چرخه‌های مشتق — ورودی پایدار تحلیل فاز ۵
+    for (const cyc of derived.cycles) {
+      await db.timingCycle.create({
+        data: {
+          id: uuidv7(),
+          sessionId,
+          seq: cyc.seq,
+          status: cyc.status,
+          startedAtEventId: cyc.startedAtEventId,
+          endedAtEventId: cyc.endedAtEventId ?? null,
+          startedElapsedMs: cyc.startedElapsedMs,
+          endedElapsedMs: cyc.endedElapsedMs ?? null,
+          cycleTimeMs: cyc.cycleTimeMs ?? null,
+          elementsSumMs: cyc.elementsSumMs,
+          deviationPct: cyc.deviationPct ?? null,
+          elementsJson: JSON.stringify(cyc.elements),
+          interruptionsJson: JSON.stringify(cyc.interruptions),
+          flagsJson: cyc.flags.length > 0 ? JSON.stringify(cyc.flags) : null,
+        },
+      });
+    }
+    console.log(`[seed] demo timing session ${spec.no}: ${spec.cycles} چرخه · ${events.length} رویداد`);
+  }
+}
+
 async function main() {
   await seedProfiles();
   const demoUser = await seedDemoUser();
+  const demoProject = await db.project.findFirst({ where: { isDemo: true, createdById: demoUser.id } });
   await seedDemoProject(demoUser.id);
+  if (demoProject) {
+    await seedDemoTimingSessions(demoProject.id, demoUser.id);
+  }
   console.log("[seed] done ✓");
 }
 

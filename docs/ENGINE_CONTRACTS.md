@@ -103,7 +103,41 @@ interface ChronoEngine {
 ۶. `clientEventId` idempotent → کلیک تکراری/retry دوباره‌شماری نمی‌کند.
 ۷. ورودی عناصر/چرخه از پروفایل پروژه (پیوسته/سnapback/lap) — موتور مستقل از UI و از مدل داده سرور.
 
-## ۴. موتور بالانس خط (فاز ۶)
+## ۴. موتور تحلیل مهندسی زمان (فاز ۵)
+
+### ورودی (immutable — خالص)
+```ts
+// هسته خالص — shared/analysis (بدون DOM/DB)
+interface AnalysisKernelInput {
+  observations: MarkedObservation[]   // از چرخه‌های نهایی‌شده + علامت‌های append-only
+  settings: AnalysisSettings          // agg.method/rating/allowance/stats — پارامترهای project-scope
+}
+// سرویس (modules/analysis): ارزیابی زنجیره از مسیر موتور فرمول فاز ۲ با
+// snapshot پروژه (TS-001/002/010/011/012 نسخه‌دار) + راستی‌آزمایی متقابل با هسته.
+```
+
+### خروجی
+```ts
+interface TimeChain {
+  representative: { value: ms | null; status: 'valid'|'incomplete'|'invalid'; method; effectiveN; warningsFa }
+  normal:         { value: ms | null; status; ratingApplied; ratingFactorPct | null; labelFa }  // خام بدون ارزیابی
+  standard:       { value: ms | null; status; allowanceMethod; allowanceRatePct | null; baseFa }
+}
+interface ElementAnalysis { counts; stats: DescriptiveStats; histogram; outlierDetection; quality; chain; formulaTrace }
+```
+
+### قیود
+۱. **دو عمل جدا:** علامت «داده پرت» ≠ «حذف از محاسبه»؛ حذف بدون علت در اعتبارسنجی رد می‌شود (B9).
+۲. تشخیص پرت (IQR توکی k=۱٫۵ / z-score |z|>۳) فقط «شناسایی» است؛ agg=outlierRule کنارگذاشتن قاعده‌ای را با ثبت قاعده انجام می‌دهد.
+۳. بدون ارزیابی عملکرد → «زمان خام» با وضعیت incomplete — نام «زمان نرمال قطعی» ممنوع (B4).
+۴. دو قرارداد مجاز نابرابرند: on-normal یعنی ST=NT×(1+r) و on-standard یعنی ST=NT÷(1−r)؛ پایه درصد صریح.
+۵. گام زنجیره اگر فرمول نسخه‌دارش منسوخ/غایب باشد → incomplete صادقانه (حتی اگر ریاضیات هسته عدد بدهد).
+۶. مقادیر موتور فرمول بر حسب ثانیه (inputContract کتابخانه)؛ هسته ms؛ تلورانس تطابق ۱e-۶s.
+۷. ردیابی: هر خروجی مهم → نسخه پیکربندی + کلید/نسخه فرمول + روش تجمیع + واحد + تنظیمات + شمارش ورودی (بلوک trace).
+۸. خروجی‌ها: CSV (UTF-8 BOM) / XLS (SpreadsheetML-2003 RTL) / JSON (ردیابی کامل)؛ PDF از مسیر چاپ مرورگر (ADR-014).
+۹. هسته از UI و Prisma مستقل است؛ DTOها در shared/contracts/analysis (قاعده مرزها).
+
+## ۵. موتور بالانس خط (فاز ۶)
 
 ### ورودی
 ```ts
@@ -138,7 +172,7 @@ interface BalanceSolution {
 ۶. تخصیص دستی کاربر مجاز است و فوری اعتبارسنجی/بازمحاسبه می‌شود؛ نامعتبری بی‌صدا پذیرفته نمی‌شود.
 ۷. موتور از UI و از Prisma مستقل است — ورودی/خروجی داده محض.
 
-## ۵. جدول تحویل قراردادها به فازهای بعد
+## ۶. جدول تحویل قراردادها به فازهای بعد
 
 | قرارداد | پیاده‌سازی در | مصرف‌کننده‌های اصلی |
 |---|---|---|

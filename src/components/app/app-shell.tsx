@@ -2,8 +2,6 @@
 
 /**
  * پوسته برنامه — هدر + ناوبری (دسکتاپ: کنار، موبایل: Sheet) + فوتر چسبان.
- * ساختار فاز ۱: داشبورد پروژه‌ها و ایجاد پروژه؛ بخش‌های فازهای بعد منو می‌شوند
- * با برچسب فاز مربوطه (نمایش صادقانه — بدون لینک ساختگی).
  */
 import { useEffect, useState } from "react";
 import { FolderPlus, LayoutDashboard, Menu, Timer, Wifi, WifiOff } from "lucide-react";
@@ -86,10 +84,6 @@ function NavList({ view, onNavigate, onPick }: { view: ViewName; onNavigate: (v:
           </Button>
         );
       })}
-      <div className="mt-2 rounded-lg border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
-        <p className="mb-1 font-medium">فازهای بعدی محصول:</p>
-        <p>یکپارچه‌سازی و انتشار (فاز ۷)</p>
-      </div>
     </nav>
   );
 }
@@ -128,7 +122,7 @@ export function AppShell({ user, view, onNavigate, children, projectTitle }: App
               <Timer className="size-4" aria-hidden />
             </span>
             <span className="hidden text-sm sm:inline">زمان‌سنجی صنعتی</span>
-            <Badge variant="secondary" className="hidden font-mono text-[10px] sm:inline-flex">فاز ۴</Badge>
+            <Badge variant="secondary" className="hidden font-mono text-[10px] sm:inline-flex" dir="ltr">v1.0.0</Badge>
           </button>
 
           <div className="flex-1" />
@@ -233,7 +227,7 @@ export function AppShell({ user, view, onNavigate, children, projectTitle }: App
       {/* فوتر چسبان */}
       <footer className="mt-auto border-t bg-background">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs text-muted-foreground">
-          <span>زمان‌سنجی صنعتی — نسخه ۱٫۰٫۰ (نسخه پایدار — فاز ۷: یکپارچه‌سازی و انتشار)</span>
+          <span>زمان‌سنجی صنعتی — نسخه ۱٫۰٫۰</span>
           <span className="flex items-center gap-2">
             <span className="inline-block size-1.5 rounded-full bg-emerald-500" aria-hidden />
             داده‌ها روی سرور ذخیره می‌شوند؛ رویدادهای زمان‌سنجی ابتدا روی دستگاه ثبت و سپس همگام می‌شوند

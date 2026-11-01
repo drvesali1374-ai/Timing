@@ -325,7 +325,7 @@ function ProfileCard({
       }}
     >
       {profile.isDefault && (
-        <span className="absolute -top-2.5 right-4 z-10 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground shadow">
+        <span className="absolute -top-2.5 start-4 z-10 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground shadow">
           پیش‌فرض — از پیش انتخاب‌شده
         </span>
       )}
@@ -535,7 +535,7 @@ function ProfilePreviewDialog({ profileId, onClose }: { profileId: string; onClo
             {detail.data ? `نسخه ${detail.data.semver} · ${detail.data.source.name} — ${detail.data.source.version}` : "در حال بارگذاری…"}
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[70vh] pr-3">
+        <ScrollArea className="max-h-[70vh] pe-3">
           {detail.isLoading || !detail.data ? (
             <LoadingBlock lines={8} />
           ) : (

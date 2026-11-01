@@ -4,7 +4,7 @@
  * بوم ویرایشگر نمودار — React Flow v12 (ADR-007) — کاملاً کنترل‌شده توسط store.
  * منبع حقیقت: editor-store (doc/layout)؛ گره/یال RF از store مشتق می‌شوند
  * (بدون state محلی موازی — رفع هشدار «node not initialized»).
- * ایجاد گام از نوار ابزار · drag-and-drop · اتصال جهت‌دار (هندل بالا→پایین) ·
+ * ایجاد گام از نوار ابزار گروه‌بندی‌شده · اتصال چهارجهته (هر ضلع source+target) ·
  * zoom/pan · شبکه اختیاری · انتخاب/حذف · undo/redo · RTL بدون معکوس‌شدن پیکان.
  */
 
@@ -15,6 +15,7 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  type Connection,
   type EdgeChange,
   type Node,
   type NodeChange,
@@ -22,7 +23,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toast } from "sonner";
-import { ArrowDownAZ, Copy, Grid3x3, Map as MapIcon, Redo2, Trash2, Undo2 } from "lucide-react";
+import { ArrowDownAZ, Expand, Grid3x3, Map as MapIcon, Minimize, Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEditorStore } from "./editor-store";
@@ -32,11 +33,25 @@ import {
   FPC_SYMBOL_LABELS_FA,
   OPC_SYMBOLS,
   FPC_SYMBOLS,
+  effectiveSourceSide,
+  effectiveTargetSide,
+  handleId,
+  handleSideFromId,
   type DiagramKind,
   type DiagramSymbol,
 } from "@/shared/diagrams/types";
 
 const nodeTypes = { diagramStep: DiagramStepNode };
+
+/** گروه ابزار با برچسب — جداکننده بصری بین خوشه‌های عملیاتی */
+function ToolGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-1 rounded-lg border bg-background/60 p-0.5" role="group" aria-label={label}>
+      <span className="sr-only">{label}</span>
+      {children}
+    </div>
+  );
+}
 
 /**
  * کش هویت پایدار گره‌ها در سطح ماژول — بازسازی آبجکت در هر رندر، ری‌اینیش RF و
@@ -50,17 +65,18 @@ export interface DiagramCanvasProps {
   distanceUnit?: string;
   errorNodeIds: Set<string>;
   warningNodeIds: Set<string>;
+  /** حالت تمام‌صفحه — دکمه در گروه «نمایش» */
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
-export function DiagramCanvas({ kind, distanceUnit, errorNodeIds, warningNodeIds }: DiagramCanvasProps) {
+export function DiagramCanvas({ kind, distanceUnit, errorNodeIds, warningNodeIds, isFullscreen = false, onToggleFullscreen }: DiagramCanvasProps) {
   const doc = useEditorStore((s) => s.doc);
   const layout = useEditorStore((s) => s.layout);
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const addNode = useEditorStore((s) => s.addNode);
   const addEdgeToStore = useEditorStore((s) => s.addEdge);
   const removeNode = useEditorStore((s) => s.removeNode);
-  const duplicateNode = useEditorStore((s) => s.duplicateNode);
-  const removeEdge = useEditorStore((s) => s.removeEdge);
   const setNodePosition = useEditorStore((s) => s.setNodePosition);
   const selectNode = useEditorStore((s) => s.selectNode);
   const undo = useEditorStore((s) => s.undo);
@@ -125,12 +141,16 @@ export function DiagramCanvas({ kind, distanceUnit, errorNodeIds, warningNodeIds
     [doc, layout, kind, distanceUnit, selectedNodeId, errorNodeIds, warningNodeIds],
   );
 
+  // یال‌ها — ضلع اتصال ذخیره‌شده به شناسه Handle نگاشت می‌شود؛
+  // یال قدیمی بدون ضلع روی پیش‌فرض سازگار (مبدأ پایین → مقصد بالا) می‌نشیند.
   const rfEdges = useMemo(
     () =>
       (doc?.edges ?? []).map((e) => ({
         id: e.id,
         source: e.from,
         target: e.to,
+        sourceHandle: handleId(effectiveSourceSide(e), "source"),
+        targetHandle: handleId(effectiveTargetSide(e), "target"),
         label: e.label ?? undefined,
         markerEnd: { type: MarkerType.ArrowClosed, color: "#78716c" },
         style: { stroke: "#78716c", strokeWidth: 1.8 },
@@ -159,21 +179,24 @@ export function DiagramCanvas({ kind, distanceUnit, errorNodeIds, warningNodeIds
     (changes: EdgeChange[]) => {
       for (const ch of changes) {
         if (ch.type === "remove") {
-          removeEdge(ch.id);
+          useEditorStore.getState().removeEdge(ch.id);
         }
       }
     },
-    [removeEdge],
+    [],
   );
 
+  // اتصال چهارجهته — ضلع مبدأ/مقصد از شناسه Handle استخراج و در مدل داده ذخیره می‌شود
   const onConnect = useCallback(
-    (connection: { source: string | null; target: string | null }) => {
+    (connection: Connection) => {
       if (!connection.source || !connection.target) return;
       if (connection.source === connection.target) {
         toast.error("اتصال خودحلقه مجاز نیست — اتصال نامعتبر.");
         return;
       }
-      const created = addEdgeToStore(connection.source, connection.target);
+      const fromSide = handleSideFromId(connection.sourceHandle);
+      const toSide = handleSideFromId(connection.targetHandle);
+      const created = addEdgeToStore(connection.source, connection.target, fromSide, toSide);
       if (!created) {
         toast.error("این اتصال قبلاً وجود دارد (یا معکوسش) — اتصال تکراری مجاز نیست.");
         return;
@@ -201,119 +224,120 @@ export function DiagramCanvas({ kind, distanceUnit, errorNodeIds, warningNodeIds
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && selectedNodeId) {
         e.preventDefault();
-        duplicateNode(selectedNodeId);
+        useEditorStore.getState().duplicateNode(selectedNodeId);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo, selectedNodeId, removeNode, duplicateNode]);
+  }, [undo, redo, selectedNodeId, removeNode]);
 
   if (!doc) return null;
 
   return (
     <div className="flex h-full min-h-0 flex-col" dir="ltr">
-      {/* نوار ابزار — متن فارسی RTL داخل بوم LTR (جهت پیکان‌ها معکوس نمی‌شود) */}
+      {/* نوار ابزار گروه‌بندی‌شده — متن فارسی RTL داخل بوم LTR (جهت پیکان‌ها معکوس نمی‌شود) */}
       <div
-        className="flex flex-wrap items-center gap-1.5 border-b bg-background px-2 py-1.5"
+        className="flex flex-wrap items-center gap-1.5 border-b bg-muted/40 px-2 py-1.5"
         dir="rtl"
         role="toolbar"
         aria-label="ابزار ویرایشگر نمودار"
       >
-        {symbols.map((s) => (
-          <Button
-            key={s}
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            onClick={() => addNode(s, `${labels[s]} ${doc.nodes.length + 1}`)}
-            title={`افزودن گام ${labels[s]}`}
-          >
-            <span className="inline-block size-2.5 rounded-full" style={{ background: symbolColor(s) }} aria-hidden />
-            {labels[s]}
-          </Button>
-        ))}
-        <span className="mx-1 h-6 w-px bg-border" aria-hidden />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" onClick={() => undo()} disabled={!canUndo} aria-label="لغو">
-              <Undo2 className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>لغو (Ctrl+Z)</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" onClick={() => redo()} disabled={!canRedo} aria-label="بازگردانی">
-              <Redo2 className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>بازگردانی (Ctrl+Shift+Z)</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" onClick={applyAutoLayout} aria-label="چیدمان خودکار">
-              <ArrowDownAZ className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>چیدمان اولیه خودکار (توالی جریان عمودی)</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
+        {/* گروه نمادها */}
+        <ToolGroup label="افزودن نماد">
+          {symbols.map((s) => (
             <Button
+              key={s}
               variant="ghost"
-              size="icon"
-              className="size-8"
-              onClick={() => setShowGrid(!showGrid)}
-              aria-label="شبکه"
-              aria-pressed={showGrid}
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => addNode(s, `${labels[s]} ${doc.nodes.length + 1}`)}
+              title={`افزودن گام ${labels[s]}`}
             >
-              <Grid3x3 className="size-4" />
+              <span className="inline-block size-2.5 rounded-full" style={{ background: symbolColor(s) }} aria-hidden />
+              {labels[s]}
             </Button>
-          </TooltipTrigger>
-          <TooltipContent>شبکه راهنما (اختیاری)</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              onClick={() => setShowMiniMap(!showMiniMap)}
-              aria-label="نقشه کوچک"
-              aria-pressed={showMiniMap}
-            >
-              <MapIcon className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>نقشه کوچک (اختیاری — می‌تواند روی گره‌ها بیفتد)</TooltipContent>
-        </Tooltip>
-        {selectedNodeId ? (
-          <>
-            <span className="mx-1 h-6 w-px bg-border" aria-hidden />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8" onClick={() => duplicateNode(selectedNodeId)} aria-label="تکثیر گام">
-                  <Copy className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>تکثیر گام (Ctrl+D)</TooltipContent>
-            </Tooltip>
+          ))}
+        </ToolGroup>
+
+        {/* گروه ویرایش */}
+        <ToolGroup label="ویرایش">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8" onClick={() => undo()} disabled={!canUndo} aria-label="لغو">
+                <Undo2 className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>لغو (Ctrl+Z)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8" onClick={() => redo()} disabled={!canRedo} aria-label="بازگردانی">
+                <Redo2 className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>بازگردانی (Ctrl+Shift+Z)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8" onClick={applyAutoLayout} aria-label="چیدمان خودکار">
+                <ArrowDownAZ className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>چیدمان اولیه خودکار (توالی جریان عمودی)</TooltipContent>
+          </Tooltip>
+        </ToolGroup>
+
+        {/* گروه نمایش */}
+        <ToolGroup label="نمایش و تنظیم بوم">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => setShowGrid(!showGrid)}
+                aria-label="شبکه"
+                aria-pressed={showGrid}
+              >
+                <Grid3x3 className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>شبکه راهنما (اختیاری)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => setShowMiniMap(!showMiniMap)}
+                aria-label="نقشه کوچک"
+                aria-pressed={showMiniMap}
+              >
+                <MapIcon className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>نقشه کوچک (اختیاری)</TooltipContent>
+          </Tooltip>
+          {onToggleFullscreen ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-8 text-red-600"
-                  onClick={() => removeNode(selectedNodeId)}
-                  aria-label="حذف گام"
+                  className={isFullscreen ? "size-8 bg-primary/10 text-primary" : "size-8"}
+                  onClick={onToggleFullscreen}
+                  aria-label={isFullscreen ? "خروج از حالت تمام‌صفحه" : "نمایش تمام‌صفحه"}
+                  aria-pressed={isFullscreen}
                 >
-                  <Trash2 className="size-4" />
+                  {isFullscreen ? <Minimize className="size-4" /> : <Expand className="size-4" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>حذف گام (Delete)</TooltipContent>
+              <TooltipContent>{isFullscreen ? "خروج از تمام‌صفحه (Esc)" : "نمایش تمام‌صفحه — فضای کامل طراحی"}</TooltipContent>
             </Tooltip>
-          </>
-        ) : null}
+          ) : null}
+        </ToolGroup>
+
         <div className="ms-auto flex items-center gap-2 text-[11px] text-muted-foreground" dir="rtl">
           <span>
             {doc.nodes.length} گام · {doc.edges.length} اتصال
@@ -339,6 +363,7 @@ export function DiagramCanvas({ kind, distanceUnit, errorNodeIds, warningNodeIds
           proOptions={{ hideAttribution: true }}
           deleteKeyCode={null}
           multiSelectionKeyCode="Shift"
+          connectionRadius={32}
           dir="ltr"
           aria-label="بوم ویرایشگر نمودار فرایند"
         >

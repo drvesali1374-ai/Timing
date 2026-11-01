@@ -11,6 +11,7 @@ import { BookOpen, GitBranch, Grid3x3, LayoutList, Scale, BarChart3, FileDown, I
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, LoadingBlock, PageHeader } from "@/components/app/ui-bits";
+import { AdvancedTabsMenu } from "@/components/app/advanced-tabs-menu";
 import { useBalanceOverview, useBalanceScenario } from "@/hooks/use-balance";
 import { ScenariosTab } from "./scenarios-tab";
 import { YamazumiTab } from "./yamazumi-tab";
@@ -31,15 +32,19 @@ interface BalanceWorkshopViewProps {
 const TABS = [
   { key: "scenarios", labelFa: "سناریوها", icon: LayoutList },
   { key: "yamazumi", labelFa: "یامازومی", icon: BarChart3 },
-  { key: "precedence", labelFa: "گراف تقدم", icon: GitBranch },
   { key: "matrix", labelFa: "ماتریس تخصیص", icon: Grid3x3 },
   { key: "metrics", labelFa: "شاخص‌ها", icon: Scale },
-  { key: "compare", labelFa: "مقایسه", icon: LayoutList },
   { key: "reports", labelFa: "گزارش‌ها", icon: FileDown },
+] as const;
+
+/** تب‌های تخصصی — در منوی «جزئیات پیشرفته» (بند ۱۰؛ بدون حذف قابلیت) */
+const ADVANCED_TABS = [
+  { key: "precedence", labelFa: "گراف تقدم", icon: GitBranch },
+  { key: "compare", labelFa: "مقایسه سناریوها", icon: LayoutList },
   { key: "guide", labelFa: "راهنما", icon: BookOpen },
 ] as const;
 
-export type BalanceTabKey = (typeof TABS)[number]["key"];
+export type BalanceTabKey = (typeof TABS)[number]["key"] | (typeof ADVANCED_TABS)[number]["key"];
 
 export function BalanceWorkshopView({ projectId, onBack, onOpenAnalysis }: BalanceWorkshopViewProps) {
   const overview = useBalanceOverview(projectId);
@@ -89,6 +94,7 @@ export function BalanceWorkshopView({ projectId, onBack, onOpenAnalysis }: Balan
                 </TabsTrigger>
               );
             })}
+            <AdvancedTabsMenu tabs={ADVANCED_TABS} activeKey={tab} onSelect={(k) => setTab(k as BalanceTabKey)} />
           </TabsList>
 
           <TabsContent value="scenarios" className="mt-4">

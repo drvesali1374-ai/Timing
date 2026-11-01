@@ -7,7 +7,10 @@
 import {
   FPC_SUBJECT_LABELS_FA,
   symbolLabelFa,
+  effectiveSourceSide,
+  effectiveTargetSide,
   type DiagramDoc,
+  type DiagramHandleSide,
   type DiagramLayout,
   type DiagramSymbol,
 } from "./types";
@@ -110,6 +113,20 @@ function symbolShape(symbol: DiagramSymbol, cx: number, cy: number): string {
   }
 }
 
+/** نقطه لنگر ضلع اتصال — مختصات مرکزگرا (مثل رندر گره) */
+function sideAnchor(pos: { x: number; y: number }, side: DiagramHandleSide): { x: number; y: number } {
+  switch (side) {
+    case "top":
+      return { x: pos.x, y: pos.y - NODE_H / 2 + 8 };
+    case "bottom":
+      return { x: pos.x, y: pos.y + NODE_H / 2 - 8 };
+    case "right":
+      return { x: pos.x + NODE_W / 2 - 8, y: pos.y };
+    case "left":
+      return { x: pos.x - NODE_W / 2 + 8, y: pos.y };
+  }
+}
+
 function nodeMetaLine(doc: DiagramDoc, node: DiagramDoc["nodes"][number]): string {
   const parts: string[] = [];
   if (node.timeSec !== undefined && node.timeSec !== null) parts.push(`${formatSeconds(node.timeSec)}`);
@@ -158,22 +175,37 @@ export function renderDiagramSvg(doc: DiagramDoc, layout: DiagramLayout, opts: S
   const offX = -minX + 20;
   const offY = -minY + headerH;
 
-  // ── یال‌ها (زیر گره‌ها) ──
+  // ── یال‌ها (زیر گره‌ها) — لنگر بر اساس ضلع اتصال ذخیره‌شده؛
+  // یال قدیمی بدون ضلع: مبدأ پایین → مقصد بالا (سازگار با نسخه قبل) ──
   const edgesSvg: string[] = [];
   for (const edge of doc.edges) {
     const from = positions[edge.from];
     const to = positions[edge.to];
     if (!from || !to) continue;
-    const sx = from.x + offX;
-    const sy = from.y + offY + NODE_H / 2 - 8;
-    const tx = to.x + offX;
-    const ty = to.y + offY - NODE_H / 2 + 8;
-    const midY = (sy + ty) / 2;
-    const points = sx === tx ? `${sx},${sy} ${tx},${ty}` : `${sx},${sy} ${sx},${midY} ${tx},${midY} ${tx},${ty}`;
+    const s = sideAnchor(from, effectiveSourceSide(edge));
+    const t = sideAnchor(to, effectiveTargetSide(edge));
+    const sx = s.x + offX;
+    const sy = s.y + offY;
+    const tx = t.x + offX;
+    const ty = t.y + offY;
+    let points: string;
+    if (sx === tx || sy === ty) {
+      points = `${sx},${sy} ${tx},${ty}`;
+    } else {
+      const sourceVertical = edge.fromHandle === "top" || edge.fromHandle === "bottom" || edge.fromHandle == null;
+      if (sourceVertical) {
+        const midY = (sy + ty) / 2;
+        points = `${sx},${sy} ${sx},${midY} ${tx},${midY} ${tx},${ty}`;
+      } else {
+        const midX = (sx + tx) / 2;
+        points = `${sx},${sy} ${midX},${sy} ${midX},${ty} ${tx},${ty}`;
+      }
+    }
     edgesSvg.push(
       `<polyline points="${points}" fill="none" stroke="#78716c" stroke-width="1.8" marker-end="url(#arrowhead)" />`,
     );
     if (edge.label?.trim()) {
+      const midY = (sy + ty) / 2;
       edgesSvg.push(
         `<text x="${(sx + tx) / 2}" y="${midY - 6}" text-anchor="middle" direction="rtl" font-family="${FONT}" font-size="11" fill="#57534e">${esc(edge.label)}</text>`,
       );

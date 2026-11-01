@@ -69,12 +69,12 @@ export function DashboardView({ onOpenProject, onNewProject }: { onOpenProject: 
       {/* فیلترها */}
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Search className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input
             value={q}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="جست‌وجو در عنوان، کد، محصول، خط، مسئول…"
-            className="pr-9"
+            className="ps-9"
             aria-label="جست‌وجوی پروژه‌ها"
           />
         </div>

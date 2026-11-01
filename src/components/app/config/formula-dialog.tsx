@@ -10,10 +10,9 @@ import { BookOpen, ChevronDown, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -149,9 +148,9 @@ export function FormulaDialog({
               : "عبارت با زبان DSL امن (بدون eval) اجرا می‌شود؛ ارجاع به پارامترها با شناسه فنی و به نتایج فرمول‌های دیگر با «کلید.result»."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit}>
-          <ScrollArea className="max-h-[62vh] pr-3">
-            <div className="grid gap-4 py-2 sm:grid-cols-2">
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
+          <DialogBody>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="formula-key">کلید فرمول *</Label>
                 <Input
@@ -325,8 +324,8 @@ export function FormulaDialog({
                 />
               </div>
             </div>
-          </ScrollArea>
-          <DialogFooter className="mt-4 gap-2">
+          </DialogBody>
+          <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               انصراف
             </Button>

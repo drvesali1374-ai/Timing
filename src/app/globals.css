@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant rtl (&:where([dir="rtl"], [dir="rtl"] *));
 
 @theme inline {
   --color-background: var(--background);
@@ -118,5 +119,90 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* ── قواعد پایه RTL (پروفایل فارسی) ──
+     متن‌های فارسی همیشه از راست (start) شروع می‌شوند؛
+     مقادیر فنی LTR باید در محل مصرف با dir="ltr" علامت بخورند. */
+  body {
+    text-align: start;
+  }
+  th,
+  td {
+    text-align: start;
+  }
+  /* عدد و واحد در جدول‌ها — هم‌ترازی رقمی برای خوانایی */
+  th.tabular,
+  td.tabular {
+    text-align: start;
+  }
+
+  /* اسکرول‌بار باریک و هماهنگ با تم (فقط دسکتاپ) */
+  @media (pointer: fine) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: oklch(0.7 0.01 155) transparent;
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: oklch(0.85 0.01 155);
+      border-radius: 8px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: oklch(0.75 0.01 155);
+    }
+    .dark ::-webkit-scrollbar-thumb {
+      background: oklch(0.35 0.01 155);
+    }
+  }
+
+  /* فونت فارسی روی عناصر ورودی (placeholder فارسی درست رندر شود) */
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
+  }
+}
+
+/* ── ابزار RTL منطقی (کلاس‌های کمکی) ──
+   برای متن‌های آزاد کاربر که جهتشان معلوم نیست. */
+@utility dir-auto {
+  unicode-bidi: plaintext;
+}
+
+/* کلاس محتوای فنی LTR — شناسه/فرمول/کد */
+@utility ltr-num {
+  direction: ltr;
+  text-align: start;
+  unicode-bidi: isolate;
+}
+
+/* ── بوم React Flow: حفظ LTR و ابزارهای فارسی RTL ──
+   پنل‌های داخلی RF (Controls/MiniMap) موقعیت فیزیکی می‌گیرند؛
+   متن‌های فارسی داخل wrapper با dir="rtl" خودشان مدیریت می‌شوند. */
+.react-flow__attribution {
+  display: none;
+}
+
+/* هاور هندل‌های اتصال — بزرگ‌نمایی لمسی/دسکتاپ */
+.react-flow__handle {
+  transition: width 0.12s ease, height 0.12s ease;
+}
+.react-flow__node:hover .react-flow__handle,
+.react-flow__node.selected .react-flow__handle {
+  width: 13px;
+  height: 13px;
+}
+
+/* دیالوگ‌های بلند — عنوان/دکمه‌ها ثابت، بدنه اسکرول */
+@layer components {
+  [data-slot="dialog-body"] {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 }

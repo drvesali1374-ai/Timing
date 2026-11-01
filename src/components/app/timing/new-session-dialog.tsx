@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import { Loader2, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -155,7 +155,7 @@ export function NewSessionDialog({ projectId, open, onOpenChange, onCreated, def
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Timer className="size-5 text-primary" aria-hidden /> جلسه زمان‌سنجی جدید
@@ -165,6 +165,7 @@ export function NewSessionDialog({ projectId, open, onOpenChange, onCreated, def
           </DialogDescription>
         </DialogHeader>
 
+        <DialogBody>
         <div className="space-y-4">
           {/* روش */}
           <div className="space-y-1.5">
@@ -339,6 +340,7 @@ export function NewSessionDialog({ projectId, open, onOpenChange, onCreated, def
             <span>ناظر: {effectiveObserver || "—"}</span>
           </div>
         </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>

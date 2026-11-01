@@ -2,7 +2,9 @@
 
 /**
  * کارگاه طراح نمودارهای فرایندی (فاز ۳ — OPC/FPC).
- * چیدمان: فهرست نمودارها (چپ) · بوم ویرایشگر (وسط) · پنل خواص/اعتبارسنجی/دستیار/تاریخچه/مقایسه (راست).
+ * چیدمان: فهرست نمودارها (راست، جمع‌شونده) · بوم ویرایشگر (وسط) · پنل خواص/اعتبارسنجی/دستیار (چپ، جمع‌شونده).
+ * حالت تمام‌صفحه: همان نمونه واحد با پوشش fixed — انتخاب/undo/ذخیره خودکار از store زنده می‌مانند؛
+ * فقط کلاس‌های چیدمان عوض می‌شوند (بازنمایی دوم ساخته نمی‌شود — بند ۸.۱).
  * ذخیره خودکار کنترل‌شده (debounce ۳s): آنلاین → revision جدید؛ آفلاین → صف محلی idempotent (ADR-006).
  * بازیابی پیش‌نویس محلی پس از reload + وضعیت صادقانه ذخیره/همگام‌سازی.
  */
@@ -16,7 +18,12 @@ import {
   Download,
   FileImage,
   Layers,
+  MoreHorizontal,
   Network,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   Printer,
   Save,
@@ -25,9 +32,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { ErrorState, FaDate, LoadingBlock, Spinner } from "@/components/app/ui-bits";
+import { Hint } from "@/components/app/hint";
 import { useProject } from "@/hooks/use-api";
 import { useProjectActivities } from "@/hooks/use-config";
 import {
@@ -80,6 +96,11 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [draftRecovery, setDraftRecovery] = useState<{ doc: unknown; layout: unknown; savedAt: string } | null>(null);
 
+  // ── حالت نمایش: تمام‌صفحه + جمع‌شدن پنل‌ها (تک‌نمونه — فقط کلاس چیدمان عوض می‌شود) ──
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [listPanelOpen, setListPanelOpen] = useState(true);
+  const [propsPanelOpen, setPropsPanelOpen] = useState(true);
+
   const doc = useEditorStore((s) => s.doc);
   const layout = useEditorStore((s) => s.layout);
   const dirty = useEditorStore((s) => s.dirty);
@@ -89,6 +110,19 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
   useEffect(() => {
     if (project?.title) onTitle?.(project.title);
   }, [project?.title, onTitle]);
+
+  // خروج از تمام‌صفحه با Escape (بند ۸.۱-۶)
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [isFullscreen]);
 
   // بارگذاری سند در store + بررسی پیش‌نویس محلی (بازیابی پس از reload)
   const loadedDiagramId = useEditorStore((s) => s.diagramId);
@@ -223,22 +257,82 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
     return <ErrorState message="پروژه یافت نشد یا شما به آن دسترسی ندارید." onRetry={onBack} />;
   }
 
+  const hasActiveDoc = !!activeDiagramId && !!doc;
+
   return (
-    <div className="space-y-4">
-      {/* سربرگ */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div
+      className={cn(
+        // همان نمونه واحد — حالت عادی/تمام‌صفحه فقط کلاس چیدمان را عوض می‌کند؛
+        // وضعیت store (انتخاب/undo/ذخیره خودکار) زنده می‌ماند (بند ۸.۱-۹).
+        isFullscreen
+          ? "fixed inset-0 z-[60] flex flex-col gap-2 overflow-hidden bg-background p-2 lg:p-3"
+          : "space-y-4",
+      )}
+      aria-label={isFullscreen ? "کارگاه نمودار — حالت تمام‌صفحه" : undefined}
+    >
+      {/* سربرگ — فشرده در تمام‌صفحه */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onBack} aria-label="بازگشت به پروژه">
-            <ArrowLeft className="size-4" />
-          </Button>
+          {isFullscreen ? (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsFullscreen(false)}>
+              <ArrowLeft className="size-4" aria-hidden /> خروج از تمام‌صفحه
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon" onClick={onBack} aria-label="بازگشت به پروژه">
+              <ArrowLeft className="size-4" />
+            </Button>
+          )}
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold">طراح نمودارهای فرایندی</h1>
-            <p className="truncate text-xs text-muted-foreground">
-              {project.title} · OPC/FPC · دستیار آفلاین قاعده‌محور
-            </p>
+            {!isFullscreen ? (
+              <p className="truncate text-xs text-muted-foreground">
+                {project.title} · OPC/FPC · اتصال از هر چهار ضلع گام‌ها
+              </p>
+            ) : null}
           </div>
+          {!isFullscreen ? (
+            <Hint
+              text="نمودار OPC توالی عملیات مونتاژ را نشان می‌دهد و FPC جریان گام‌به‌گام یک ماده/فرد/تجهیزات را. گام‌ها را از نوار ابزار اضافه کنید، سپس با کشیدن از نقاط اتصال هر ضلع، جریان را ترسیم کنید. محل دقیق اتصال‌ها هنگام ذخیره حفظ می‌شود."
+              title="راهنمای طراح نمودار"
+            />
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          {/* پنل‌های جمع‌شونده — دکمه همیشه در دسترس */}
+          {hasActiveDoc ? (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="size-8"
+                    onClick={() => setListPanelOpen((v) => !v)}
+                    aria-label={listPanelOpen ? "جمع‌کردن فهرست نمودارها" : "نمایش فهرست نمودارها"}
+                    aria-pressed={listPanelOpen}
+                  >
+                    {listPanelOpen ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>فهرست نمودارهای پروژه</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="size-8"
+                    onClick={() => setPropsPanelOpen((v) => !v)}
+                    aria-label={propsPanelOpen ? "جمع‌کردن پنل ویژگی‌ها" : "نمایش پنل ویژگی‌ها"}
+                    aria-pressed={propsPanelOpen}
+                  >
+                    {propsPanelOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>پنل ویژگی گام / اعتبارسنجی / دستیار</TooltipContent>
+              </Tooltip>
+            </>
+          ) : null}
           {/* وضعیت ذخیره/آفلاین — صادقانه */}
           <Badge
             variant="outline"
@@ -281,7 +375,7 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
       </div>
 
       {/* بازیابی پیش‌نویس محلی */}
-      {draftRecovery ? (
+      {draftRecovery && !isFullscreen ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40">
           <p className="text-amber-900 dark:text-amber-200">
             پیش‌نویس محلی ذخیره‌نشده برای این نمودار پیدا شد ({new Date(draftRecovery.savedAt).toLocaleString("fa-IR")}) — بازیابی
@@ -314,37 +408,57 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-        {/* فهرست نمودارها */}
-        <aside className="space-y-2">
-          <Button className="w-full gap-2" onClick={() => setNewDialogOpen(true)}>
-            <Plus className="size-4" aria-hidden /> نمودار جدید
-          </Button>
-          <div className="max-h-[calc(100vh-320px)] space-y-1.5 overflow-y-auto rounded-xl border p-2">
-            {diagrams.length === 0 ? (
-              <p className="p-3 text-center text-xs leading-relaxed text-muted-foreground">
-                هنوز نموداری نساخته‌اید. با OPC توالی مونتاژ و با FPC جریان گام‌به‌گام (زمان/مسافت) را ترسیم کنید.
-              </p>
-            ) : null}
-            {diagrams.map((d) => (
-              <DiagramListItem
-                key={d.id}
-                diagram={d}
-                active={d.id === activeDiagramId}
-                onClick={() => {
-                  if (useEditorStore.getState().dirty) {
-                    void saveNow("ذخیره پیش از تغییر نمودار");
-                  }
-                  setSelectedDiagramId(d.id);
-                }}
-              />
-            ))}
-          </div>
-        </aside>
+      {/* بدنه — فهرست (راست/جمع‌شونده) + بوم + پنل (چپ/جمع‌شونده) */}
+      <div className={cn("min-h-0", isFullscreen ? "flex flex-1 flex-col gap-2 lg:flex-row" : "flex flex-col gap-4 lg:flex-row")}>
+        {/* فهرست نمودارها — جمع‌شونده */}
+        {listPanelOpen ? (
+          <aside
+            className={cn(
+              "space-y-2 lg:shrink-0",
+              isFullscreen ? "lg:w-56" : "lg:w-60",
+              isFullscreen ? "flex flex-col overflow-hidden rounded-xl border bg-card lg:max-h-full" : "",
+            )}
+            aria-label="فهرست نمودارها"
+          >
+            <Button className="w-full gap-2" onClick={() => setNewDialogOpen(true)}>
+              <Plus className="size-4" aria-hidden /> نمودار جدید
+            </Button>
+            <div
+              className={cn(
+                "space-y-1.5 overflow-y-auto rounded-xl border p-2",
+                isFullscreen ? "flex-1 lg:max-h-none" : "max-h-[calc(100vh-320px)]",
+              )}
+            >
+              {diagrams.length === 0 ? (
+                <p className="p-3 text-center text-xs leading-relaxed text-muted-foreground">
+                  هنوز نموداری نساخته‌اید. با OPC توالی مونتاژ و با FPC جریان گام‌به‌گام (زمان/مسافت) را ترسیم کنید.
+                </p>
+              ) : null}
+              {diagrams.map((d) => (
+                <DiagramListItem
+                  key={d.id}
+                  diagram={d}
+                  active={d.id === activeDiagramId}
+                  onClick={() => {
+                    if (useEditorStore.getState().dirty) {
+                      void saveNow("ذخیره پیش از تغییر نمودار");
+                    }
+                    setSelectedDiagramId(d.id);
+                  }}
+                />
+              ))}
+            </div>
+          </aside>
+        ) : null}
 
-        {/* بوم + پنل */}
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="flex min-h-[520px] flex-col overflow-hidden rounded-xl border bg-card">
+        {/* بوم + پنل ویژگی‌ها */}
+        <div className={cn("min-w-0 flex-1", isFullscreen ? "flex gap-2 flex-col xl:flex-row" : "flex flex-col gap-4 xl:flex-row")}>
+          <div
+            className={cn(
+              "flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card",
+              isFullscreen ? "min-h-[320px]" : "min-h-[520px]",
+            )}
+          >
             {diagramQuery.isLoading && activeDiagramId ? (
               <div className="flex flex-1 items-center justify-center p-8">
                 <Spinner />
@@ -360,7 +474,7 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
               </div>
             ) : (
               <>
-                {/* نوار عملیات نمودار جاری */}
+                {/* نوار عملیات نمودار جاری — گروه ذخیره/خروجی + منوی عملیات بیشتر */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-3 py-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                     {currentDiagramMeta ? (
@@ -390,6 +504,7 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
                     ) : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-1">
+                    {/* گروه ذخیره و خروجی */}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -468,6 +583,7 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
                       </TooltipTrigger>
                       <TooltipContent>چاپ نمودار</TooltipContent>
                     </Tooltip>
+                    {/* تأیید — عملیات اصلی تک‌مرحله‌ای */}
                     {currentDiagramMeta && currentDiagramMeta.status !== "confirmed" && liveReport?.valid ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -487,110 +603,133 @@ export function DiagramWorkshopView({ projectId, onBack, onTitle }: DiagramWorks
                         <TooltipContent>تأیید (فقط بدون خطا) — ویرایش بعدی نسخه جدید می‌سازد</TooltipContent>
                       </Tooltip>
                     ) : null}
-                    {currentDiagramMeta && currentDiagramMeta.variant === "current" ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            aria-label="نسخه پیشنهادی"
-                            onClick={() => setNewProposedFrom(currentDiagramMeta.id)}
-                          >
-                            <Layers className="size-4" />
+                    {/* عملیات کم‌کاربرد — منوی بیشتر */}
+                    {currentDiagramMeta ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="size-8" aria-label="عملیات بیشتر">
+                            <MoreHorizontal className="size-4" />
                           </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>ایجاد نسخه پیشنهادی برای مقایسه</TooltipContent>
-                      </Tooltip>
-                    ) : null}
-                    {currentDiagramMeta && currentDiagramMeta.status !== "archived" ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-red-600"
-                            aria-label="بایگانی نمودار"
-                            disabled={patchMutation.isPending}
-                            onClick={() => patchMutation.mutate({ diagramId: currentDiagramMeta.id, status: "archived" })}
-                          >
-                            <Archive className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>بایگانی</TooltipContent>
-                      </Tooltip>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>عملیات نمودار</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {currentDiagramMeta.variant === "current" ? (
+                            <DropdownMenuItem onClick={() => setNewProposedFrom(currentDiagramMeta.id)} className="gap-2">
+                              <Layers className="size-4" aria-hidden /> ایجاد نسخه پیشنهادی برای مقایسه
+                            </DropdownMenuItem>
+                          ) : null}
+                          {currentDiagramMeta.status !== "archived" ? (
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => patchMutation.mutate({ diagramId: currentDiagramMeta.id, status: "archived" })}
+                              disabled={patchMutation.isPending}
+                              className="gap-2"
+                            >
+                              <Archive className="size-4" aria-hidden /> بایگانی نمودار
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => patchMutation.mutate({ diagramId: currentDiagramMeta.id, status: "draft" })}
+                              disabled={patchMutation.isPending}
+                              className="gap-2"
+                            >
+                              <Archive className="size-4" aria-hidden /> خروج از بایگانی
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     ) : null}
                   </div>
                 </div>
-                <div className="h-[calc(100vh-330px)] min-h-[420px]">
+                <div className={cn("min-h-0", isFullscreen ? "flex-1" : "h-[calc(100vh-330px)] min-h-[420px]")}>
                   <DiagramCanvas
                     kind={doc.kind}
                     distanceUnit={doc.distanceUnit}
                     errorNodeIds={errorNodeIds}
                     warningNodeIds={warningNodeIds}
+                    isFullscreen={isFullscreen}
+                    onToggleFullscreen={() => setIsFullscreen((v) => !v)}
                   />
                 </div>
               </>
             )}
           </div>
 
-          {/* پنل سمت چپ (در RTL) */}
-          <div className="min-h-0 overflow-hidden rounded-xl border bg-card xl:max-h-[calc(100vh-220px)]">
-            {activeDiagramId && doc ? (
-              <Tabs defaultValue={selectedNodeId ? "props" : "validation"} className="h-full">
-                <TabsList className="mx-3 mt-2 grid w-auto grid-cols-3">
-                  <TabsTrigger value="props" className="text-xs">
-                    گام انتخابی
-                  </TabsTrigger>
-                  <TabsTrigger value="validation" className="gap-1 text-xs">
-                    اعتبارسنجی
-                    {liveReport && liveReport.errors.length > 0 ? (
-                      <Badge className="ms-1 bg-red-600 px-1 text-[9px] hover:bg-red-600">{liveReport.errors.length}</Badge>
-                    ) : null}
-                  </TabsTrigger>
-                  <TabsTrigger value="assistant" className="gap-1 text-xs">
-                    دستیار
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="props" className="mt-0 max-h-[calc(100vh-330px)] overflow-y-auto">
-                  <NodePropertiesPanel activities={activities} />
-                </TabsContent>
-                <TabsContent value="validation" className="mt-0 max-h-[calc(100vh-330px)] overflow-y-auto">
-                  <ValidationPanel
-                    knownActivityKeys={knownActivityKeys}
-                    onSelectNode={(id) => useEditorStore.getState().selectNode(id)}
-                  />
-                </TabsContent>
-                <TabsContent value="assistant" className="mt-0 max-h-[calc(100vh-330px)] overflow-y-auto">
-                  <AssistantPanel
-                    kind={doc.kind}
-                    knownActivityKeys={knownActivityKeys}
-                    onCreateProposedVariant={() => setNewProposedFrom(activeDiagramId)}
-                  />
-                </TabsContent>
-              </Tabs>
+          {/* پنل سمت چپ (در RTL) — جمع‌شونده */}
+          {propsPanelOpen ? (
+            <div
+              className={cn(
+                "min-h-0 shrink-0 overflow-hidden rounded-xl border bg-card xl:w-[340px]",
+                isFullscreen ? "flex flex-col max-h-full xl:max-h-none" : "xl:max-h-[calc(100vh-220px)]",
+              )}
+              aria-label="پنل ویژگی‌ها و ابزارها"
+            >
+              {activeDiagramId && doc ? (
+                <Tabs defaultValue={selectedNodeId ? "props" : "validation"} className="h-full">
+                  <TabsList className="mx-3 mt-2 grid w-auto grid-cols-3">
+                    <TabsTrigger value="props" className="text-xs">
+                      گام انتخابی
+                    </TabsTrigger>
+                    <TabsTrigger value="validation" className="gap-1 text-xs">
+                      اعتبارسنجی
+                      {liveReport && liveReport.errors.length > 0 ? (
+                        <Badge className="ms-1 bg-red-600 px-1 text-[9px] hover:bg-red-600">{liveReport.errors.length}</Badge>
+                      ) : null}
+                    </TabsTrigger>
+                    <TabsTrigger value="assistant" className="gap-1 text-xs">
+                      دستیار
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent
+                    value="props"
+                    className={cn("mt-0 overflow-y-auto", isFullscreen ? "max-h-none flex-1" : "max-h-[calc(100vh-330px)]")}
+                  >
+                    <NodePropertiesPanel activities={activities} />
+                  </TabsContent>
+                  <TabsContent
+                    value="validation"
+                    className={cn("mt-0 overflow-y-auto", isFullscreen ? "max-h-none flex-1" : "max-h-[calc(100vh-330px)]")}
+                  >
+                    <ValidationPanel
+                      knownActivityKeys={knownActivityKeys}
+                      onSelectNode={(id) => useEditorStore.getState().selectNode(id)}
+                    />
+                  </TabsContent>
+                  <TabsContent
+                    value="assistant"
+                    className={cn("mt-0 overflow-y-auto", isFullscreen ? "max-h-none flex-1" : "max-h-[calc(100vh-330px)]")}
+                  >
+                    <AssistantPanel
+                      kind={doc.kind}
+                      knownActivityKeys={knownActivityKeys}
+                      onCreateProposedVariant={() => setNewProposedFrom(activeDiagramId)}
+                    />
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <p className="p-4 text-sm text-muted-foreground">برای استفاده از پنل‌ها یک نمودار بسازید/انتخاب کنید.</p>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* تاریخچه نسخه‌ها + مقایسه — ردیف دوم (فقط حالت عادی؛ در تمام‌صفحه با خروج از حالت در دسترس) */}
+      {activeDiagramId && currentDiagramMeta && !isFullscreen ? (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="overflow-hidden rounded-xl border bg-card">
+            <RevisionHistoryPanel projectId={projectId} diagramId={activeDiagramId} currentRev={currentDiagramMeta.currentRev} />
+          </div>
+          <div className="overflow-hidden rounded-xl border bg-card">
+            {currentDiagramMeta.variant === "proposed" ? (
+              <VariantComparePanel projectId={projectId} diagramId={activeDiagramId} kind={currentDiagramMeta.kind} />
             ) : (
-              <p className="p-4 text-sm text-muted-foreground">برای استفاده از پنل‌ها یک نمودار بسازید/انتخاب کنید.</p>
+              <NoCompareHint onCreate={() => setNewProposedFrom(activeDiagramId)} />
             )}
           </div>
         </div>
-
-        {/* تاریخچه نسخه‌ها + مقایسه — ردیف دوم */}
-        {activeDiagramId && currentDiagramMeta ? (
-          <div className="grid gap-4 xl:grid-cols-2 lg:col-span-2">
-            <div className="overflow-hidden rounded-xl border bg-card">
-              <RevisionHistoryPanel projectId={projectId} diagramId={activeDiagramId} currentRev={currentDiagramMeta.currentRev} />
-            </div>
-            <div className="overflow-hidden rounded-xl border bg-card">
-              {currentDiagramMeta.variant === "proposed" ? (
-                <VariantComparePanel projectId={projectId} diagramId={activeDiagramId} kind={currentDiagramMeta.kind} />
-              ) : (
-                <NoCompareHint onCreate={() => setNewProposedFrom(activeDiagramId)} />
-              )}
-            </div>
-          </div>
-        ) : null}
-      </div>
+      ) : null}
 
       {newDialogOpen ? (
         <NewDiagramDialog

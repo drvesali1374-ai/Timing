@@ -70,9 +70,13 @@ export function TimingWorkshopView({ projectId, onBack, onTitle }: TimingWorksho
             <Button variant="outline" onClick={onBack} className="gap-2">
               بازگشت به پروژه
             </Button>
-            <Button onClick={() => setDialogOpen(true)} disabled={!session.data} className="gap-2">
-              <Timer className="size-4" aria-hidden /> جلسه جدید
-            </Button>
+            {/* دکمه ایجاد جلسه فقط وقتی فهرست پر است در سربرگ؛
+                حالت خالی CTA اختصاصی خود را دارد (بند ۳.۲ — نمونه چهارم) */}
+            {(sessions.data?.length ?? 0) > 0 ? (
+              <Button onClick={() => setDialogOpen(true)} disabled={!session.data} className="gap-2">
+                <Timer className="size-4" aria-hidden /> جلسه جدید
+              </Button>
+            ) : null}
           </>
         }
       />

@@ -21,7 +21,7 @@ export function StatusBadge({ status }: { status: ProjectStatus }) {
   const s = map[status];
   return (
     <Badge variant="outline" className={cn("font-medium", s.className)}>
-      {status === "active" && <span className="ml-1 inline-block size-1.5 rounded-full bg-emerald-500" aria-hidden />}
+      {status === "active" && <span className="ms-1 inline-block size-1.5 rounded-full bg-emerald-500" aria-hidden />}
       {s.label}
     </Badge>
   );

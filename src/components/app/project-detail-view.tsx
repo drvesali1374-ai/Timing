@@ -1,21 +1,28 @@
 "use client";
 
 /**
- * جزئیات پروژه — تب‌ها: نمای کلی / نسخه‌های پیکربندی (append-only) / اعضا و نقش‌ها / ممیزی.
+ * جزئیات پروژه — مسیر مرحله‌ای مطالعه (Stepper بر اساس داده واقعی readiness) + تب‌ها:
+ * نسخه‌های پیکربندی (append-only) / اعضا و نقش‌ها / ممیزی.
  * عملیات مجاز بر اساس نقش کاربر (همان ماتریس سرور — shared/contracts/acl).
+ * دکمه هر عملیات فقط در یک مکان منطقی (بند ۳.۳ مأموریت UX):
+ *   ورود به کارگاه‌ها = دکمه مرحله مربوطه؛ ویرایش/تکثیر/بایگانی = منوی «عملیات پروژه».
  */
 import { useEffect, useState } from "react";
 import {
   Archive,
   ArchiveRestore,
+  BarChart3,
   BookOpen,
+  CheckCircle2,
+  Circle,
+  CircleDot,
   Copy,
   FileClock,
+  ListChecks,
   Network,
   Pencil,
-  Settings2,
-  BarChart3,
   Scale,
+  Sigma,
   Timer,
   UserPlus,
 } from "lucide-react";
@@ -24,6 +31,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +56,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { roleCan, PROJECT_ROLE_LABELS_FA, type ProjectRole } from "@/shared/contracts/acl";
+import type { ProjectReadinessDto } from "@/shared/contracts/api";
 import {
   useAddMember,
   useArchiveProject,
@@ -52,8 +69,10 @@ import {
   useUpdateMemberRole,
 } from "@/hooks/use-api";
 import type { MemberDto } from "@/shared/contracts/api";
-import { DemoBadge, ErrorState, FaDate, LoadingBlock, LoadingCards, PageHeader, ReadinessChips, Spinner, StatusBadge } from "./ui-bits";
+import { DemoBadge, ErrorState, FaDate, LoadingBlock, LoadingCards, PageHeader, Spinner, StatusBadge } from "./ui-bits";
+import { Hint } from "./hint";
 import { ProjectEditDialog } from "./project-edit-dialog";
+import { cn } from "@/lib/utils";
 
 export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, onOpenDiagrams, onOpenTiming, onOpenAnalysis, onOpenBalance }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void; onOpenDiagrams: () => void; onOpenTiming: () => void; onOpenAnalysis: () => void; onOpenBalance: () => void }) {
   const projectQuery = useProject(projectId);
@@ -114,56 +133,63 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
         title={project.title}
         description={`کد ${project.code} · ساخته‌شده توسط ${project.createdByName ?? "—"} · ${new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" }).format(new Date(project.createdAt))}`}
         actions={
-          <>
-            <Button variant="outline" size="sm" className="gap-2" onClick={onOpenConfig}>
-              <Settings2 className="size-4" aria-hidden /> پیکربندی
-            </Button>
-            {canUpdate ? (
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setEditOpen(true)}>
-                <Pencil className="size-4" aria-hidden /> ویرایش
+          // عملیات پروژه — منوی واحد (بند ۵.۱: عملیات کم‌کاربرد/مدیریتی در منوی بیشتر)
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Pencil className="size-4" aria-hidden /> عملیات پروژه
               </Button>
-            ) : null}
-            {canDuplicate ? (
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => duplicate.mutate()} disabled={duplicate.isPending}>
-                {duplicate.isPending ? <Spinner /> : <Copy className="size-4" aria-hidden />} تکثیر
-              </Button>
-            ) : null}
-            {canArchive ? (
-              project.status === "archived" ? (
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => archive.mutate(false)} disabled={archive.isPending}>
-                  <ArchiveRestore className="size-4" aria-hidden /> خروج از بایگانی
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" className="gap-2 text-red-600 dark:text-red-400" onClick={() => setConfirmArchive(true)}>
-                  <Archive className="size-4" aria-hidden /> بایگانی
-                </Button>
-              )
-            ) : null}
-          </>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>مدیریت پروژه</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {canUpdate ? (
+                <DropdownMenuItem onClick={() => setEditOpen(true)} className="gap-2">
+                  <Pencil className="size-4" aria-hidden /> ویرایش اطلاعات
+                </DropdownMenuItem>
+              ) : null}
+              {canDuplicate ? (
+                <DropdownMenuItem onClick={() => duplicate.mutate()} disabled={duplicate.isPending} className="gap-2">
+                  {duplicate.isPending ? <Spinner /> : <Copy className="size-4" aria-hidden />} تکثیر پروژه
+                </DropdownMenuItem>
+              ) : null}
+              {canArchive ? (
+                project.status === "archived" ? (
+                  <DropdownMenuItem onClick={() => archive.mutate(false)} disabled={archive.isPending} className="gap-2">
+                    <ArchiveRestore className="size-4" aria-hidden /> خروج از بایگانی
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem variant="destructive" onClick={() => setConfirmArchive(true)} className="gap-2">
+                    <Archive className="size-4" aria-hidden /> بایگانی پروژه
+                  </DropdownMenuItem>
+                )
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
+      {/* وضعیت کلی — فشرده (بدون ده‌ها Badge پراکنده) */}
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={project.status} />
         {project.isDemo ? <DemoBadge /> : null}
-        <ReadinessChips readiness={project.readiness} />
-        <Badge variant="secondary" className="gap-1">
-          <FileClock className="size-3" aria-hidden /> پیکربندی فعال: {project.currentConfigVersion?.semver ?? "—"}
-        </Badge>
         {project.myRole ? (
           <Badge variant="outline">نقش شما: {PROJECT_ROLE_LABELS_FA[project.myRole]}</Badge>
         ) : null}
+        <Badge variant="secondary" className="gap-1">
+          <FileClock className="size-3" aria-hidden /> پیکربندی فعال: {project.currentConfigVersion?.semver ?? "—"}
+        </Badge>
       </div>
 
       <Tabs defaultValue="overview">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="overview">نمای کلی</TabsTrigger>
+          <TabsTrigger value="overview">مراحل مطالعه</TabsTrigger>
           <TabsTrigger value="versions">نسخه‌های پیکربندی ({project.configVersionCount})</TabsTrigger>
           <TabsTrigger value="members">اعضا ({project.memberCount})</TabsTrigger>
           {canReadAudit ? <TabsTrigger value="audit">ممیزی</TabsTrigger> : null}
         </TabsList>
 
-        {/* ── نمای کلی ── */}
+        {/* ── مراحل انجام مطالعه ── */}
         <TabsContent value="overview" className="mt-4 space-y-4">
           {project.isDemo ? (
             <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
@@ -175,103 +201,14 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
             </div>
           ) : null}
 
-          <Card className="border-primary/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Settings2 className="size-4 text-primary" aria-hidden /> کارگاه پیکربندی (فاز ۲)
-              </CardTitle>
-              <CardDescription>
-                خانواده‌ها و پارامترها · فرمول‌نویسی با اعتبارسنجی زنده و آزمون · فرم ثبت مقادیر · نتایج محاسبه · فعالیت‌ها
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <Badge variant="secondary" className="gap-1 font-mono" dir="ltr">
-                  v{project.currentConfigVersion?.semver ?? "—"}
-                </Badge>
-                <span>نسخه فعال پیکربندی · هر تغییر ساختاری نسخه جدید append-only می‌سازد</span>
-              </div>
-              <Button className="gap-2" onClick={onOpenConfig}>
-                <Settings2 className="size-4" aria-hidden /> ورود به کارگاه پیکربندی
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Network className="size-4 text-primary" aria-hidden /> طراح نمودارهای فرایندی (فاز ۳)
-              </CardTitle>
-              <CardDescription>
-                OPC/FPC با ویرایشگر بصری · اعتبارسنجی زنده · مقایسه روش فعلی/پیشنهادی · دستیار آفلاین قاعده‌محور
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <ReadinessChips readiness={project.readiness} compact />
-              </div>
-              <Button className="gap-2" onClick={onOpenDiagrams}>
-                <Network className="size-4" aria-hidden /> ورود به طراح نمودارها
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Timer className="size-4 text-primary" aria-hidden /> کارگاه زمان‌سنجی (فاز ۴)
-              </CardTitle>
-              <CardDescription>
-                کرنومتر پیوسته/بازگشت به صفر/حلقه‌ای · چرخه‌ها و وقفه‌ها · اصلاح با سابقه · صف آفلاین · خروجی خام قابل بازیابی
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>عناصر از فعالیت‌ها، نمودار یا ورود دستی — ثبت زمان به نمودار وابسته نیست</span>
-              </div>
-              <Button className="gap-2" onClick={onOpenTiming}>
-                <Timer className="size-4" aria-hidden /> ورود به کارگاه زمان‌سنجی
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <BarChart3 className="size-4 text-primary" aria-hidden /> کارگاه تحلیل مهندسی زمان (فاز ۵)
-              </CardTitle>
-              <CardDescription>
-                آمار B9 · زنجیره نماینده ← نرمال ← استاندارد با دو قرارداد مجاز · مدیریت داده ناقص/پرت (علامت/حذف جدا) · کیفیت نمونه · گزارش‌ها و خروجی CSV/Excel/JSON/PDF
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>ورودی: جلسات نهایی‌شده و موتور فرمول نسخه‌دار — بدون داده نمایشی جعلی</span>
-              </div>
-              <Button className="gap-2" onClick={onOpenAnalysis}>
-                <BarChart3 className="size-4" aria-hidden /> ورود به کارگاه تحلیل
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-primary/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Scale className="size-4 text-primary" aria-hidden /> کارگاه بالانس خط و نیروی کار (فاز ۶)
-              </CardTitle>
-              <CardDescription>
-                سناریوهای B10 · الگوریتم‌های LCR / RPW / کیلبریج–وستر + تخصیص دستی · نمودار یامازومی با خط تاکت · گراف تقدم · شاخص‌های E/d/mMin با فرمول مستند · برآورد نیروی نظری/عملیاتی · مقایسه قبل/بعد
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>ورودی: فعالیت‌های B5 با پیش‌نیازها + زمان‌های تحلیل فاز ۵ (یا بازتنظیم دستی)</span>
-              </div>
-              <Button className="gap-2" onClick={onOpenBalance}>
-                <Scale className="size-4" aria-hidden /> ورود به کارگاه بالانس
-              </Button>
-            </CardContent>
-          </Card>
+          <StudyPathStepper
+            readiness={project.readiness}
+            onOpenConfig={onOpenConfig}
+            onOpenDiagrams={onOpenDiagrams}
+            onOpenTiming={onOpenTiming}
+            onOpenAnalysis={onOpenAnalysis}
+            onOpenBalance={onOpenBalance}
+          />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
@@ -299,7 +236,13 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">پروفایل روش‌شناختی و پیکربندی</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  پروفایل روش‌شناختی
+                  <Hint
+                    text="کپی مستقل از الگوی روش‌شناختی در لحظه ایجاد پروژه. تغییرات ساختاری (خانواده‌ها، پارامترها، فرمول‌ها) به‌صورت نسخه‌های جدید append-only ثبت می‌شوند و نسخه‌های قبلی برای بازتولید نتایج حفظ می‌شوند."
+                    title="پروفایل و نسخه‌بندی"
+                  />
+                </CardTitle>
                 <CardDescription>کپی مستقل از الگو — لحظه ایجاد پروژه (ADR-005)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
@@ -314,13 +257,9 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
                   <Badge variant="secondary">نسخه فعال {project.currentConfigVersion?.semver ?? "—"}</Badge>
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  تغییرات ساختاری (خانواده‌ها، پارامترها، فرمول‌ها) در کارگاه پیکربندی به‌صورت نسخه‌های جدید
-                  append-only ثبت می‌شوند؛ نسخه‌های قبلی برای بازتولید نتایج حفظ می‌شوند.
+                  تب «نسخه‌های پیکربندی» تاریخچه کامل و قابل بازبینی نسخه‌ها را نشان می‌دهد؛ درون‌ریزی و برون‌ریزی
+                  پیکربندی از کارگاه پیکربندی در دسترس است.
                 </p>
-                <div className="rounded-lg border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
-                  بخش‌های بعدی محصول روی همین پروژه ساخته می‌شوند: نمودارهای OPC/FPC (فاز ۳)، کرنومتر (فاز ۴)، تحلیل
-                  (فاز ۵) و بالانس خط (فاز ۶).
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -352,7 +291,7 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
               <div>
                 <CardTitle className="text-base">اعضا و کنترل دسترسی</CardTitle>
                 <CardDescription>
-                  نقش‌ها: مالک (همه)، ویرایشگر (پیکربندی/داده)، ثبت‌کننده (مشاهدات — فاز ۴)، ببیننده (گزارش‌ها)
+                  نقش‌ها: مالک (همه)، ویرایشگر (پیکربندی/داده)، ثبت‌کننده (مشاهدات)، ببیننده (گزارش‌ها)
                 </CardDescription>
               </div>
               {canManageMembers ? (
@@ -419,6 +358,174 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
   );
 }
 
+// ─────────────────────── مسیر مرحله‌ای مطالعه ───────────────────────
+
+interface StepDef {
+  key: string;
+  title: string;
+  desc: string;
+  icon: React.ElementType;
+  done: boolean;
+  /** دکمه ورود به مرحله — همیشه در دسترس (کاربران حرفه‌ای مستقیم وارد هر بخش می‌شوند) */
+  enter: () => void;
+  ctaDone: string;
+  ctaNext: string;
+}
+
+function StudyPathStepper({
+  readiness,
+  onOpenConfig,
+  onOpenDiagrams,
+  onOpenTiming,
+  onOpenAnalysis,
+  onOpenBalance,
+}: {
+  readiness: ProjectReadinessDto;
+  onOpenConfig: () => void;
+  onOpenDiagrams: () => void;
+  onOpenTiming: () => void;
+  onOpenAnalysis: () => void;
+  onOpenBalance: () => void;
+}) {
+  const steps: StepDef[] = [
+    {
+      key: "diagram",
+      title: "ترسیم نمودار فرایند",
+      desc: "مسیر عملیات را با OPC یا FPC طراحی کنید — اتصال از هر چهار ضلع گام‌ها.",
+      icon: Network,
+      done: readiness.diagramReady,
+      enter: onOpenDiagrams,
+      ctaDone: "مشاهده نمودارها",
+      ctaNext: "شروع طراحی نمودار",
+    },
+    {
+      key: "activities",
+      title: "فعالیت‌ها و ایستگاه‌ها",
+      desc: "گام‌های نمودار را به فعالیت‌ها و ایستگاه‌های کاری مرتبط و اطلاعات ضروری را تکمیل کنید.",
+      icon: ListChecks,
+      done: readiness.measurementReady,
+      enter: onOpenConfig,
+      ctaDone: "مدیریت فعالیت‌ها",
+      ctaNext: "تعریف فعالیت‌ها",
+    },
+    {
+      key: "timing",
+      title: "زمان‌سنجی",
+      desc: "با کرنومتر، فعالیت‌ها یا عناصر کاری را اندازه‌گیری کنید — آفلاین هم فعال است.",
+      icon: Timer,
+      done: readiness.analysisReady,
+      enter: onOpenTiming,
+      ctaDone: "جلسات زمان‌سنجی",
+      ctaNext: "شروع زمان‌سنجی",
+    },
+    {
+      key: "params",
+      title: "پارامترها و فرمول‌ها",
+      desc: "در صورت نیاز: پارامترهای سفارشی و فرمول‌های محاسباتی با آزمون زنده.",
+      icon: Sigma,
+      done: readiness.configReady,
+      enter: onOpenConfig,
+      ctaDone: "پیکربندی پیشرفته",
+      ctaNext: "ساخت پارامتر/فرمول",
+    },
+    {
+      key: "balance",
+      title: "تحلیل و بالانس خط",
+      desc: "نتایج را تحلیل کنید؛ تعداد ایستگاه‌ها، تخصیص فعالیت‌ها و نیروی انسانی را تعیین کنید.",
+      icon: readiness.approvalReady ? Scale : BarChart3,
+      done: readiness.approvalReady,
+      enter: readiness.approvalReady ? onOpenBalance : onOpenAnalysis,
+      ctaDone: "کارگاه بالانس خط",
+      ctaNext: "شروع تحلیل",
+    },
+  ];
+
+  const doneCount = steps.filter((s) => s.done).length;
+  const currentIdx = steps.findIndex((s) => !s.done);
+  const current = currentIdx >= 0 ? steps[currentIdx] : null;
+
+  return (
+    <section aria-label="مراحل انجام مطالعه" className="rounded-xl border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold">مراحل انجام مطالعه</h2>
+          <Hint
+            text="مسیر پیشنهادی انجام یک مطالعه زمان‌سنجی است، نه محدودیت اجباری: با دکمه هر مرحله می‌توانید مستقیم به همان بخش بروید. وضعیت هر مرحله از داده واقعی پروژه به دست می‌آید."
+            title="مسیر مطالعه"
+          />
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>
+            {doneCount} از {steps.length} مرحله کامل
+          </span>
+          <Progress value={(doneCount / steps.length) * 100} className="h-2 w-28 sm:w-40" aria-label="پیشرفت مطالعه" />
+        </div>
+      </div>
+
+      {current ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-primary/[0.04] p-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <current.icon className="size-4.5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">اقدام پیشنهادی — {current.title}</p>
+              <p className="truncate text-xs text-muted-foreground">{current.desc}</p>
+            </div>
+          </div>
+          <Button className="gap-2" onClick={current.enter}>
+            <current.icon className="size-4" aria-hidden /> {current.ctaNext}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-emerald-50 p-4 dark:bg-emerald-950/30">
+          <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+            همه مراحل پایه کامل شده‌اند — گزارش‌ها و مقایسه سناریوهای بالانس در کارگاه تحلیل/بالانس در دسترس است.
+          </p>
+          <Button variant="outline" size="sm" className="gap-2" onClick={onOpenBalance}>
+            <Scale className="size-4" aria-hidden /> کارگاه بالانس خط
+          </Button>
+        </div>
+      )}
+
+      <ol className="grid gap-0 sm:grid-cols-2 lg:grid-cols-5">
+        {steps.map((s, i) => {
+          const isCurrent = current?.key === s.key;
+          return (
+            <li
+              key={s.key}
+              className={cn(
+                "flex flex-col gap-2 border-b border-e p-4 last:border-b-0 last:border-e-0 sm:[&:nth-last-child(-n+1)]:border-e-0 lg:[&:nth-last-child(-n+5)]:border-b-0 lg:[&:nth-last-child(-n+5)]:border-e",
+                i < steps.length - 1 && "lg:border-e",
+                isCurrent && "bg-muted/40",
+              )}
+              aria-current={isCurrent ? "step" : undefined}
+            >
+              <div className="flex items-center gap-2">
+                {s.done ? (
+                  <CheckCircle2 className="size-4 shrink-0 text-emerald-600" aria-hidden />
+                ) : isCurrent ? (
+                  <CircleDot className="size-4 shrink-0 text-primary" aria-hidden />
+                ) : (
+                  <Circle className="size-4 shrink-0 text-muted-foreground/50" aria-hidden />
+                )}
+                <span className={cn("text-xs font-semibold", isCurrent && "text-primary")}>
+                  {i + 1}. {s.title}
+                </span>
+              </div>
+              <p className="min-h-8 text-[11px] leading-relaxed text-muted-foreground">{s.desc}</p>
+              <Button variant={isCurrent ? "default" : "outline"} size="sm" className="mt-auto w-full gap-1.5 text-xs" onClick={s.enter}>
+                <s.icon className="size-3.5" aria-hidden />
+                {s.done ? s.ctaDone : isCurrent ? s.ctaNext : "ورود به مرحله"}
+              </Button>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 // ─────────────────────── نسخه‌ها ───────────────────────
 
 function VersionList({ versions }: { versions: Array<{ id: string; semver: string; reason: string | null; isCurrent: boolean; createdByName: string | null; createdAt: string; snapshot: unknown }> }) {
@@ -454,7 +561,7 @@ function VersionList({ versions }: { versions: Array<{ id: string; semver: strin
           </div>
           {expanded === v.id ? (
             <ScrollArea className="max-h-72 border-t">
-              <pre className="whitespace-pre-wrap p-3 text-left text-[11px] leading-relaxed" dir="ltr">
+              <pre className="whitespace-pre-wrap p-3 text-start text-[11px] leading-relaxed" dir="ltr">
                 {JSON.stringify(v.snapshot, null, 2)}
               </pre>
             </ScrollArea>
@@ -489,7 +596,7 @@ function MembersTable({
           <TableHead>کاربر</TableHead>
           <TableHead>نقش</TableHead>
           <TableHead>عضویت از</TableHead>
-          {canManage ? <TableHead className="text-left">عملیات</TableHead> : null}
+          {canManage ? <TableHead>عملیات</TableHead> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -510,7 +617,7 @@ function MembersTable({
                   onValueChange={(role) => updateRole.mutate({ memberId: m.id, role })}
                   disabled={updateRole.isPending}
                 >
-                  <SelectTrigger className="h-8 w-32" aria-label={`نقش ${m.name ?? m.email}`}>
+                  <SelectTrigger className="h-8 w-36" aria-label={`نقش ${m.name ?? m.email}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -527,7 +634,7 @@ function MembersTable({
               <FaDate iso={m.createdAt} />
             </TableCell>
             {canManage ? (
-              <TableCell className="text-left">
+              <TableCell>
                 {m.role !== "owner" ? (
                   <Button
                     variant="ghost"
@@ -605,7 +712,7 @@ function AddMemberDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="editor">ویرایشگر — پیکربندی و ویرایش داده</SelectItem>
-                <SelectItem value="recorder">ثبت‌کننده — ثبت مشاهدات (فاز ۴)</SelectItem>
+                <SelectItem value="recorder">ثبت‌کننده — ثبت مشاهدات</SelectItem>
                 <SelectItem value="viewer">ببیننده — فقط مشاهده و گزارش</SelectItem>
               </SelectContent>
             </Select>

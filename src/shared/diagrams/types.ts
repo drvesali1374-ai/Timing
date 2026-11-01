@@ -101,7 +101,47 @@ export interface DiagramEdge {
   id: string;
   from: string;
   to: string;
+  /** ضلع اتصال مبدأ (چهارجهته) — پیش‌فرض سازگار با داده قدیمی: "bottom" */
+  fromHandle?: DiagramHandleSide | null;
+  /** ضلع اتصال مقصد (چهارجهته) — پیش‌فرض سازگار با داده قدیمی: "top" */
+  toHandle?: DiagramHandleSide | null;
   label?: string | null;
+}
+
+// ─────────────────────── اتصال چهارجهته (هر گام از ۴ ضلع) ───────────────────────
+
+/** ضلع‌های قابل اتصال هر گام — هر ضلع هم مبدأ و هم مقصد یال می‌تواند باشد */
+export const DIAGRAM_HANDLE_SIDES = ["top", "bottom", "left", "right"] as const;
+export type DiagramHandleSide = (typeof DIAGRAM_HANDLE_SIDES)[number];
+
+export function isHandleSide(v: unknown): v is DiagramHandleSide {
+  return typeof v === "string" && (DIAGRAM_HANDLE_SIDES as readonly string[]).includes(v);
+}
+
+/** شناسه Handle پایدار در React Flow — «ضلع-نقش» */
+export function handleId(side: DiagramHandleSide, role: "source" | "target"): string {
+  return `${side}-${role}`;
+}
+
+/** استخراج ضلع از شناسه Handle («top-source» → "top")؛ نامعتبر → null */
+export function handleSideFromId(id: string | null | undefined): DiagramHandleSide | null {
+  if (!id) return null;
+  const side = id.replace(/-(source|target)$/, "");
+  return isHandleSide(side) ? side : null;
+}
+
+/** پیش‌فرض سازگار: یال بدون ضلع ذخیره‌شده — مبدأ پایین، مقصد بالا (رفتار نسخه‌های قبل) */
+export const LEGACY_SOURCE_SIDE: DiagramHandleSide = "bottom";
+export const LEGACY_TARGET_SIDE: DiagramHandleSide = "top";
+
+/** ضلع مؤثر مبدأ — داده قدیمی بدون fromHandle روی پیش‌فرض می‌نشیند */
+export function effectiveSourceSide(edge: Pick<DiagramEdge, "fromHandle">): DiagramHandleSide {
+  return edge.fromHandle ?? LEGACY_SOURCE_SIDE;
+}
+
+/** ضلع مؤثر مقصد — داده قدیمی بدون toHandle روی پیش‌فرض می‌نشیند */
+export function effectiveTargetSide(edge: Pick<DiagramEdge, "toHandle">): DiagramHandleSide {
+  return edge.toHandle ?? LEGACY_TARGET_SIDE;
 }
 
 // ─────────────────────── سند معنایی ───────────────────────

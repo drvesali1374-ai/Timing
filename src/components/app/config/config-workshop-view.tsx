@@ -6,10 +6,18 @@
  * هر تغییر ساختاری بلافاصله یک نسخه append-only با دلیل می‌سازد.
  */
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, Download, Eye, FolderPlus, Sigma, Upload } from "lucide-react";
+import { AlertTriangle, ArrowRight, Download, Eye, MoreHorizontal, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { roleCan } from "@/shared/contracts/acl";
 import { PROJECT_ROLE_LABELS_FA } from "@/shared/contracts/acl";
 import type { CurrentConfigDto } from "@/shared/contracts/config";
@@ -22,8 +30,6 @@ import { FormulasTab } from "./formulas-tab";
 import { FormValuesTab } from "./form-values-tab";
 import { ResultsTab } from "./results-tab";
 import { ActivitiesTab } from "./activities-tab";
-import { FamilyDialog } from "./family-dialog";
-import { FormulaDialog } from "./formula-dialog";
 import { ImportDialog } from "./import-dialog";
 
 export function ConfigWorkshopView({
@@ -40,8 +46,6 @@ export function ConfigWorkshopView({
   const exportConfig = useExportConfig(projectId);
 
   const [tab, setTab] = useState("families");
-  const [familyCreateOpen, setFamilyCreateOpen] = useState(false);
-  const [formulaCreateOpen, setFormulaCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
   const projectData = projectQuery.data;
@@ -78,29 +82,31 @@ export function ConfigWorkshopView({
             <Button variant="outline" size="sm" className="gap-2" onClick={onBack}>
               <ArrowRight className="size-4" aria-hidden /> بازگشت به پروژه
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => exportConfig.mutate()}
-              disabled={exportConfig.isPending}
-              aria-label="دانلود خروجی JSON پیکربندی جاری"
-            >
-              {exportConfig.isPending ? <Spinner /> : <Download className="size-4" aria-hidden />} خروجی JSON
-            </Button>
-            {canWrite ? (
-              <>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => { setTab("families"); setFamilyCreateOpen(true); }}>
-                  <FolderPlus className="size-4" aria-hidden /> خانواده جدید
+            {/* ابزارهای سطح کارگاه — منوی واحد؛
+                ایجاد خانواده/فرمول در محل اصلی خود (تب مربوطه) انجام می‌شود (بند ۳.۳) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <MoreHorizontal className="size-4" aria-hidden /> ابزارها
                 </Button>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => { setTab("formulas"); setFormulaCreateOpen(true); }}>
-                  <Sigma className="size-4" aria-hidden /> فرمول جدید
-                </Button>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
-                  <Upload className="size-4" aria-hidden /> درون‌ریزی
-                </Button>
-              </>
-            ) : null}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>درمان‌ریزی و برون‌ریزی</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => exportConfig.mutate()}
+                  disabled={exportConfig.isPending}
+                  className="gap-2"
+                >
+                  {exportConfig.isPending ? <Spinner /> : <Download className="size-4" aria-hidden />} خروجی JSON پیکربندی
+                </DropdownMenuItem>
+                {canWrite ? (
+                  <DropdownMenuItem onClick={() => setImportOpen(true)} className="gap-2">
+                    <Upload className="size-4" aria-hidden /> درون‌ریزی پیکربندی
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       />
@@ -113,13 +119,7 @@ export function ConfigWorkshopView({
         <ConfigTabsBody projectId={projectId} config={configQuery.data} canWrite={canWrite} tab={tab} setTab={setTab} projectRole={project.myRole} />
       )}
 
-      {/* دیالوگ‌های سطح کارگاه */}
-      {familyCreateOpen ? (
-        <FamilyDialog projectId={projectId} open={true} onOpenChange={(o) => !o && setFamilyCreateOpen(false)} />
-      ) : null}
-      {formulaCreateOpen ? (
-        <FormulaDialog projectId={projectId} open={true} onOpenChange={(o) => !o && setFormulaCreateOpen(false)} />
-      ) : null}
+      {/* دیالوگ سطح کارگاه — فقط درون‌ریزی (ایجاد خانواده/فرمول از تب مربوطه) */}
       {importOpen ? <ImportDialog projectId={projectId} open={true} onOpenChange={setImportOpen} /> : null}
     </div>
   );

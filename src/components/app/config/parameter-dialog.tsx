@@ -9,10 +9,9 @@ import { useState } from "react";
 import { Info, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -308,9 +307,9 @@ export function ParameterDialog({
             مقدارهای ثبت‌شده به نسخه قبلی گره می‌خورند و باید بازنگری شوند.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit}>
-          <ScrollArea className="max-h-[62vh] pr-3">
-            <div className="grid gap-4 py-2 sm:grid-cols-2">
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
+          <DialogBody>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor={id("key")}>شناسه فنی (stableKey) *</Label>
                 <Input
@@ -634,8 +633,8 @@ export function ParameterDialog({
                 />
               </div>
             </div>
-          </ScrollArea>
-          <DialogFooter className="mt-4 gap-2">
+          </DialogBody>
+          <DialogFooter className="gap-2">
             <p className="me-auto flex items-center gap-1 text-xs text-muted-foreground">
               <Info className="size-3.5" aria-hidden /> اعتبارسنجی نهایی در سرور انجام می‌شود
             </p>

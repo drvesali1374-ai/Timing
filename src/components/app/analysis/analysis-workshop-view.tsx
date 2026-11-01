@@ -10,6 +10,7 @@ import { useState } from "react";
 import { BarChart3, BookOpen, ClipboardList, FileDown, Gauge, GitBranch, LineChart } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState, ErrorState, LoadingBlock, PageHeader } from "@/components/app/ui-bits";
+import { AdvancedTabsMenu } from "@/components/app/advanced-tabs-menu";
 import { Button } from "@/components/ui/button";
 import { useAnalysis } from "@/hooks/use-analysis";
 import { useSession } from "@/hooks/use-api";
@@ -33,13 +34,17 @@ const TABS = [
   { key: "summary", labelFa: "خلاصه", icon: Gauge },
   { key: "observations", labelFa: "مشاهدات", icon: ClipboardList },
   { key: "elements", labelFa: "تحلیل عنصر", icon: BarChart3 },
-  { key: "quality", labelFa: "کیفیت نمونه", icon: LineChart },
   { key: "chain", labelFa: "زنجیره زمان", icon: GitBranch },
   { key: "reports", labelFa: "گزارش‌ها", icon: FileDown },
+] as const;
+
+/** تب‌های تخصصی — در منوی «جزئیات پیشرفته» (بند ۱۰؛ بدون حذف قابلیت) */
+const ADVANCED_TABS = [
+  { key: "quality", labelFa: "کیفیت نمونه", icon: LineChart },
   { key: "guide", labelFa: "راهنمای تحلیل", icon: BookOpen },
 ] as const;
 
-export type AnalysisTabKey = (typeof TABS)[number]["key"];
+export type AnalysisTabKey = (typeof TABS)[number]["key"] | (typeof ADVANCED_TABS)[number]["key"];
 
 export function AnalysisWorkshopView({ projectId, onBack, onTitle, onOpenTiming }: AnalysisWorkshopViewProps) {
   const session = useSession();
@@ -91,6 +96,7 @@ export function AnalysisWorkshopView({ projectId, onBack, onTitle, onOpenTiming 
                 </TabsTrigger>
               );
             })}
+            <AdvancedTabsMenu tabs={ADVANCED_TABS} activeKey={tab} onSelect={(k) => setTab(k as AnalysisTabKey)} />
           </TabsList>
 
           <TabsContent value="summary" className="mt-4">

@@ -8,8 +8,22 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
-import { symbolLabelFa, type DiagramKind, type DiagramSymbol } from "@/shared/diagrams/types";
+import {
+  DIAGRAM_HANDLE_SIDES,
+  symbolLabelFa,
+  handleId,
+  type DiagramHandleSide,
+  type DiagramKind,
+  type DiagramSymbol,
+} from "@/shared/diagrams/types";
 import { formatSeconds } from "@/shared/diagrams/svg";
+
+const SIDE_POSITION: Record<DiagramHandleSide, Position> = {
+  top: Position.Top,
+  bottom: Position.Bottom,
+  right: Position.Right,
+  left: Position.Left,
+};
 
 /** رنگ نماد — همان پالت خروجی SVG */
 export function symbolColor(symbol: DiagramSymbol): string {
@@ -145,9 +159,30 @@ function StepNodeInner({ data, selected }: NodeProps) {
       )}
       style={{ direction: "rtl" }}
     >
-      {/* هندل‌های اتصال: بالا/پایین (جریان عمودی) — z بالاتر از محتوا تا کلیک روی نماد، drag اتصال را نپوشاند */}
-      <Handle type="target" position={Position.Top} style={{ background: c, zIndex: 20 }} aria-label="ورودی اتصال" />
-      <Handle type="source" position={Position.Bottom} style={{ background: c, zIndex: 20 }} aria-label="خروجی اتصال" />
+      {/* هندل‌های اتصال چهارجهته — هر ضلع هم مبدأ (source) هم مقصد (target):
+          شناسه‌های پایدار «ضلع-نقش» (top-source/top-target/...) در DiagramEdge ذخیره می‌شوند.
+          z بالاتر از محتوا تا کلیک روی نماد، drag اتصال را نپوشاند؛
+          target زیر source هم‌جایگاه است — شروع drag از source و رهاسازی روی target هر دو فعال‌اند. */}
+      {DIAGRAM_HANDLE_SIDES.map((side) => (
+        <Handle
+          key={handleId(side, "target")}
+          type="target"
+          id={handleId(side, "target")}
+          position={SIDE_POSITION[side]}
+          style={{ background: c, zIndex: 20 }}
+          aria-label={`ورودی اتصال — ${side === "top" ? "بالا" : side === "bottom" ? "پایین" : side === "right" ? "راست" : "چپ"}`}
+        />
+      ))}
+      {DIAGRAM_HANDLE_SIDES.map((side) => (
+        <Handle
+          key={handleId(side, "source")}
+          type="source"
+          id={handleId(side, "source")}
+          position={SIDE_POSITION[side]}
+          style={{ background: c, zIndex: 21, borderColor: "#ffffff" }}
+          aria-label={`خروجی اتصال — ${side === "top" ? "بالا" : side === "bottom" ? "پایین" : side === "right" ? "راست" : "چپ"}`}
+        />
+      ))}
 
       <div className="flex items-center gap-2">
         <div className="relative shrink-0" aria-hidden>

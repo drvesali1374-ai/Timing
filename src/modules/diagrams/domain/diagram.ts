@@ -9,6 +9,7 @@ import { ApiError } from "@/shared/errors";
 import {
   DIAGRAM_LIMITS,
   isDiagramSymbolFor,
+  DIAGRAM_HANDLE_SIDES,
   type DiagramDoc,
   type DiagramKind,
   type DiagramVariant,
@@ -67,11 +68,17 @@ const nodeSchema = z
   })
   .strict();
 
+const handleSideSchema = z.enum(DIAGRAM_HANDLE_SIDES);
+
 const edgeSchema = z
   .object({
     id: z.string().min(1).max(64),
     from: z.string().min(1).max(64),
     to: z.string().min(1).max(64),
+    /** ضلع اتصال مبدأ — اختیاری برای سازگاری با نمودارهای قدیمی */
+    fromHandle: handleSideSchema.nullable().optional(),
+    /** ضلع اتصال مقصد — اختیاری برای سازگاری با نمودارهای قدیمی */
+    toHandle: handleSideSchema.nullable().optional(),
     label: z.string().max(120).nullable().optional(),
   })
   .strict();

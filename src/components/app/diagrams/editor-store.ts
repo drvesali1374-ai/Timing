@@ -8,7 +8,14 @@
 
 import { create } from "zustand";
 import { autoLayout } from "@/shared/diagrams/layout";
-import { makeNode, type DiagramDoc, type DiagramLayout, type DiagramNode, type DiagramSymbol } from "@/shared/diagrams/types";
+import {
+  makeNode,
+  type DiagramDoc,
+  type DiagramHandleSide,
+  type DiagramLayout,
+  type DiagramNode,
+  type DiagramSymbol,
+} from "@/shared/diagrams/types";
 
 interface HistoryEntry {
   doc: DiagramDoc;
@@ -40,7 +47,7 @@ interface EditorState {
   updateNode: (nodeId: string, patch: Partial<DiagramNode>) => void;
   removeNode: (nodeId: string) => void;
   duplicateNode: (nodeId: string) => string | null;
-  addEdge: (from: string, to: string) => string | null;
+  addEdge: (from: string, to: string, fromHandle?: DiagramHandleSide | null, toHandle?: DiagramHandleSide | null) => string | null;
   removeEdge: (edgeId: string) => void;
   setNodePosition: (nodeId: string, x: number, y: number) => void;
   applyAutoLayout: () => void;
@@ -205,7 +212,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return id;
   },
 
-  addEdge: (from, to) => {
+  addEdge: (from, to, fromHandle, toHandle) => {
     const { doc } = get();
     if (!doc) return null;
     if (from === to) return null;
@@ -213,7 +220,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (exists) return null;
     get().pushHistory();
     const id = `e${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`;
-    const edges = [...doc.edges, { id, from, to }];
+    const edges = [...doc.edges, { id, from, to, fromHandle: fromHandle ?? null, toHandle: toHandle ?? null }];
     set({ doc: { ...cloneDoc(doc), edges } });
     return id;
   },

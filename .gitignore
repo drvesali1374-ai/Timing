@@ -41,8 +41,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-local-*
-!src/lib/local-model.ts
+# فایل‌های محلی موقتی — فقط در ریشه (لنگر شده تا سورس‌های src/** بی‌صدا ignore نشوند — درس فاز ۵)
+/local-*
 .claude
 .z-ai-config
 *.log

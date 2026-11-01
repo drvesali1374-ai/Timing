@@ -17,7 +17,10 @@
     "check:boundaries": "node scripts/check-module-boundaries.mjs",
     "test:phase3": "node scripts/test-phase3.mjs",
     "test:phase4": "node scripts/test-phase4.mjs",
-    "test:phase5": "node scripts/test-phase5.mjs"
+    "test:phase5": "node scripts/test-phase5.mjs",
+    "test:phase6": "node scripts/test-phase6.mjs",
+    "check:untracked": "node scripts/check-untracked.mjs",
+    "restore:env": "node scripts/restore-env.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

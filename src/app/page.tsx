@@ -5,7 +5,7 @@
  *  ورود/ثبت‌نام → داشبورد پروژه‌ها → ایجاد پروژه → جزئیات پروژه → کارگاه پیکربندی.
  * ناوبری داخلی با state (محیط پیش‌نمایش تک-مسیر).
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppProviders } from "@/components/app/providers";
 import { AuthView } from "@/components/app/auth-view";
 import { AppShell, type ViewName } from "@/components/app/app-shell";
@@ -35,6 +35,18 @@ function AppRoot() {
     if (view !== "project" && view !== "project-config" && view !== "project-diagrams" && view !== "project-timing" && view !== "project-analysis" && view !== "project-balance") setProjectTitle(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }, []);
+
+  // با خروج کاربر، نما به داشبورد ریست می‌شود تا ورود کاربر بعدی (همان یا متفاوت)
+  // ناخواسته پروژه انتخابی کاربر قبلی را باز نکند (که برای او ۴۰۴/۴۰۳ می‌دهد).
+  const hadSessionRef = useRef(false);
+  useEffect(() => {
+    const hasSession = !!session.data;
+    if (hadSessionRef.current && !hasSession) {
+      setRoute({ name: "dashboard" });
+      setProjectTitle(null);
+    }
+    hadSessionRef.current = hasSession;
+  }, [session.data]);
 
   if (session.isLoading) {
     return (

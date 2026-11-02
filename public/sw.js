@@ -1,22 +1,42 @@
 /**
  * Service Worker پلتفرم زمان‌سنجی صنعتی — پیاده‌سازی ADR-006 (فاز ۷)
  * ----------------------------------------------------------------
- * استراتژی:
- *  - ناوبری (request.mode === 'navigate'): شبکه-اول → عقب‌گرد به کش → صفحه آفلاین
- *  - دارایی‌های استاتیک هش‌شده (/_next/static/، آیکون‌ها، فونت‌ها): کش-اول + بازآوری در پس‌زمینه (SWR)
+ * استراتژی (نسخه ۱.۱.۰ — مقاوم‌سازی در برابر صفحه سفید):
+ *  - ناوبری (request.mode === 'navigate'): شبکه-اول با سقف زمانی ۸s →
+ *    عقب‌گرد به کش → صفحه آفلاین. شبکهٔ معلق هرگز صفحه را قفل نمی‌کند.
+ *  - دارایی‌های استاتیک (/_next/static/، آیکون‌ها، فونت‌ها): شبکه-اول →
+ *    عقب‌گرد به کش. (تغییر از SWR: در محیط dev محتوای فایل‌های هم‌نام پس از
+ *    هر بازساخت سرور عوض می‌شود؛ کش-اول JS کهنه/ناسازگار سرو می‌کرد و
+ *    صفحهٔ سفید می‌ساخت. شبکه-اول + عقب‌گردِ آفلاین صحت را تضمین می‌کند
+ *    و آفلاین همچنان کار می‌کند.)
  *  - API (/api/**): فقط-شبکه — هرگز پاسخ API کش نمی‌شود (یکپارچگی داده)؛
  *    صف‌های آفلاین دادهٔ ساخت‌یافته در IndexedDB (timing-chrono / timing-diagrams)
  *    طبق ADR-013/012 مدیریت می‌شوند، نه در این SW.
  *  - پایان‌های احراز هویت (/api/auth/**): کاملاً دست‌نخورده.
- *  - نسخه‌بندی کش: با تغییر APP_VERSION کش‌های قدیمی در activate پاک می‌شوند.
+ *  - نسخه‌بندی کش: با تغییر APP_VERSION کش‌های قدیمی در activate پاک می‌شوند
+ *    (v1.1.0 → پاک شدن خودکار کش‌های کهنهٔ v1.0.0 در مرورگر همهٔ کاربران).
  *
  * صداقت (قاعده منشور): هیچ «همگام موفق» جعلی ادعا نمی‌شود؛ آفلاین فقط
  * برای پوسته برنامه و دارایی‌هاست، نه داده.
  */
 
-const APP_VERSION = "tazmin-pwa-v1.0.0";
+const APP_VERSION = "tazmin-pwa-v1.1.0";
 const SHELL_CACHE = `${APP_VERSION}-shell`;
 const STATIC_CACHE = `${APP_VERSION}-static`;
+
+/** سقف انتظار شبکه (میلی‌ثانیه) — پس از آن عقب‌گرد به کش/آفلاین، نه انتظار بی‌پایان. */
+const NETWORK_TIMEOUT_MS = 8_000;
+
+/** fetch با سقف زمانی — شبکهٔ معلق هرگز صفحه را قفل نمی‌کند. */
+async function fetchWithTimeout(req) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), NETWORK_TIMEOUT_MS);
+  try {
+    return await fetch(req, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** دارایی‌های پایه که همیشه باید آفلاین در دسترس باشند. */
 const PRECACHE_URLS = [
@@ -93,15 +113,22 @@ self.addEventListener("fetch", (event) => {
   // API داده: فقط-شبکه (خطا شفاف به caller می‌رسد؛ صف‌های IndexedDB خودشان عمل می‌کنند)
   if (url.pathname.startsWith("/api/")) return;
 
-  // ناوبری صفحه: شبکه-اول با عقب‌گرد
+  // ناوبری صفحه: شبکه-اول با سقف زمانی و عقب‌گرد
   if (req.mode === "navigate") {
     event.respondWith(
       (async () => {
         try {
-          const fresh = await fetch(req);
-          // نسخه تازه پوسته را کش کن (برای بار بعدی)
-          const cache = await caches.open(SHELL_CACHE);
-          cache.put("/", fresh.clone()).catch(() => {});
+          const fresh = await fetchWithTimeout(req);
+          if (!fresh.ok && fresh.status >= 500) {
+            // خطای سرور (مثلاً کامپایل قطع‌شده در dev) → عقب‌گرد به کش در صورت وجود
+            const cachedErr = (await caches.match(req)) || (await caches.match("/"));
+            if (cachedErr) return cachedErr;
+          }
+          if (fresh.ok) {
+            // نسخه تازه پوسته را کش کن (برای بار بعد)
+            const cache = await caches.open(SHELL_CACHE);
+            cache.put("/", fresh.clone()).catch(() => {});
+          }
           return fresh;
         } catch (err) {
           const cached =
@@ -117,32 +144,30 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // دارایی استاتیک: کش-اول + بازآوری در پس‌زمینه (stale-while-revalidate)
+  // دارایی استاتیک: شبکه-اول → عقب‌گرد به کش (آفلاین) — هرگز JS کهنه سرو نمی‌شود
   if (isStaticAsset(url)) {
     event.respondWith(
       (async () => {
-        const cached = await caches.match(req);
-        const revalidate = fetch(req)
-          .then((res) => {
-            if (res && res.status === 200) {
-              const put = res.clone();
-              caches
-                .open(STATIC_CACHE)
-                .then((c) => c.put(req, put))
-                .catch((err) => {
-                  console.warn("[sw] cache.put failed:", req.url, err && err.message);
-                });
-            }
-            return res;
-          })
-          .catch(() => null);
-        if (cached) {
-          revalidate.catch(() => {});
-          return cached;
+        try {
+          const fresh = await fetchWithTimeout(req);
+          if (fresh && fresh.status === 200) {
+            const put = fresh.clone();
+            caches
+              .open(STATIC_CACHE)
+              .then((c) => c.put(req, put))
+              .catch((err) => {
+                console.warn("[sw] cache.put failed:", req.url, err && err.message);
+              });
+            return fresh;
+          }
+          // 404/خطای دیگر → کش در صورت وجود (دارایی هش‌شده تغییرنکرده)؛ وگرنه همان پاسخ
+          const cached = await caches.match(req);
+          return cached ?? fresh;
+        } catch (err) {
+          const cached = await caches.match(req);
+          if (cached) return cached;
+          return new Response("", { status: 504 });
         }
-        const fresh = await revalidate;
-        if (fresh) return fresh;
-        return new Response("", { status: 504 });
       })(),
     );
   }

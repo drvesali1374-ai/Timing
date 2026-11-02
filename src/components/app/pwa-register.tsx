@@ -23,9 +23,15 @@ export function PwaRegister() {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
 
+    // آیا از قبل SW کنترل داشته؟ (نصب اول نیست و به‌روزرسانی واقعی است)
+    // بدون این تفکیک، clients.claim در نصب اول controllerchange می‌سازد و
+    // صفحه بی‌دلیل یک‌بار reload می‌شد.
+    const hadController = !!navigator.serviceWorker.controller;
+
     let reloading = false;
     const onControllerChange = () => {
       if (reloading) return;
+      if (!hadController) return; // نصب اول — reload لازم نیست
       reloading = true;
       // نسخه جدید فعال شد — بارگذاری مجدد یک‌باره برای پوسته تازه
       window.location.reload();

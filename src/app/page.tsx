@@ -6,6 +6,7 @@
  * ناوبری داخلی با state (محیط پیش‌نمایش تک-مسیر).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { RotateCcw, WifiOff } from "lucide-react";
 import { AppProviders } from "@/components/app/providers";
 import { AuthView } from "@/components/app/auth-view";
 import { AppShell, type ViewName } from "@/components/app/app-shell";
@@ -19,16 +20,74 @@ import { AnalysisWorkshopView } from "@/components/app/analysis/analysis-worksho
 import { BalanceWorkshopView } from "@/components/app/balance/balance-workshop-view";
 import { useSession } from "@/hooks/use-api";
 import { LoadingBlock } from "@/components/app/ui-bits";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Route {
   name: ViewName;
   projectId?: string;
 }
 
+/**
+ * دروازهٔ بارگذاری نشست — تا ۸ ثانیه اسکلتون؛ پس از آن کارت «تلاش دوباره».
+ * با پایان بارگذاری unmount می‌شود تا حالت کهنه برای بار بعدی نماند.
+ */
+function SessionGate({ onRetry }: { onRetry: () => void }) {
+  const [tooLong, setTooLong] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTooLong(true), 8_000);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!tooLong) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="w-full max-w-md">
+          <LoadingBlock lines={4} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md text-center">
+        <CardHeader>
+          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            <WifiOff className="size-6" aria-hidden />
+          </div>
+          <CardTitle>اتصال به سرور بیش از حد طول کشید</CardTitle>
+          <CardDescription>
+            احتمالاً اتصال شبکه قطع یا کند است. می‌توانید دوباره تلاش کنید یا صفحه را بازآوری کنید.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <Button onClick={onRetry} className="w-full gap-2">
+            <RotateCcw className="size-4" aria-hidden /> تلاش دوباره
+          </Button>
+          <Button variant="outline" className="w-full" onClick={() => window.location.reload()}>
+            بازآوری کامل صفحه
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function AppRoot() {
   const session = useSession();
   const [route, setRoute] = useState<Route>({ name: "dashboard" });
   const [projectTitle, setProjectTitle] = useState<string | null>(null);
+
+  // پرچم بالاآمدن کلاینت برای گارد صفحه سفیدِ layout — فقط در مرورگر معنا دارد.
+  useEffect(() => {
+    try {
+      (window as unknown as { __appBooted?: boolean }).__appBooted = true;
+      (window as unknown as { __hideBootFallback?: () => void }).__hideBootFallback?.();
+    } catch {
+      // نادیده — فقط بهبود تجربه است
+    }
+  }, []);
 
   const navigate = useCallback((view: ViewName, projectId?: string) => {
     setRoute({ name: view, projectId });
@@ -48,14 +107,10 @@ function AppRoot() {
     hadSessionRef.current = hasSession;
   }, [session.data]);
 
+  // سقف زمانی بارگذاری نشست — اگر شبکه/سرور معلق بود، اسکلتون بی‌پایان
+  // («صفحه سفید گیرکرده») نمایش داده نمی‌شود؛ کارت تلاش دوباره ظاهر می‌شود.
   if (session.isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="w-full max-w-md">
-          <LoadingBlock lines={4} />
-        </div>
-      </div>
-    );
+    return <SessionGate onRetry={() => void session.refetch()} />;
   }
 
   // بدون نشست → نمای ورود/ثبت‌نام

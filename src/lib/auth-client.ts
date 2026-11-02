@@ -41,7 +41,12 @@ export async function logout(): Promise<void> {
 
 export async function fetchSession(): Promise<SessionUserDto | null> {
   try {
-    const res = await fetch("/api/auth/session", { credentials: "include" });
+    // سقف زمانی ۱۵ث — درخواست معلق (شبکه/گیت‌وی گیرکرده) هرگز پرس‌شوی نشست را
+    // بی‌پایان «در حال بارگذاری» نگه نمی‌دارد؛ پس از سقف، کاربر به نمای ورود می‌رسد.
+    const res = await fetch("/api/auth/session", {
+      credentials: "include",
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!res.ok) return null;
     const data = (await res.json()) as { user?: { id: string; email: string; name: string | null } };
     if (!data?.user?.id) return null;

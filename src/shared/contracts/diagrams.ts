@@ -124,3 +124,22 @@ export const FPC_SUBJECT_OPTIONS_FA: Array<{ value: FpcSubject; labelFa: string 
   { value: "person", labelFa: "فرد" },
   { value: "equipment", labelFa: "تجهیزات" },
 ];
+
+// ─────────────────── ارتباط فعالیت↔گام نمودار (ADR-017) ───────────────────
+
+export interface ActivityLinkEntryDto {
+  diagramId: string;
+  diagramTitle: string;
+  diagramKind: "opc" | "fpc";
+  revNo: number;
+  nodeId: string;
+  stepNo: number | null;
+  nodeTitle: string;
+}
+
+export interface ActivityLinksDto {
+  /** به‌ازای stableKey فعالیت — گام‌های ارجاع‌دهنده */
+  byActivity: Record<string, ActivityLinkEntryDto[]>;
+  /** ارجاع‌های نامعتبر (فعالیت حذف‌شده/بایگانی‌شده یا کلید ناشناس) */
+  invalidRefs: Array<{ stableKey: string; diagramId: string; diagramTitle: string; nodeId: string }>;
+}

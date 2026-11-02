@@ -69,6 +69,8 @@ model Project {
   parameterValues    ParameterValue[]
   calculationResults CalculationResult[]
   activities         Activity[]
+  stations           WorkStation[]
+  manualSheets       ManualSheet[]
   diagrams           Diagram[]
   timingSessions     TimingSession[]
   balanceScenarios   BalanceScenario[]
@@ -319,7 +321,10 @@ model Activity {
   // محدودیت‌های تخصیص (ایستگاه مجاز/تجهیز اختصاصی/مهارت) — JSON
   constraintsJson String?
 
-  stationHint   String?
+  // ایستگاه کاری مرتبط (رابطه واقعی — ADR-017)؛ stationHint میراث متنی قدیمی است
+  stationId   String?
+  station     WorkStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  stationHint String?
   skillRequired String?
 
   // B5 — پیش‌نیازها (تقدم/تأخر): آرایه JSON از stableKey فعالیت‌های مقدم؛ مصرف‌کننده اصلی: بالانس فاز ۶
@@ -335,10 +340,135 @@ model Activity {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project             Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  manualObservations  ManualObservation[]
+  manualInterruptions ManualInterruption[]
 
   @@unique([projectId, stableKey])
   @@index([projectId, archived])
+  @@index([projectId, stationId])
+}
+
+// ─────────────────── ایستگاه کاری (ADR-017 — خط تولید تک‌خطی، ایستگاه‌های ترتیبی) ───────────────────
+// پروژه یک خط تولید را مدل می‌کند؛ ایستگاه‌ها واحدهای ترتیبی آن‌اند و فعالیت‌ها به ایستگاه متصل می‌شوند.
+// نتیجه بالانس خط از همین موجودیت تغذیه می‌شود (جایگزین تفسیر عددی stationHint).
+model WorkStation {
+  id        String  @id
+  projectId String
+
+  name        String
+  description String?
+
+  orderIndex Int
+  archived   Boolean @default(false)
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  activities Activity[]
+
+  @@unique([projectId, name])
+  @@index([projectId, archived])
+  @@index([projectId, orderIndex])
+}
+
+// ─────────────────── برگه ثبت زمان (ورود دستی — ADR-017) ───────────────────
+// پارادایم ثبت دستی: کاربر زمان‌ها را قبلاً با کرنومتر واقعی/ابزار مستقل اندازه گرفته و
+// اعداد را در جدول ثبت می‌کند. هیچ رویداد ساختگی کرنومتری تولید نمی‌شود؛ داده دستی
+// موجودیت مستقل خود را دارد و از طریق قرارداد مشترک مشاهدات به موتور تحلیل متصل می‌شود.
+model ManualSheet {
+  id        String  @id
+  projectId String
+
+  title     String
+  // draft | completed | finalized — پیش‌نویس/تکمیل‌شده/نهایی‌شده (ارسال‌شده به تحلیل)
+  status    String  @default("draft")
+  note      String?
+
+  // تعداد ستون‌های نمونه جدول (حداکثر sampleCount نمونه در هر فعالیت)
+  sampleCount Int    @default(0)
+
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project       Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  observations  ManualObservation[]
+  interruptions ManualInterruption[]
+
+  @@index([projectId, status])
+  @@index([projectId, createdAt])
+}
+
+// مشاهده دستی — یک سلول جدول (فعالیت × نمونه). واحد استاندارد: میلی‌ثانیه.
+// اصلاح مقدار = به‌روزرسانی با دلیل الزامی + ثبت قبل/بعد در ممیزی (قواعد ممیزی ADR-004).
+model ManualObservation {
+  id         String @id
+  sheetId    String
+  activityId String
+
+  // شماره نمونه/چرخه (۱-مبنا)
+  sampleIndex Int
+
+  // مدت در واحد استاندارد (میلی‌ثانیه) — مثبت
+  durationMs  Int
+
+  // منبع ثبت: manual | paste | import
+  source      String @default("manual")
+
+  note        String?
+
+  // علامت‌گذاری تحلیل (مشابه ObservationMark — برای داده دستی روی خود رکورد)
+  outlierMarked Boolean @default(false)
+  excluded      Boolean @default(false)
+  markReason    String?
+
+  // آخرین اصلاح (ردیابی)
+  lastEditReason String?
+  corrected      Boolean @default(false)
+
+  recordedBy String
+  recordedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sheet    ManualSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  activity Activity    @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetId, activityId, sampleIndex])
+  @@index([sheetId, activityId])
+  @@index([activityId])
+}
+
+// وقفه ثبت‌شده در برگه — مستقل از کرنومتر؛ مدت نامشخص مجاز است (durationMs = null).
+model ManualInterruption {
+  id         String @id
+  sheetId    String
+  activityId String?
+
+  // علت: fixture-failure | material-shortage | operator-talk | equipment-failure | waiting-transport | tool-change | other
+  reason       String
+  // فقط وقتی reason = other: متن دلخواه کاربر (الزامی)
+  reasonOther  String?
+
+  // مدت وقفه در میلی‌ثانیه — null یعنی «نامشخص» (هیچ عدد ساختگی ساخته نمی‌شود)
+  durationMs   Int?
+
+  note         String?
+
+  // نمونه/چرخه مرتبط در صورت وجود
+  sampleIndex  Int?
+
+  recordedBy String
+  recordedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sheet    ManualSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  activity Activity?   @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@index([sheetId])
+  @@index([sheetId, activityId])
 }
 
 // ─────────────────── فاز ۵: تحلیل مهندسی زمان (B9/B4 — DATA_DICTIONARY §۲٫۱۵) ───────────────────

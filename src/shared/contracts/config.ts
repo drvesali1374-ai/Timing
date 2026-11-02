@@ -202,11 +202,19 @@ export interface ActivityDto {
   description: string | null;
   workType: string;
   vaClassification: string | null;
+  /** ایستگاه کاری متصل (ADR-017) — null یعنی بدون ایستگاه */
+  stationId: string | null;
+  stationName: string | null;
+  /** میراث متنی قدیمی — برای سازگاری داده‌های قبلی */
   stationHint: string | null;
   skillRequired: string | null;
   sourceOfTime: string;
   order: number;
   archived: boolean;
+  /** B5 — کلیدهای پیش‌نیاز (تقدم) */
+  predecessors: string[];
+  /** B5/B10 — قیود تخصیص تجزیه‌شده */
+  constraints: { incompatibleWith: string[] };
   createdAt: string;
   updatedAt: string;
 }

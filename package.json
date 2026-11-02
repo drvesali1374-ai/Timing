@@ -24,7 +24,8 @@
     "restore:env": "node scripts/restore-env.mjs",
     "backup:db": "bun scripts/backup-db.mjs",
     "restore:db": "bun scripts/restore-db.mjs",
-    "test:phase7": "node scripts/test-phase7.mjs"
+    "test:phase7": "node scripts/test-phase7.mjs",
+    "test:manual": "node scripts/test-manual-study.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",

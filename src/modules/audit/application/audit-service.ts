@@ -48,6 +48,20 @@ export const AUDIT_ACTIONS = {
   balanceManualSaved: "balance.manual-saved",
   balanceExported: "balance.exported",
   analysisExported: "analysis.exported",
+  // ── ADR-017: ایستگاه‌های کاری و ثبت دستی زمان ──
+  stationCreated: "station.created",
+  stationUpdated: "station.updated",
+  stationArchived: "station.archived",
+  manualSheetCreated: "manual.sheet-created",
+  manualSheetUpdated: "manual.sheet-updated",
+  manualSheetFinalized: "manual.sheet-finalized",
+  manualObservationSaved: "manual.observation-saved",
+  manualObservationCorrected: "manual.observation-corrected",
+  manualObservationMarked: "manual.observation-marked",
+  manualInterruptionAdded: "manual.interruption-added",
+  manualInterruptionUpdated: "manual.interruption-updated",
+  manualInterruptionRemoved: "manual.interruption-removed",
+  activityBulkCreated: "activity.bulk-created",
 } as const;
 
 export interface AuditInput {

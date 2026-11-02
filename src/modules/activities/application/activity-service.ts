@@ -26,6 +26,7 @@ import {
   instantiateActivityTemplates,
   type ActivityRow,
 } from "../infrastructure/activity-repo";
+import { getStationById, listStations } from "@/modules/stations/application/station-service";
 
 export { instantiateActivityTemplates };
 
@@ -38,6 +39,8 @@ export interface ActivityDto {
   description: string | null;
   workType: string;
   vaClassification: string | null;
+  stationId: string | null;
+  stationName: string | null;
   stationHint: string | null;
   skillRequired: string | null;
   sourceOfTime: string;
@@ -51,7 +54,12 @@ export interface ActivityDto {
   updatedAt: string;
 }
 
-function toDto(row: ActivityRow): ActivityDto {
+async function stationNameMap(projectId: string): Promise<Map<string, string>> {
+  const stations = await listStations(projectId, true);
+  return new Map(stations.map((s) => [s.id, s.name]));
+}
+
+function toDto(row: ActivityRow, stationNames?: Map<string, string>): ActivityDto {
   return {
     id: row.id,
     stableKey: row.stableKey,
@@ -59,6 +67,8 @@ function toDto(row: ActivityRow): ActivityDto {
     description: row.description,
     workType: row.workType,
     vaClassification: row.vaClassification,
+    stationId: row.stationId,
+    stationName: row.stationId ? (stationNames?.get(row.stationId) ?? null) : null,
     stationHint: row.stationHint,
     skillRequired: row.skillRequired,
     sourceOfTime: row.sourceOfTime,
@@ -97,18 +107,20 @@ function parsePredecessors(json: string | null): string[] {
 }
 
 export async function listActivities(projectId: string, includeArchived = false): Promise<ActivityDto[]> {
-  const rows = await listActivityRows(projectId, includeArchived);
-  return rows.map(toDto);
+  const [rows, stationNames] = await Promise.all([listActivityRows(projectId, includeArchived), stationNameMap(projectId)]);
+  return rows.map((r) => toDto(r, stationNames));
 }
 
 export interface CreateActivityInput {
   projectId: string;
   userId: string;
-  stableKey: string;
+  /** خالی/نامشخص = تولید خودکار (act-N) — تجربه ساده (دستورالعمل ۶٫۴) */
+  stableKey?: string;
   name: string;
   description?: string;
   workType: string;
   vaClassification?: string | null;
+  stationId?: string | null;
   stationHint?: string | null;
   skillRequired?: string | null;
   sourceOfTime?: string;
@@ -117,7 +129,7 @@ export interface CreateActivityInput {
 
 export async function createActivity(input: CreateActivityInput): Promise<ActivityDto> {
   const { projectId, userId } = input;
-  const stableKey = assertActivityStableKey(input.stableKey);
+  const stableKey = input.stableKey?.trim() ? assertActivityStableKey(input.stableKey) : await nextAutoStableKey(projectId);
   if (!input.name?.trim()) throw ApiError.badRequest("نام فعالیت الزامی است.");
   const workType = assertWorkType(input.workType);
   if (input.vaClassification !== undefined && input.vaClassification !== null && !isVaClassification(input.vaClassification)) {
@@ -129,6 +141,13 @@ export async function createActivity(input: CreateActivityInput): Promise<Activi
   const existing = await findActivityByKey(projectId, stableKey);
   if (existing) {
     throw ApiError.conflict(`فعالیت با شناسه «${stableKey}» از قبل وجود دارد.`);
+  }
+  // ایستگاه مرتبط باید در همین پروژه موجود باشد (ADR-017)
+  let stationId: string | null = null;
+  if (input.stationId) {
+    const station = await getStationById(projectId, input.stationId);
+    if (!station || station.archived) throw ApiError.badRequest("ایستگاه انتخاب‌شده یافت نشد یا بایگانی است.");
+    stationId = station.id;
   }
   // B5 — اعتبارسنجی پیش‌نیازها (ارجاع موجود، بدون خودارجاعی/تکرار)
   const predecessors = input.predecessors ?? [];
@@ -150,6 +169,7 @@ export async function createActivity(input: CreateActivityInput): Promise<Activi
     workType,
     vaClassification: input.vaClassification ?? null,
     constraintsJson: null,
+    stationId,
     stationHint: input.stationHint?.trim() || null,
     skillRequired: input.skillRequired?.trim() || null,
     sourceOfTime: input.sourceOfTime ?? "measured",
@@ -163,12 +183,12 @@ export async function createActivity(input: CreateActivityInput): Promise<Activi
     entityType: "Activity",
     entityId: id,
     projectId,
-    after: { stableKey, name: input.name, workType, predecessors },
+    after: { stableKey, name: input.name, workType, predecessors, stationId },
   });
   log.info("activity created", { projectId, stableKey });
   const row = await findActivityById(projectId, id);
   if (!row) throw ApiError.internal();
-  return toDto(row);
+  return toDto(row, await stationNameMap(projectId));
 }
 
 export interface UpdateActivityInput {
@@ -179,6 +199,7 @@ export interface UpdateActivityInput {
   description?: string | null;
   workType?: string;
   vaClassification?: string | null;
+  stationId?: string | null;
   stationHint?: string | null;
   skillRequired?: string | null;
   sourceOfTime?: string;
@@ -226,6 +247,17 @@ export async function updateActivity(input: UpdateActivityInput): Promise<Activi
       before.vaClassification = row.vaClassification;
       after.vaClassification = input.vaClassification;
       data.vaClassification = input.vaClassification;
+    }
+  }
+  if (input.stationId !== undefined) {
+    if (input.stationId !== null) {
+      const station = await getStationById(projectId, input.stationId);
+      if (!station || station.archived) throw ApiError.badRequest("ایستگاه انتخاب‌شده یافت نشد یا بایگانی است.");
+    }
+    if (input.stationId !== row.stationId) {
+      before.stationId = row.stationId;
+      after.stationId = input.stationId;
+      data.stationId = input.stationId;
     }
   }
   if (input.stationHint !== undefined) {
@@ -291,7 +323,7 @@ export async function updateActivity(input: UpdateActivityInput): Promise<Activi
   }
   const updated = await findActivityById(projectId, activityId);
   if (!updated) throw ApiError.internal();
-  return toDto(updated);
+  return toDto(updated, await stationNameMap(projectId));
 }
 
 export async function setActivityArchived(
@@ -321,4 +353,124 @@ export async function setActivityArchived(
 /** شمار فعالیت‌های فعال — ورودی readiness پروژه */
 export async function activeActivityCount(projectId: string): Promise<number> {
   return countActivities(projectId, false);
+}
+
+// ─────────────────── ورود گروهی فعالیت‌ها (ADR-017 — تجربه ساده) ───────────────────
+
+export interface BulkActivityItem {
+  name: string;
+  stableKey?: string;
+  description?: string;
+  workType?: string;
+  stationId?: string | null;
+  sourceOfTime?: string;
+}
+
+export interface BulkCreateActivitiesResult {
+  created: ActivityDto[];
+  skipped: { name: string; reasonFa: string }[];
+}
+
+/** تولید شناسه فنی خودکار یکتا — act-1، act-2، … (بدون درگیری کاربر) */
+async function nextAutoStableKey(projectId: string): Promise<string> {
+  let n = (await countActivities(projectId, true)) + 1;
+  for (;;) {
+    const candidate = `act-${n}`;
+    const exists = await findActivityByKey(projectId, candidate);
+    if (!exists) return candidate;
+    n += 1;
+  }
+}
+
+/**
+ * ورود گروهی فعالیت‌ها — برای فهرست‌های آماده (Paste از Excel/متن).
+ * تکراری‌ها با دلیل فارسی رد می‌شوند؛ شناسه فنی خودکار تولید می‌شود.
+ */
+export async function createActivitiesBulk(
+  projectId: string,
+  userId: string,
+  items: BulkActivityItem[],
+): Promise<BulkCreateActivitiesResult> {
+  if (items.length === 0) throw ApiError.badRequest("فهرست فعالیت‌ها خالی است.");
+  if (items.length > 200) throw ApiError.badRequest("حداکثر ۲۰۰ فعالیت در هر دسته — فهرست را بخش‌بندی کنید.");
+  const created: ActivityDto[] = [];
+  const skipped: { name: string; reasonFa: string }[] = [];
+
+  // اعتبارسنجی ایستگاه‌ها یک‌بار
+  const stations = await listStations(projectId, false);
+  const stationById = new Map(stations.map((s) => [s.id, s]));
+
+  const seenNames = new Set<string>();
+  const seenKeys = new Set<string>();
+  const existingRows = await listActivityRows(projectId, false);
+  const existingNames = new Set(existingRows.map((r) => r.name.replace(/\s+/g, " ")));
+  const existingKeys = new Set(existingRows.map((r) => r.stableKey));
+  for (const item of items) {
+    const name = item.name?.trim();
+    if (!name) {
+      skipped.push({ name: item.name ?? "", reasonFa: "نام فعالیت خالی است." });
+      continue;
+    }
+    const nameKey = name.replace(/\s+/g, " ");
+    if (seenNames.has(nameKey)) {
+      skipped.push({ name, reasonFa: "در همین فهرست تکراری است." });
+      continue;
+    }
+    seenNames.add(nameKey);
+    // تکراری با فعالیت موجود (توسط نام) — جلوگیری از ثبت ناخواسته تکراری
+    if (existingNames.has(nameKey)) {
+      skipped.push({ name, reasonFa: "فعالیتی با همین نام موجود است." });
+      continue;
+    }
+    let stableKey = item.stableKey?.trim();
+    if (stableKey) {
+      try {
+        stableKey = assertActivityStableKey(stableKey);
+      } catch (e) {
+        skipped.push({ name, reasonFa: (e as Error).message });
+        continue;
+      }
+      if (seenKeys.has(stableKey) || existingKeys.has(stableKey)) {
+        skipped.push({ name, reasonFa: `شناسه «${stableKey}» تکراری است.` });
+        continue;
+      }
+    } else {
+      stableKey = await nextAutoStableKey(projectId);
+    }
+    seenKeys.add(stableKey);
+    existingNames.add(nameKey);
+    existingKeys.add(stableKey);
+    let stationId: string | null = null;
+    if (item.stationId) {
+      const st = stationById.get(item.stationId);
+      if (!st) {
+        skipped.push({ name, reasonFa: "ایستگاه انتخاب‌شده یافت نشد." });
+        continue;
+      }
+      stationId = st.id;
+    }
+    const dto = await createActivity({
+      projectId,
+      userId,
+      stableKey,
+      name,
+      description: item.description,
+      workType: item.workType ?? "operatorManual",
+      stationId,
+      sourceOfTime: item.sourceOfTime,
+    });
+    created.push(dto);
+  }
+  if (created.length > 0) {
+    await recordAudit({
+      userId,
+      action: AUDIT_ACTIONS.activityBulkCreated,
+      entityType: "Activity",
+      entityId: projectId,
+      projectId,
+      after: { created: created.length, skipped: skipped.length },
+    });
+  }
+  log.info("activities bulk created", { projectId, created: created.length, skipped: skipped.length });
+  return { created, skipped };
 }

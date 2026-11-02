@@ -167,7 +167,7 @@ export function FormulaDialog({
                 {!keyValid ? (
                   <p className="text-xs text-red-600 dark:text-red-400">الگو: f.zamanKol — حرف کوچک شروع، بدون خط تیره (یا کلید سیستمی مثل TS-011)</p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">مثل f.ovenTotalDaily — ناورداست؛ نتیجه فرمول با «کلید.result» قابل ارجاع است</p>
+                  <p className="text-xs text-muted-foreground">مثل f.ovenTotalDaily — این شناسه پس از ایجاد ثابت می‌ماند و قابل تغییر نیست؛ نتیجه فرمول با «کلید.result» قابل ارجاع است</p>
                 )}
               </div>
               <div className="space-y-1.5">

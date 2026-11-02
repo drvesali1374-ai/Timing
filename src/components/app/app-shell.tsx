@@ -27,9 +27,11 @@ export type ViewName =
   | "project"
   | "project-config"
   | "project-diagrams"
+  | "project-stations"
   | "project-timing"
   | "project-analysis"
-  | "project-balance";
+  | "project-balance"
+  | "project-guide";
 
 export interface AppShellProps {
   user: SessionUserDto;
@@ -181,7 +183,7 @@ export function AppShell({ user, view, onNavigate, children, projectTitle }: App
         {/* محتوا */}
         <main className="min-w-0 flex-1" aria-live="polite">
           {projectTitle &&
-          (view === "project" || view === "project-config" || view === "project-diagrams" || view === "project-timing" || view === "project-analysis" || view === "project-balance") ? (
+          (view === "project" || view === "project-config" || view === "project-diagrams" || view === "project-stations" || view === "project-timing" || view === "project-analysis" || view === "project-balance" || view === "project-guide") ? (
             <nav aria-label="مسیر" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
               <button className="hover:text-foreground hover:underline" onClick={() => onNavigate("dashboard")}>
                 پروژه‌ها
@@ -206,10 +208,22 @@ export function AppShell({ user, view, onNavigate, children, projectTitle }: App
                   <span className="font-medium text-foreground">کارگاه تحلیل مهندسی زمان</span>
                 </>
               ) : null}
+              {view === "project-stations" ? (
+                <>
+                  <span aria-hidden>›</span>
+                  <span className="font-medium text-foreground">خط و ایستگاه‌های کاری</span>
+                </>
+              ) : null}
+              {view === "project-guide" ? (
+                <>
+                  <span aria-hidden>›</span>
+                  <span className="font-medium text-foreground">راهنمای انجام مطالعه</span>
+                </>
+              ) : null}
               {view === "project-timing" ? (
                 <>
                   <span aria-hidden>›</span>
-                  <span className="font-medium text-foreground">کارگاه زمان‌سنجی</span>
+                  <span className="font-medium text-foreground">ثبت مشاهدات زمان‌سنجی</span>
                 </>
               ) : null}
               {view === "project-balance" ? (

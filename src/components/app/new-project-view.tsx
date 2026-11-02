@@ -32,6 +32,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useCreateProject, useProfileDetail, useProfiles } from "@/hooks/use-api";
+import { useUxMode } from "@/lib/ux-mode";
+import { FieldHelp } from "@/components/app/field-help";
 import { projectInfoSchema } from "@/shared/validation/project";
 import type { ProfileDetailDto, ProfileSummaryDto } from "@/shared/contracts/api";
 import { ErrorState, LoadingBlock, LoadingCards, PageHeader, Spinner } from "./ui-bits";
@@ -58,23 +60,109 @@ interface WizardState {
   previewProfileId: string | null;
 }
 
-const INFO_FIELDS: Array<{ key: keyof WizardState["info"]; label: string; placeholder?: string; required?: boolean }> = [
-  { key: "title", label: "عنوان پروژه *", placeholder: "مثال: زمان‌سنجی خط مونتاژ A", required: true },
-  { key: "code", label: "کد پروژه *", placeholder: "مثال: PRJ-001", required: true },
-  { key: "goal", label: "هدف مطالعه", placeholder: "مثال: تعیین زمان استاندارد برای ظرفیت‌ریزی" },
-  { key: "location", label: "محل (کارخانه/کارگاه)" },
-  { key: "department", label: "بخش" },
-  { key: "line", label: "خط تولید" },
-  { key: "station", label: "ایستگاه" },
-  { key: "product", label: "محصول" },
-  { key: "process", label: "فرایند" },
-  { key: "responsible", label: "مسئول مطالعه" },
-  { key: "shift", label: "شیفت" },
+const INFO_FIELDS: Array<{
+  key: keyof WizardState["info"];
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  help?: { meaning: string; input: string; format?: string; example: string; usage?: string; effect?: string; required?: boolean };
+}> = [
+  {
+    key: "title",
+    label: "عنوان پروژه *",
+    placeholder: "مثال: زمان‌سنجی خط مونتاژ A",
+    required: true,
+    help: {
+      meaning: "نام شناسا این مطالعه — در داشبورد و همه گزارش‌ها نمایش داده می‌شود.",
+      input: "نامی کوتاه که خط/بخش مورد مطالعه را مشخص کند.",
+      example: "«زمان‌سنجی خط مونتاژ پنل» یا «مطالعه ایستگاه بازرسی نهایی».",
+      usage: "در فهرست پروژه‌ها، سربرگ گزارش‌ها و ناوبری.",
+      required: true,
+    },
+  },
+  {
+    key: "code",
+    label: "کد پروژه *",
+    placeholder: "مثال: PRJ-001",
+    required: true,
+    help: {
+      meaning: "شناسه کوتاه سازمانی پروژه برای ارجاع در مکاتبات و مستندات کاغذی.",
+      input: "یک کد یکتا طبق قرارداد سازمان — اگر قرارداد ندارید، شماره ترتیبی بگذارید.",
+      example: "PRJ-001 یا TS-1403.",
+      required: true,
+    },
+  },
+  {
+    key: "goal",
+    label: "هدف مطالعه",
+    placeholder: "مثال: تعیین زمان استاندارد برای ظرفیت‌ریزی",
+    help: {
+      meaning: "چرایی انجام این مطالعه — خروجی مورد انتظار.",
+      input: "یک جمله درباره اینکه این مطالعه چه تصمیمی را پشتیبانی می‌کند.",
+      example: "تعیین زمان استاندارد برای ظرفیت‌ریزی شیفت صبح.",
+    },
+  },
+  {
+    key: "location",
+    label: "محل (کارخانه/کارگاه)",
+    help: {
+      meaning: "محل فیزیکی انجام مطالعه.",
+      input: "نام کارخانه/کارگاه.",
+      example: "کارخانه نیرو، سالن ۲.",
+    },
+  },
+  {
+    key: "department",
+    label: "بخش",
+    help: { meaning: "واحد سازمانی متولی خط.", input: "نام بخش.", example: "تولید" },
+  },
+  {
+    key: "line",
+    label: "خط تولید",
+    help: {
+      meaning: "خطی که این مطالعه روی آن انجام می‌شود — پروژه هر خط تولید یک خط را مدل می‌کند.",
+      input: "نام خط.",
+      example: "«خط مونتاژ پنل».",
+      usage: "ایستگاه‌های کاری که بعداً تعریف می‌کنید، ایستگاه‌های همین خط هستند.",
+    },
+  },
+  {
+    key: "station",
+    label: "ایستگاه",
+    help: {
+      meaning: "ایستگاه کانونی مطالعه — اگر کل خط مطالعه می‌شود خالی بگذارید و ایستگاه‌ها را جداگانه تعریف کنید.",
+      input: "نام ایستگاه یا خالی.",
+      example: "«ایستگاه ۳» یا خالی برای مطالعه کل خط.",
+    },
+  },
+  {
+    key: "product",
+    label: "محصول",
+    help: { meaning: "محصولی که روی خط تولید می‌شود.", input: "نام محصول.", example: "پنل کنترل صنعتی مدل C2." },
+  },
+  {
+    key: "process",
+    label: "فرایند",
+    help: { meaning: "نوع فرایند غالب خط.", input: "وصف کوتاه فرایند.", example: "مونتاژ دستی با پیچ‌گوشتی بادی." },
+  },
+  {
+    key: "responsible",
+    label: "مسئول مطالعه",
+    help: { meaning: "نفری که پاسخ‌گوی مطالعه است.", input: "نام مسئول.", example: "مهندس رضایی." },
+  },
+  {
+    key: "shift",
+    label: "شیفت",
+    help: { meaning: "شیفت کاری دوره مطالعه.", input: "مثلاً صبح یا سه‌شیفت.", example: "صبح (۸ تا ۱۶)." },
+  },
 ];
 
 export function NewProjectView({ onCreated, onCancel }: { onCreated: (id: string) => void; onCancel: () => void }) {
   const profilesQuery = useProfiles();
   const create = useCreateProject();
+  // حالت ساده/پیشرفته (دستورالعمل ۶٫۳): ساده = ویزارد ۲گامی با پیش‌فرض‌های آماده
+  const uxMode = useUxMode();
+  const simpleMode = !uxMode.advanced;
 
   const [state, setState] = useState<WizardState>({
     step: 1,
@@ -112,7 +200,7 @@ export function NewProjectView({ onCreated, onCancel }: { onCreated: (id: string
     [profilesQuery.data, effectiveProfileId],
   );
 
-  const detailQuery = useProfileDetail(state.step === 3 ? effectiveProfileId : null);
+  const detailQuery = useProfileDetail(uxMode.advanced && state.step === 3 ? effectiveProfileId : null);
 
   const setInfo = (key: keyof WizardState["info"]) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setState((s) => ({ ...s, info: { ...s.info, [key]: e.target.value } }));
@@ -155,16 +243,32 @@ export function NewProjectView({ onCreated, onCancel }: { onCreated: (id: string
     <div className="space-y-6">
       <PageHeader
         title="ایجاد پروژه جدید"
-        description="در سه گام: اطلاعات پروژه ← انتخاب پروفایل روش‌شناختی ← اجزای پروفایل."
+        description={
+          simpleMode
+            ? "در دو گام: اطلاعات پروژه ← ایجاد با تنظیمات آماده پیش‌فرض. (برای تنظیمات تخصصی، «حالت پیشرفته» را روشن کنید)"
+            : "در سه گام: اطلاعات پروژه ← انتخاب پروفایل روش‌شناختی ← اجزای پروفایل."
+        }
+        actions={
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <Switch checked={uxMode.advanced} onCheckedChange={uxMode.setAdvanced} aria-label="حالت پیشرفته" />
+            حالت پیشرفته
+          </label>
+        }
       />
 
       {/* نشانگر گام‌ها */}
       <ol className="flex items-center gap-2 text-xs font-medium" aria-label="گام‌های ایجاد پروژه">
-        {[
-          { n: 1, label: "اطلاعات پروژه", icon: Info },
-          { n: 2, label: "پروفایل روش‌شناختی", icon: Sparkles },
-          { n: 3, label: "اجزای پروفایل", icon: ListChecks },
-        ].map((s, i) => {
+        {(simpleMode
+          ? [
+              { n: 1, label: "اطلاعات پروژه", icon: Info },
+              { n: 2, label: "ایجاد پروژه", icon: Check },
+            ]
+          : [
+              { n: 1, label: "اطلاعات پروژه", icon: Info },
+              { n: 2, label: "پروفایل روش‌شناختی", icon: Sparkles },
+              { n: 3, label: "اجزای پروفایل", icon: ListChecks },
+            ]
+        ).map((s, i) => {
           const Icon = s.icon;
           const active = state.step === s.n;
           const done = state.step > s.n;
@@ -199,7 +303,10 @@ export function NewProjectView({ onCreated, onCancel }: { onCreated: (id: string
             <div className="grid gap-4 sm:grid-cols-2">
               {INFO_FIELDS.map((f) => (
                 <div key={f.key} className="space-y-1.5">
-                  <Label htmlFor={`np-${f.key}`}>{f.label}</Label>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Label htmlFor={`np-${f.key}`}>{f.label}</Label>
+                    {f.help ? <FieldHelp content={f.help} label={f.label.replace(" *", "")} /> : null}
+                  </span>
                   <Input id={`np-${f.key}`} value={state.info[f.key]} onChange={setInfo(f.key)} placeholder={f.placeholder} />
                 </div>
               ))}
@@ -233,8 +340,8 @@ export function NewProjectView({ onCreated, onCancel }: { onCreated: (id: string
         </div>
       )}
 
-      {/* گام ۳ */}
-      {state.step === 3 && (
+      {/* گام ۳ — فقط حالت پیشرفته (۶٫۳) */}
+      {uxMode.advanced && state.step === 3 && (
         <div className="space-y-4">
           {detailQuery.isLoading || !detailQuery.data ? (
             <Card>
@@ -269,7 +376,7 @@ export function NewProjectView({ onCreated, onCancel }: { onCreated: (id: string
           {state.step === 1 ? "انصراف" : <><ArrowRight className="size-4" aria-hidden /> گام قبلی</>}
         </Button>
         <div className="flex items-center gap-2">
-          {state.step === 3 ? (
+          {state.step === 3 || (simpleMode && state.step === 2) ? (
             <Button onClick={submit} disabled={!step1Valid || !effectiveProfileId || create.isPending}>
               {create.isPending ? <Spinner /> : <Check className="size-4" aria-hidden />} ایجاد پروژه
             </Button>

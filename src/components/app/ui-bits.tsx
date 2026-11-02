@@ -40,10 +40,10 @@ export function DemoBadge() {
 export function ReadinessChips({ readiness, compact = false }: { readiness: ProjectReadinessDto; compact?: boolean }) {
   const items: Array<{ key: keyof ProjectReadinessDto; label: string; hint: string }> = [
     { key: "configReady", label: "پیکربندی", hint: "نسخه پیکربندی فعال وجود دارد" },
-    { key: "diagramReady", label: "نمودار", hint: "نمودار فرایندی OPC/FPC فعال وجود دارد — فاز ۳" },
-    { key: "measurementReady", label: "اندازه‌گیری", hint: "منتظر تعریف فعالیت‌ها — فاز ۲ و ۴" },
-    { key: "analysisReady", label: "تحلیل", hint: "منتظر ثبت مشاهدات — فاز ۴ و ۵" },
-    { key: "approvalReady", label: "تأیید", hint: "منتظر زمان استاندارد — فاز ۵" },
+    { key: "diagramReady", label: "نمودار", hint: "نمودار فرایندی OPC/FPC فعال وجود دارد" },
+    { key: "measurementReady", label: "اندازه‌گیری", hint: "منتظر تعریف فعالیت‌ها" },
+    { key: "analysisReady", label: "تحلیل", hint: "منتظر ثبت زمان‌های اندازه‌گیری‌شده" },
+    { key: "approvalReady", label: "تأیید", hint: "منتظر محاسبه زمان استاندارد" },
   ];
   return (
     <div className={cn("flex flex-wrap items-center gap-1.5", compact ? "text-[11px]" : "text-xs")} aria-label="نشانگرهای آمادگی پروژه">

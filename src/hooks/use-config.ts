@@ -21,6 +21,8 @@ import type {
   FunctionCatalogDto,
   ParamValueDto,
 } from "@/shared/contracts/config";
+import type { StationDto } from "@/shared/contracts/stations";
+import type { ActivityLinkEntryDto } from "@/shared/contracts/diagrams";
 
 // ── شکل واقعی پاسخ /values ───────────────────────────────────
 // نکته: سرور value را تودرتو به‌صورت {value, unit} برمی‌گرداند (StoredParamValue)؛
@@ -220,7 +222,105 @@ export interface ActivityInput {
   description?: string | null;
   workType: string;
   vaClassification?: string | null;
+  stationId?: string | null;
   sourceOfTime?: string;
+}
+
+// ── ایستگاه‌های کاری (ADR-017) ───────────────────────────────
+
+export function useProjectStations(projectId: string | null, includeArchived = false) {
+  const session = useSession();
+  return useQuery({
+    queryKey: ["project-stations", projectId, includeArchived],
+    queryFn: () =>
+      api<{ items: StationDto[] }>(`/api/projects/${projectId}/stations`).then((r) => r.items),
+    enabled: !!session.data && !!projectId,
+  });
+}
+
+export function useCreateStation(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; description?: string }) =>
+      api<StationDto>(`/api/projects/${projectId}/stations`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (s) => {
+      qc.invalidateQueries({ queryKey: ["project-stations", projectId] });
+      toast.success(`ایستگاه «${s.name}» ایجاد شد.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useCreateStationsBulk(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { names: string[] }) =>
+      api<{ created: StationDto[]; skipped: { name: string; reasonFa: string }[] }>(`/api/projects/${projectId}/stations`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["project-stations", projectId] });
+      if (r.created.length > 0) toast.success(`${r.created.length} ایستگاه ایجاد شد.`);
+      if (r.skipped.length > 0) toast.warning(`${r.skipped.length} مورد رد شد (تکراری یا نامعتبر).`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useUpdateStation(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { stationId: string; name?: string; description?: string | null; archived?: boolean; reorder?: string[] }) => {
+      const { stationId, ...patch } = input;
+      return api<StationDto | { items: StationDto[] }>(`/api/projects/${projectId}/stations/${stationId}`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project-stations", projectId] });
+      qc.invalidateQueries({ queryKey: ["project-activities", projectId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ── ورود گروهی فعالیت‌ها (ADR-017) ───────────────────────────
+
+export function useCreateActivitiesBulk(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Array<{ name: string; stationId?: string | null; workType?: string }>) =>
+      api<{ created: ActivityDto[]; skipped: { name: string; reasonFa: string }[] }>(`/api/projects/${projectId}/activities/bulk`, {
+        method: "POST",
+        body: JSON.stringify({ items: input }),
+      }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["project-activities", projectId] });
+      if (r.created.length > 0) toast.success(`${r.created.length} فعالیت ایجاد شد.`);
+      if (r.skipped.length > 0) toast.warning(`${r.skipped.length} مورد رد شد (تکراری یا نامعتبر).`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ── ارتباط فعالیت↔گام نمودار (ADR-017) ──────────────────────
+
+export function useActivityLinks(projectId: string | null) {
+  const session = useSession();
+  return useQuery({
+    queryKey: ["activity-links", projectId],
+    queryFn: () =>
+      api<{ byActivity: Record<string, ActivityLinkEntryDto[]>; invalidRefs: Array<{ stableKey: string; diagramId: string; diagramTitle: string; nodeId: string }> }>(
+        `/api/projects/${projectId}/diagrams/activity-links`,
+      ),
+    enabled: !!session.data && !!projectId,
+    staleTime: 60 * 1000,
+  });
 }
 
 export function useCreateActivity(projectId: string) {

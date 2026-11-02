@@ -23,11 +23,12 @@ export const GET = withApi<Ctx>(async (req: NextRequest, ctx: Ctx) => {
 });
 
 const createSchema = z.object({
-  stableKey: z.string().min(1),
+  stableKey: z.string().optional(), // خالی = تولید خودکار (تجربه ساده — دستورالعمل ۶٫۴)
   name: z.string().min(1),
   description: z.string().optional(),
   workType: z.string().min(1),
   vaClassification: z.string().nullable().optional(),
+  stationId: z.string().nullable().optional(),
   stationHint: z.string().nullable().optional(),
   skillRequired: z.string().nullable().optional(),
   sourceOfTime: z.string().optional(),
@@ -44,11 +45,12 @@ export const POST = withApi<Ctx>(async (req: NextRequest, ctx: Ctx) => {
     await createActivity({
       projectId: id,
       userId: user.id,
-      stableKey: body.stableKey,
+      stableKey: body.stableKey ?? "",
       name: body.name,
       description: body.description,
       workType: body.workType,
       vaClassification: body.vaClassification ?? null,
+      stationId: body.stationId ?? null,
       stationHint: body.stationHint ?? null,
       skillRequired: body.skillRequired ?? null,
       sourceOfTime: body.sourceOfTime,

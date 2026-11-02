@@ -103,12 +103,14 @@ export function IntegrityBanner({ flags, compact = false }: { flags: IntegrityFl
   );
 }
 
-/** نشان روش زمان‌سنجی. */
+/** نشان روش ثبت — کرنومتری یا برگه دستی (ADR-017). */
 export function MethodBadge({ method }: { method: TimingMethod | string }) {
+  const label =
+    method === "manual" ? "برگه ثبت دستی" : (TIMING_METHOD_LABELS_FA[method as TimingMethod] ?? method);
   return (
     <Badge variant="outline" className="gap-1 text-[11px]">
       <Timer className="size-3" aria-hidden />
-      {TIMING_METHOD_LABELS_FA[method as TimingMethod] ?? method}
+      {label}
     </Badge>
   );
 }

@@ -13,6 +13,7 @@ export interface ActivityRow {
   workType: string;
   vaClassification: string | null;
   constraintsJson: string | null;
+  stationId: string | null;
   stationHint: string | null;
   skillRequired: string | null;
   sourceOfTime: string;
@@ -48,6 +49,7 @@ export async function insertActivityRow(input: {
   workType: string;
   vaClassification: string | null;
   constraintsJson: string | null;
+  stationId?: string | null;
   stationHint: string | null;
   skillRequired: string | null;
   sourceOfTime: string;

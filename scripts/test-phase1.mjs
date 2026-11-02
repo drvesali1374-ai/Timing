@@ -347,7 +347,8 @@ async function main() {
   check("ورود کاربر نمونه موفق", !!demoSession.body?.user?.id);
   const demoList = await demo.req("/api/projects?demo=only");
   check("فیلتر demo=only فقط پروژه‌های نمونه", (demoList.body?.items ?? []).length >= 1 && demoList.body.items.every((p) => p.isDemo === true));
-  const demoProject = demoList.body.items[0];
+  // با وجود چند پروژه نمونه (DEMO-101 میراث + DEMO-102 مثال آموزشی)، جست‌وجو با کد — نه موقعیت
+  const demoProject = demoList.body.items.find((p) => p.code === "DEMO-101") ?? null;
   check("پروژه نمونه DEMO-101 موجود است", demoProject?.code === "DEMO-101");
   // کاربر آزمون A نباید پروژه نمونه را ببیند (مالکیت demo user)
   const aAll = await A.req("/api/projects?status=all&demo=include");

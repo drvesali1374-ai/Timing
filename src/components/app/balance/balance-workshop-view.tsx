@@ -60,7 +60,7 @@ export function BalanceWorkshopView({ projectId, onBack, onOpenAnalysis }: Balan
     <div className="space-y-5">
       <PageHeader
         title="کارگاه بالانس خط و نیروی کار"
-        description="تخصیص فعالیت‌ها به ایستگاه‌ها با الگوریتم‌های LCR / RPW / کیلبریج–وستر، تاکت‌تایم، نمودار یامازومی، شاخص‌های راندمان و برآورد نیرو — از زمان‌های واقعی تحلیل فاز ۵."
+        description="تخصیص فعالیت‌ها به ایستگاه‌ها با الگوریتم‌های LCR / RPW / کیلبریج–وستر، تاکت‌تایم، نمودار یامازومی، شاخص‌های راندمان و برآورد نیرو — از زمان‌های واقعی تحلیل مهندسی."
         actions={
           <Button variant="outline" onClick={onBack} className="gap-2">
             بازگشت به پروژه

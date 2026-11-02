@@ -129,8 +129,18 @@ export function SummaryTab({ analysis }: { analysis: AnalysisDto | undefined }) 
               <TableBody>
                 {analysis.sessions.map((s) => (
                   <TableRow key={s.sessionId}>
-                    <TableCell className="py-2 text-xs">{s.observer}</TableCell>
-                    <TableCell className="py-2 text-xs">{TIMING_METHOD_LABELS_FA[s.method]}</TableCell>
+                    <TableCell className="py-2 text-xs">
+                      {s.source === "manual" && s.title ? `${s.observer} — «${s.title}»` : s.observer}
+                    </TableCell>
+                    <TableCell className="py-2 text-xs">
+                      {s.source === "manual" ? (
+                        <Badge variant="outline" className="border-sky-300 bg-sky-50 text-[10px] text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                          برگه ثبت دستی
+                        </Badge>
+                      ) : (
+                        TIMING_METHOD_LABELS_FA[s.method as keyof typeof TIMING_METHOD_LABELS_FA] ?? String(s.method)
+                      )}
+                    </TableCell>
                     <TableCell className="py-2 font-mono text-xs tabular-nums">
                       {faDigits(s.cyclesValid)}/{faDigits(s.cyclesTotal)}
                       {s.cyclesSuspect > 0 ? <Badge variant="outline" className="ms-1 text-[9px] text-amber-700">{faDigits(s.cyclesSuspect)} مشکوک</Badge> : null}

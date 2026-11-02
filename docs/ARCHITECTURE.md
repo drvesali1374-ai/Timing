@@ -324,3 +324,19 @@ src/
 - **لایه‌ها**: domain (zod: تاکت/سناریو/حل/تخصیص) · application (ساخت مسئله از فعالیت‌ها + تحلیل فاز ۵ از طریق application ماژول‌های دیگر — قاعده مرزها) · infrastructure (repo Prisma).
 - **API**: /api/projects/[id]/balance/** (۶ مسیر — CRUD/solve/assignment/results/export)؛ ACL: balance:read/write.
 - **UI**: کارگاه بالانس ۸ تبی (سناریو/یامازومی/گراف تقدم/ماتریس/شاخص‌ها/مقایسه/گزارش/راهنما) + hooks/use-balance.
+
+---
+
+## نسخه ۱٫۱ — تغییرات ADR-017 (۲ نوامبر ۲۰۲۶)
+
+- **ماژول جدید `stations`**: موجودیت WorkStation + سرویس/API (ADR-017 §۴).
+- **ماژول جدید `manual-study`**: برگه ثبت زمان/مشاهده/وقفه + قفل وضعیت + اصلاح ممیزی‌دار.
+- **آداپتور تحلیل**: `gatherObservations` برگه‌های finalized را به قرارداد مشترک
+  `MarkedObservation` نگاشت می‌کند (`sessionMethod="manual"`, `source` صریح) — هسته
+  آماری/زنجیره/فرمول بدون تغییر از هر دو منبع تغذیه می‌شود.
+- **فعالیت‌ها**: `stationId` (رابطه) + ورود گروهی با شناسه خودکار؛ `stationHint` میراث حفظ شد.
+- **ارتباط دوطرفه نمودار**: سرویس `activity-links` روی همان `node.activityStableKey`
+  (منبع حقیقت واحد) — بدون رابطه تکراری.
+- **مرزها**: ماژول‌های جدید همان قواعد مرز را رعایت می‌کنند (application ↔ infrastructure؛
+  cross-module فقط از لایه application) — `scripts/check-module-boundaries.mjs` ✓.
+- جزئیات کامل: `docs/ADR/ADR-017-manual-study-ux-simplification.md`.

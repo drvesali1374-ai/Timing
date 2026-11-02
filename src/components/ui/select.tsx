@@ -107,12 +107,16 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-start gap-2 rounded-sm py-1.5 pe-8 ps-2 text-start text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2 [&_[data-slot=select-item-text]]:break-words",
+        "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-start gap-2 rounded-sm py-1.5 pe-2 ps-8 text-start text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2 [&_[data-slot=select-item-text]]:break-words",
         className
       )}
       {...props}
     >
-      <span className="absolute start-2 flex size-3.5 items-center justify-center">
+      {/*
+        نشانگر انتخاب (تیک) در ابتدای آیتم (سمت راست در RTL) با فضای رزروشده ps-8 —
+        متن هرگز روی تیک نمی‌افتد (دستورالعمل ۲٫۲). آیتم بدون انتخاب: فضای خالی هم‌عرض تیک.
+      */}
+      <span className="absolute start-2 flex size-3.5 items-center justify-center" aria-hidden="true">
         <SelectPrimitive.ItemIndicator>
           <CheckIcon className="size-4" />
         </SelectPrimitive.ItemIndicator>

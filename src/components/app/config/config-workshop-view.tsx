@@ -6,7 +6,7 @@
  * هر تغییر ساختاری بلافاصله یک نسخه append-only با دلیل می‌سازد.
  */
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, Download, Eye, MoreHorizontal, Upload } from "lucide-react";
+import { AlertTriangle, ArrowRight, Download, Eye, MoreHorizontal, Sparkles, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +31,7 @@ import { FormValuesTab } from "./form-values-tab";
 import { ResultsTab } from "./results-tab";
 import { ActivitiesTab } from "./activities-tab";
 import { ImportDialog } from "./import-dialog";
+import { useUxMode } from "@/lib/ux-mode";
 
 export function ConfigWorkshopView({
   projectId,
@@ -45,7 +46,12 @@ export function ConfigWorkshopView({
   const configQuery = useProjectConfig(projectId);
   const exportConfig = useExportConfig(projectId);
 
-  const [tab, setTab] = useState("families");
+  // حالت ساده شروع از تب «فعالیت‌ها» (مسیر معمول کاربر)؛ پیشرفته از گروه‌ها.
+  // تصحیح تب غیرمجاز در حالت ساده به‌صورت مشتق‌شده (بدون setState داخل effect):
+  const uxMode = useUxMode();
+  const [tabState, setTab] = useState(() => (useUxMode.getState().advanced ? "families" : "activities"));
+  const ADVANCED_ONLY_TABS = ["families", "formulas", "results"];
+  const tab = !uxMode.advanced && ADVANCED_ONLY_TABS.includes(tabState) ? "activities" : tabState;
   const [importOpen, setImportOpen] = useState(false);
 
   const projectData = projectQuery.data;
@@ -76,7 +82,8 @@ export function ConfigWorkshopView({
     <div className="space-y-5">
       <PageHeader
         title="کارگاه پیکربندی"
-        description={`پروژه «${project.title}» · کد ${project.code} · ساختار زنده پیکربندی (خانواده‌ها، فرمول‌ها، مقدارها)`}
+        description={`پروژه «${project.title}» · کد ${project.code} · فرم اطلاعات، فعالیت‌ها و تنظیمات محاسبات`}
+        //(actions continues)
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-2" onClick={onBack}>
@@ -91,8 +98,8 @@ export function ConfigWorkshopView({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>درمان‌ریزی و برون‌ریزی</DropdownMenuLabel>
-                <DropdownMenuSeparator />
+                {/* دو عمل مستقل — بدون عنوان/جداکننده اضافی (دستورالعمل ۲٫۳)؛
+                    کاربر با باز کردن منو مستقیماً عملیات را می‌بیند. */}
                 <DropdownMenuItem
                   onClick={() => exportConfig.mutate()}
                   disabled={exportConfig.isPending}
@@ -116,7 +123,7 @@ export function ConfigWorkshopView({
       ) : configQuery.isError ? (
         <ErrorState message={(configQuery.error as Error)?.message ?? "خطا در بارگذاری پیکربندی."} onRetry={() => configQuery.refetch()} />
       ) : !configQuery.data ? null : (
-        <ConfigTabsBody projectId={projectId} config={configQuery.data} canWrite={canWrite} tab={tab} setTab={setTab} projectRole={project.myRole} />
+        <ConfigTabsBody projectId={projectId} config={configQuery.data} canWrite={canWrite} tab={tab} setTab={setTab} projectRole={project.myRole} advanced={uxMode.advanced} uxMode={uxMode} />
       )}
 
       {/* دیالوگ سطح کارگاه — فقط درون‌ریزی (ایجاد خانواده/فرمول از تب مربوطه) */}
@@ -134,6 +141,8 @@ function ConfigTabsBody({
   tab,
   setTab,
   projectRole,
+  advanced,
+  uxMode,
 }: {
   projectId: string;
   config: CurrentConfigDto;
@@ -141,6 +150,8 @@ function ConfigTabsBody({
   tab: string;
   setTab: (tab: string) => void;
   projectRole: string | null | undefined;
+  advanced: boolean;
+  uxMode: { advanced: boolean; setAdvanced: (v: boolean) => void };
 }) {
   const familiesCount = config.snapshot.families.length;
   const paramsCount = config.snapshot.families.reduce((n, f) => n + f.parameters.length, 0);
@@ -196,12 +207,25 @@ function ConfigTabsBody({
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex-wrap">
-          <TabsTrigger value="families">خانواده‌ها و پارامترها</TabsTrigger>
-          <TabsTrigger value="formulas">فرمول‌ها</TabsTrigger>
-          <TabsTrigger value="values">فرم و مقادیر</TabsTrigger>
-          <TabsTrigger value="results">نتایج محاسبه</TabsTrigger>
+          {/* حالت ساده (۶٫۳): تب‌های تخصصی (گروه‌ها/فرمول‌ها/نتایج) پشت «تنظیمات پیشرفته» */}
           <TabsTrigger value="activities">فعالیت‌ها</TabsTrigger>
+          <TabsTrigger value="values">فرم اطلاعات</TabsTrigger>
+          {advanced ? (
+            <>
+              <TabsTrigger value="families">گروه‌های اطلاعات و فیلدها</TabsTrigger>
+              <TabsTrigger value="formulas">روش‌های محاسبه (فرمول‌ها)</TabsTrigger>
+              <TabsTrigger value="results">نتایج محاسبه</TabsTrigger>
+            </>
+          ) : null}
         </TabsList>
+        {!advanced ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+            <span>تنظیمات تخصصی (گروه اطلاعات، فرمول‌نویسی، نتایج) در «حالت پیشرفته» قابل دسترس است.</span>
+            <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-[11px]" onClick={() => uxMode.setAdvanced(true)}>
+              <Sparkles className="size-3" aria-hidden /> نمایش تنظیمات پیشرفته
+            </Button>
+          </div>
+        ) : null}
 
         <TabsContent value="families" className="mt-4 space-y-4">
           <FamiliesTab projectId={projectId} config={config} canWrite={canWrite} />

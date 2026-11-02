@@ -20,12 +20,29 @@ import { CYCLE_STATUS_LABELS_FA, TIMING_METHOD_LABELS_FA, type IntegrityFlag } f
 import type { AnalysisDto } from "@/shared/contracts/analysis";
 import { INTEGRITY_FLAG_LABELS_FA } from "@/shared/timing/types";
 import { useMarkObservation, useSessionContext } from "@/hooks/use-analysis";
+import { useMarkManualObservation } from "@/hooks/use-manual-sheets";
 import { faDigits, fmtSec, HonestyWarnings, MarkBadges } from "./analysis-bits";
+
+const MANUAL_SOURCE_LABELS_FA: Record<string, string> = {
+  manual: "ورود دستی",
+  paste: "چسباندن از Excel",
+  import: "درون‌ریزی فایل",
+};
+
+function SourceBadge({ source }: { source?: string }) {
+  if (!source || source === "chronometer") return null;
+  return (
+    <Badge variant="outline" className="border-sky-300 bg-sky-50 text-[10px] text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300">
+      {MANUAL_SOURCE_LABELS_FA[source] ?? source}
+    </Badge>
+  );
+}
 
 type MarkAction = "outlier" | "exclude" | "clear";
 
 export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: string; analysis: AnalysisDto | undefined; signedIn: boolean }) {
   const markMutation = useMarkObservation(projectId);
+  const markManualMutation = useMarkManualObservation(projectId);
   const contextMutation = useSessionContext(projectId);
   const [filterElement, setFilterElement] = useState<string>("all");
   const [filterSession, setFilterSession] = useState<string>("all");
@@ -39,6 +56,8 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
     sessionId: string;
     cycleSeq: number;
     action: MarkAction;
+    /** منبع مشاهده — برای داده دستی مسیر علامت متفاوت است (ADR-017) */
+    source?: string;
     /** وضعیت فعلی علامت‌ها — برای حفظ عمل جدا در به‌روزرسانی حالت کامل */
     currentOutlier: boolean;
     currentExcluded: boolean;
@@ -51,6 +70,7 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
       sessionId: string;
       observer: string;
       method: string;
+      source?: string;
       cycleSeq: number;
       cycleStatus: string;
       elementKey: string;
@@ -69,7 +89,11 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
         out.push({
           sessionId: o.sessionId,
           observer: o.observer,
-          method: TIMING_METHOD_LABELS_FA[o.sessionMethod],
+          method:
+            o.sessionMethod === "manual"
+              ? "برگه ثبت دستی"
+              : TIMING_METHOD_LABELS_FA[o.sessionMethod as keyof typeof TIMING_METHOD_LABELS_FA] ?? String(o.sessionMethod),
+          source: o.source,
           cycleSeq: o.cycleSeq,
           cycleStatus: o.cycleStatus,
           elementKey: o.elementKey,
@@ -150,9 +174,10 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
     cycleSeq: number,
     currentOutlier: boolean,
     currentExcluded: boolean,
+    source?: string,
   ) => {
     setReason("");
-    setDialog({ elementKey, readingEventId, sessionId, cycleSeq, action, currentOutlier, currentExcluded });
+    setDialog({ elementKey, readingEventId, sessionId, cycleSeq, action, source, currentOutlier, currentExcluded });
   };
 
   const submitMark = async () => {
@@ -166,15 +191,26 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
           ? { outlierMarked: dialog.currentOutlier, excluded: true }
           : { outlierMarked: false, excluded: false };
     if (dialog.action === "exclude" && !reason.trim()) return; // اعتبارسنجی سمت سرور هم قفل می‌کند
-    await markMutation.mutateAsync({
-      sessionId: dialog.sessionId,
-      readingEventId: dialog.readingEventId,
-      cycleSeq: dialog.cycleSeq,
-      elementKey: dialog.elementKey,
-      outlierMarked: target.outlierMarked,
-      excluded: target.excluded,
-      reason: dialog.action === "clear" ? null : reason.trim() || null,
-    });
+    if (dialog.source && dialog.source !== "chronometer") {
+      // مشاهده دستی (ADR-017): sessionId = شناسه برگه، readingEventId = شناسه مشاهده
+      await markManualMutation.mutateAsync({
+        sheetId: dialog.sessionId,
+        observationId: dialog.readingEventId,
+        outlierMarked: target.outlierMarked,
+        excluded: target.excluded,
+        reason: dialog.action === "clear" ? undefined : reason.trim() || undefined,
+      });
+    } else {
+      await markMutation.mutateAsync({
+        sessionId: dialog.sessionId,
+        readingEventId: dialog.readingEventId,
+        cycleSeq: dialog.cycleSeq,
+        elementKey: dialog.elementKey,
+        outlierMarked: target.outlierMarked,
+        excluded: target.excluded,
+        reason: dialog.action === "clear" ? null : reason.trim() || null,
+      });
+    }
     setDialog(null);
   };
 
@@ -291,9 +327,10 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-right">چرخه</TableHead>
+                  <TableHead className="text-right">چرخه/نمونه</TableHead>
                   <TableHead className="text-right">عنصر</TableHead>
                   <TableHead className="text-right">مدت (s)</TableHead>
+                  <TableHead className="text-right">منبع</TableHead>
                   <TableHead className="text-right">وضعیت چرخه</TableHead>
                   <TableHead className="text-right">پرچم/اصلاح</TableHead>
                   <TableHead className="text-right">علامت‌ها</TableHead>
@@ -306,6 +343,9 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
                     <TableCell className="py-1.5 font-mono text-xs tabular-nums">{faDigits(r.cycleSeq)}</TableCell>
                     <TableCell className="max-w-40 truncate py-1.5 text-xs" title={r.elementKey}>{r.elementName}</TableCell>
                     <TableCell className="py-1.5 font-mono text-xs tabular-nums" dir="ltr">{fmtSec(r.durationMs)}</TableCell>
+                    <TableCell className="py-1.5">
+                      <SourceBadge source={r.source} />
+                    </TableCell>
                     <TableCell className="py-1.5 text-xs">
                       <Badge
                         variant="outline"
@@ -339,7 +379,7 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
                           className="h-7 gap-1 px-2 text-[10px]"
                           disabled={!signedIn || markMutation.isPending}
                           aria-label={`${r.outlierMarked ? "برداشتن علامت پرت" : "علامت‌گذاری داده پرت"} عنصر ${r.elementName} چرخه ${r.cycleSeq}`}
-                          onClick={() => openDialog("outlier", r.elementKey, r.readingEventId, r.sessionId, r.cycleSeq, r.outlierMarked, r.excluded)}
+                          onClick={() => openDialog("outlier", r.elementKey, r.readingEventId, r.sessionId, r.cycleSeq, r.outlierMarked, r.excluded, r.source)}
                         >
                           <AlertTriangle className="size-3" aria-hidden /> {r.outlierMarked ? "برداشتن پرت" : "علامت پرت"}
                         </Button>
@@ -349,7 +389,7 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
                           className="h-7 gap-1 px-2 text-[10px] text-red-700 hover:text-red-800 dark:text-red-400"
                           disabled={!signedIn || markMutation.isPending}
                           aria-label={`حذف از محاسبه عنصر ${r.elementName} چرخه ${r.cycleSeq}`}
-                          onClick={() => openDialog("exclude", r.elementKey, r.readingEventId, r.sessionId, r.cycleSeq, r.outlierMarked, r.excluded)}
+                          onClick={() => openDialog("exclude", r.elementKey, r.readingEventId, r.sessionId, r.cycleSeq, r.outlierMarked, r.excluded, r.source)}
                         >
                           <Trash2 className="size-3" aria-hidden /> حذف از محاسبه
                         </Button>
@@ -360,7 +400,7 @@ export function ObservationsTab({ projectId, analysis, signedIn }: { projectId: 
                             className="h-7 gap-1 px-2 text-[10px]"
                             disabled={!signedIn || markMutation.isPending}
                             aria-label="برداشتن علامت‌ها"
-                            onClick={() => openDialog("clear", r.elementKey, r.readingEventId, r.sessionId, r.cycleSeq, r.outlierMarked, r.excluded)}
+                            onClick={() => openDialog("clear", r.elementKey, r.readingEventId, r.sessionId, r.cycleSeq, r.outlierMarked, r.excluded, r.source)}
                           >
                             <CircleOff className="size-3" aria-hidden /> برداشتن
                           </Button>

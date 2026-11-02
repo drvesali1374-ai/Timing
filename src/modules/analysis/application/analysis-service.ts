@@ -278,13 +278,87 @@ async function gatherObservations(
         flags: (el.flags ?? []) as MarkedObservation["flags"],
         sessionContext: sessionMeta.context,
         mark: markState,
+        source: "chronometer",
       };
       const arr = byElement.get(el.elementKey) ?? [];
       arr.push(observation);
       byElement.set(el.elementKey, arr);
     }
   }
+
+  // ── ADR-017: مشاهدات برگه‌های ثبت دستیِ نهایی‌شده — همان قرارداد مشترک ──
+  // داده دستی با موجودیت مستقل خودش وارد تحلیل می‌شود (بدون رویداد ساختگی کرنومتر).
+  // تجمیع روی elementKey (= stableKey فعالیت) → هم‌جمع‌شدن صحیح با داده کرنومتری همان فعالیت.
+  await appendManualSheetObservations(projectId, byElement);
+
   return { sessions, byElement, sessionMeta: new Map() };
+}
+
+/**
+ * افزودن مشاهدات برگه‌های دستی نهایی‌شده به نقشه عنصرها (ADR-017).
+ * sessionId = شناسه برگه؛ readingEventId = شناسه مشاهده؛ cycleSeq = شماره نمونه؛
+ * cycleStatus = valid (تشخیص پرت بعداً توسط هسته آماری انجام می‌شود)؛ منبع روی
+ * مشاهده صریح اعلام می‌شود تا داده دستی و کرنومتری هرگز با یک روش ثبت اشتباه نشوند.
+ */
+async function appendManualSheetObservations(
+  projectId: string,
+  byElement: Map<string, MarkedObservation[]>,
+): Promise<void> {
+  const sheets = await db.manualSheet.findMany({
+    where: { projectId, status: "finalized" },
+    select: { id: true, title: true, createdBy: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (sheets.length === 0) return;
+  const sheetIds = sheets.map((s) => s.id);
+
+  const [observations, activities, observers] = await Promise.all([
+    db.manualObservation.findMany({
+      where: { sheetId: { in: sheetIds } },
+      orderBy: [{ sheetId: "asc" }, { activityId: "asc" }, { sampleIndex: "asc" }],
+    }),
+    db.activity.findMany({ where: { projectId }, select: { id: true, stableKey: true, name: true } }),
+    db.user.findMany({ where: { id: { in: [...new Set(sheets.map((s) => s.createdBy))] } }, select: { id: true, name: true, email: true } }),
+  ]);
+
+  const activityById = new Map(activities.map((a) => [a.id, a]));
+  const observerById = new Map(observers.map((u) => [u.id, u.name ?? u.email]));
+  const sheetById = new Map(sheets.map((s) => [s.id, s]));
+
+  for (const o of observations) {
+    const activity = activityById.get(o.activityId);
+    const sheet = sheetById.get(o.sheetId);
+    if (!activity || !sheet) continue;
+    const markState: ObservationMarkState | null =
+      o.outlierMarked || o.excluded
+        ? {
+            outlierMarked: o.outlierMarked,
+            excluded: o.excluded,
+            reason: o.markReason,
+            markedBy: o.recordedBy,
+            markedAt: o.updatedAt.toISOString(),
+          }
+        : null;
+    const observation: MarkedObservation = {
+      sessionId: o.sheetId,
+      sessionMethod: "manual",
+      observer: observerById.get(sheet.createdBy) ?? "برگه ثبت دستی",
+      cycleSeq: o.sampleIndex,
+      cycleStatus: "valid",
+      elementKey: activity.stableKey,
+      elementName: activity.name,
+      durationMs: o.durationMs,
+      readingEventId: o.id,
+      corrected: o.corrected,
+      flags: [],
+      sessionContext: { "sheet.title": sheet.title },
+      mark: markState,
+      source: (o.source === "manual" || o.source === "paste" || o.source === "import" ? o.source : "manual"),
+    };
+    const arr = byElement.get(activity.stableKey) ?? [];
+    arr.push(observation);
+    byElement.set(activity.stableKey, arr);
+  }
 }
 
 // ─────────────────────── ارزیابی فرمول زنجیره از snapshot ───────────────────────
@@ -566,6 +640,29 @@ export async function getAnalysis(projectId: string): Promise<AnalysisDto> {
     contextBySessionId.set(row.scopeId, cur);
   }
 
+  // ── ADR-017: خلاصه برگه‌های دستی نهایی‌شده — همان فهرست منابع داده تحلیل ──
+  const manualSheetRows = await db.manualSheet.findMany({
+    where: { projectId, status: "finalized" },
+    select: { id: true, title: true, createdBy: true, createdAt: true, _count: { select: { observations: true, interruptions: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  const manualSummaries: SessionAnalysisSummary[] = manualSheetRows.map((m) => ({
+    sessionId: m.id,
+    method: "manual" as const,
+    source: "manual" as const,
+    title: m.title,
+    observer: "برگه ثبت دستی",
+    status: "finalized",
+    cyclesTotal: 0,
+    cyclesValid: 0,
+    cyclesSuspect: 0,
+    cyclesRecovered: 0,
+    cyclesIncomplete: 0,
+    observationsCount: m._count.observations,
+    meanCycleTimeMs: null,
+    startedAtWall: m.createdAt.toISOString(),
+    sessionContext: { "sheet.title": m.title },
+  }));
   const sessionSummaries: SessionAnalysisSummary[] = sessions.map((s) => {
     const c = cyclesBySession.get(s.id);
     const times = c?.cycleTimes ?? [];
@@ -645,7 +742,7 @@ export async function getAnalysis(projectId: string): Promise<AnalysisDto> {
     profile,
     settings,
     settingsSources: sources,
-    sessions: sessionSummaries,
+    sessions: [...sessionSummaries, ...manualSummaries],
     elements,
     standardCycle,
     formulaCatalog,

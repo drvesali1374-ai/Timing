@@ -30,6 +30,7 @@ import {
   type TimeBasis,
 } from "@/shared/balance/types";
 import { listActivities } from "@/modules/activities/application/activity-service";
+import { listStations } from "@/modules/stations/application/station-service";
 import { getAnalysis } from "@/modules/analysis/application/analysis-service";
 import { recordAudit, AUDIT_ACTIONS } from "@/modules/audit/application/audit-service";
 import type { ElementAnalysis } from "@/shared/analysis/types";
@@ -195,9 +196,10 @@ interface BuiltProblem {
  * Cross-module از طریق application ماژول‌ها (قاعده مرزها — بدون دسترسی به infra دیگران).
  */
 export async function buildProblem(projectId: string, inputs: ScenarioInputsParsed): Promise<BuiltProblem> {
-  const [activityRows, analysis] = await Promise.all([
+  const [activityRows, analysis, stationRows] = await Promise.all([
     listActivities(projectId, false),
     getAnalysis(projectId),
+    listStations(projectId, false),
   ]);
 
   const elementsByKey = new Map<string, ElementAnalysis>();
@@ -205,6 +207,10 @@ export async function buildProblem(projectId: string, inputs: ScenarioInputsPars
     // elementKey == activityStableKey وقتی عناصر جلسه از فعالیت‌ها ساخته شده‌اند (فاز ۴)
     elementsByKey.set(el.elementKey, el);
   }
+
+  // ایندکس ایستگاه‌های واقعی (۱-مبا) — مرجع تخصیص فعلی خط (ADR-017)
+  const stationIndexById = new Map<string, number>();
+  stationRows.forEach((s, i) => stationIndexById.set(s.id, i + 1));
 
   const activities: BalanceActivity[] = activityRows.map((row) => {
     const workType = isBalanceWorkType(row.workType) ? row.workType : "operatorManual";
@@ -238,7 +244,9 @@ export async function buildProblem(projectId: string, inputs: ScenarioInputsPars
     // ناسازگاری‌ها از DTO فعالیت (B5/B10 — تجزیه در application فعالیت‌ها)
     const incompatibleWith = row.constraints?.incompatibleWith ?? [];
     const predecessors = row.predecessors;
-    const hint = row.stationHint ? Number.parseInt(row.stationHint, 10) : null;
+    // اولویت: ایستگاه واقعی متصل (ADR-017)؛ در غیاب آن، تفسیر عددی stationHint میراثی
+    const stationIdx = row.stationId ? (stationIndexById.get(row.stationId) ?? null) : null;
+    const hint = stationIdx ?? (row.stationHint ? Number.parseInt(row.stationHint, 10) : null);
 
     return {
       id: row.stableKey,

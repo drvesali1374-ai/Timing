@@ -383,3 +383,44 @@ User: `id, name, email, authProvider`; Role: `owner,editor,recorder,viewer,admin
 
 مصرف‌کننده‌ها: UI کارگاه بالانس (۸ تب) · گزارش‌های مقایسه‌ای · فاز ۷ (مسیر انتهابه‌انتهای).
 پیوند مصرف: زمان‌ها از حلقه B4 فاز ۵ با ۵ مبنا؛ فعالیت‌ها و پیش‌نیازها از B5؛ قیود ناسازگاری از constraintsJson فعالیت.
+
+---
+
+## §۲٫۲۵-۲٫۲۸ — موجودیت‌های ADR-017 (ثبت دستی زمان و ایستگاه‌ها)
+
+### WorkStation (ایستگاه کاری) — §۲٫۲۵
+| فیلد | نوع | توضیح |
+|---|---|---|
+| id | UUIDv7 | شناسه |
+| projectId | FK | پروژه (خط تولید واحد هر پروژه) |
+| name | String | یکتا در پروژه؛ فارسی‌پذیر |
+| orderIndex | Int | ترتیب جریان کار (۱-مبا) |
+| archived | Bool | بایگانی نرم (با فعالیت فعال مجاز نیست) |
+
+رابطه: `Activity.stationId → WorkStation` (SetNull). بالانس: ایندکس ایستگاه به‌عنوان `stationHint` مسئله (اولویت بر تفسیر عددی میراثی).
+
+### ManualSheet (برگه ثبت زمان) — §۲٫۲۶
+| فیلد | نوع | توضیح |
+|---|---|---|
+| status | String | draft \| completed \| finalized — finalized = در تحلیل |
+| sampleCount | Int | تعداد ستون‌های نمونه (≤ ۶۰) |
+| note | String? | یادداشت |
+
+### ManualObservation (مشاهده دستی) — §۲٫۲۷
+| فیلد | نوع | توضیح |
+|---|---|---|
+| (sheetId, activityId, sampleIndex) | یکتا | یک سلول جدول |
+| durationMs | Int | واحد استاندارد — مثبت |
+| source | String | manual \| paste \| import |
+| outlierMarked/excluded/markReason | — | علامت‌های تحلیل روی رکورد |
+| corrected/lastEditReason | — | اصلاح با دلیل (الزامی پس از finalize) |
+
+نگاشت به قرارداد مشترک تحلیل: `elementKey = activity.stableKey`؛ `sessionMethod = "manual"`؛ `source` صریح.
+
+### ManualInterruption (وقفه) — §۲٫۲۸
+| فیلد | نوع | توضیح |
+|---|---|---|
+| reason | String | کاتالوگ ۷گانه (fixture-failure … other) |
+| reasonOther | String? | فقط reason=other — **الزامی** |
+| durationMs | Int? | null = نامشخص (بدون عدد ساختگی) |
+| sampleIndex | Int? | نمونه مرتبط اختیاری |

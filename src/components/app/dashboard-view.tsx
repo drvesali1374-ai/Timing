@@ -256,5 +256,5 @@ export function DashboardHint() {
 }
 
 export function notifyNotImplemented(feature: string) {
-  toast.info(`«${feature}» در فاز بعدی فعال می‌شود.`);
+  toast.info(`«${feature}» به‌زودی فعال می‌شود.`);
 }

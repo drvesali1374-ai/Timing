@@ -72,7 +72,7 @@ export function AnalysisWorkshopView({ projectId, onBack, onTitle, onOpenTiming 
       ) : (analysis.data?.sessions.length ?? 0) === 0 ? (
         <EmptyState
           title="هنوز جلسه نهایی‌شده‌ای برای تحلیل وجود ندارد"
-          description="تحلیل فقط از جلسات نهایی‌شده تغذیه می‌شود (قفل ورودی فاز ۵): جلسه را ثبت، متوقف و نهایی کنید تا چرخه‌های آن به‌عنوان ورودی پایدار تحلیل ذخیره شوند."
+          description="تحلیل از داده‌های نهایی‌شده تغذیه می‌شود: برگه ثبت زمان را «ارسال به تحلیل» کنید یا جلسه کرنومتری را نهایی کنید تا به‌عنوان ورودی پایدار ذخیره شود."
           action={
             <Button onClick={onOpenTiming} className="gap-2">
               <ClipboardList className="size-4" aria-hidden /> رفتن به کارگاه زمان‌سنجی

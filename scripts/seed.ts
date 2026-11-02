@@ -396,6 +396,197 @@ async function seedDemoTimingSessions(projectId: string, demoUserId: string) {
   }
 }
 
+// ══════════ مثال آموزشی یکپارچه (دستورالعمل ۸٫۳ — ADR-017) ══════════
+// «خط مونتاژ پنل»: ایستگاه‌ها + فعالیت‌های متصل + برگه ثبت دستی نهایی‌شده با وقفه «سایر».
+// تمام مسیر جدید (بدون کرنومتر) را با داده واقعی قابل پیگیری نمایش می‌دهد.
+
+async function seedTutorialProject(demoUserId: string) {
+  const existing = await db.project.findFirst({ where: { code: "DEMO-102", isDemo: true } });
+  if (existing) {
+    console.log("[seed] tutorial project exists: DEMO-102");
+    return;
+  }
+  const defaultTemplate = PROFILE_DEFINITIONS.find((d) => d.isDefault) ?? PROFILE_DEFINITIONS[0];
+  const snapshot = instantiateSnapshot(
+    { id: defaultTemplate.id, semver: defaultTemplate.semver, content: buildV2Content(defaultTemplate) },
+    { excludedFamilies: [], parameterOverrides: [] },
+  );
+
+  const projectId = uuidv7();
+  const configVersionId = uuidv7();
+
+  await db.$transaction(async (tx) => {
+    await tx.project.create({
+      data: {
+        id: projectId,
+        code: "DEMO-102",
+        title: "مثال آموزشی: خط مونتاژ پنل (از ابتدا تا گزارش)",
+        goal: "راهنمای قدم‌به‌قدم زنده — کاربر تازه‌کار با همین مثال کل مسیر (ایستگاه‌ها ← فعالیت‌ها ← ثبت دستی زمان ← تحلیل ← گزارش) را دنبال می‌کند.",
+        location: "کارخانه نمونه — سالن ۱",
+        department: "مونتاژ",
+        line: "خط مونتاژ پنل",
+        product: "پنل کنترل صنعتی مدل P-100",
+        process: "مونتاژ دستی",
+        responsible: "کاربر نمونه",
+        shift: "صبح (۸ تا ۱۶)",
+        notes: "پروژه آموزشی ایزوله (isDemo=true) — مثال کامل دستورالعمل بخش ۸٫۳.",
+        status: "active",
+        isDemo: true,
+        profileTemplateId: defaultTemplate.id,
+        profileTemplateVersion: defaultTemplate.semver,
+        profileSnapshotId: configVersionId,
+        createdById: demoUserId,
+      },
+    });
+    await tx.projectMembership.create({ data: { id: uuidv7(), projectId, userId: demoUserId, role: "owner" } });
+    await tx.configVersion.create({
+      data: {
+        id: configVersionId,
+        projectId,
+        semver: "1.0.0",
+        snapshotJson: JSON.stringify(snapshot),
+        reason: `مثال آموزشی از پروفایل «${defaultTemplate.nameFa}»`,
+        profileTemplateId: defaultTemplate.id,
+        profileTemplateVersion: defaultTemplate.semver,
+        createdBy: demoUserId,
+      },
+    });
+    await tx.project.update({ where: { id: projectId }, data: { currentConfigVersionId: configVersionId } });
+    await tx.auditLog.create({
+      data: {
+        id: uuidv7(),
+        userId: demoUserId,
+        action: "project.created",
+        entityType: "Project",
+        entityId: projectId,
+        projectId,
+        afterJson: JSON.stringify({ code: "DEMO-102", isDemo: true }),
+      },
+    });
+  });
+
+  // ایستگاه‌های خط به ترتیب جریان کار (۸٫۳)
+  const stationNames = ["آماده‌سازی قطعات", "مونتاژ", "بازرسی", "بسته‌بندی"];
+  const stations: Array<{ id: string; name: string }> = [];
+  for (let i = 0; i < stationNames.length; i += 1) {
+    const id = uuidv7();
+    await db.workStation.create({
+      data: { id, projectId, name: stationNames[i], orderIndex: i + 1, createdBy: demoUserId },
+    });
+    stations.push({ id, name: stationNames[i] });
+  }
+
+  // فعالیت‌ها با شناسه خودکار، متصل به ایستگاه‌ها (۸٫۳)
+  interface TutAct { id: string; stableKey: string; name: string; stationIdx: number; workType?: string }
+  const acts: TutAct[] = [];
+  const actDefs = [
+    { name: "برداشتن قطعه از جعبه", stationIdx: 0 },
+    { name: "جای‌گذاری قطعه در محل", stationIdx: 1 },
+    { name: "نصب پیچ", stationIdx: 1 },
+    { name: "کنترل اتصال", stationIdx: 1, workType: "inspection" },
+    { name: "بازرسی نهایی", stationIdx: 2, workType: "inspection" },
+    { name: "بسته‌بندی", stationIdx: 3 },
+  ];
+  let order = 0;
+  for (const def of actDefs) {
+    const id = uuidv7();
+    order += 1;
+    const stableKey = `act-${order}`;
+    await db.activity.create({
+      data: {
+        id,
+        projectId,
+        stableKey,
+        name: def.name,
+        workType: def.workType ?? "operatorManual",
+        stationId: stations[def.stationIdx].id,
+        order,
+        createdBy: demoUserId,
+      },
+    });
+    acts.push({ id, stableKey, name: def.name, stationIdx: def.stationIdx });
+  }
+
+  // برگه ثبت دستی نهایی‌شده — زمان‌های نمونه (۵ نمونه × ۵ فعالیت داده‌دار، جدول ۵٫۳)
+  const sheetId = uuidv7();
+  await db.manualSheet.create({
+    data: {
+      id: sheetId,
+      projectId,
+      title: "اندازه‌گیری خط مونتاژ پنل — نمونه آموزشی",
+      status: "finalized",
+      note: "زمان‌ها با کرنومتر مستقل اندازه‌گیری و دستی ثبت شده‌اند (۵ نمونه هر فعالیت).",
+      sampleCount: 5,
+      createdBy: demoUserId,
+    },
+  });
+  // داده آموزشی — الگوی واقع‌گرا با پراکندگی کوچک (ثانیه)
+  const times: Record<string, number[]> = {
+    "برداشتن قطعه از جعبه": [4.2, 4.5, 4.1, 4.3, 4.4],
+    "جای‌گذاری قطعه در محل": [7.1, 7.3, 6.9, 7.0, 7.2],
+    "نصب پیچ": [12.1, 12.5, 12.3, 12.2, 12.6],
+    "کنترل اتصال": [6.2, 6.0, 6.5, 6.1, 6.3],
+    "بازرسی نهایی": [9.8, 10.1, 9.9, 10.0, 10.2],
+  };
+  for (const act of acts) {
+    const arr = times[act.name];
+    if (!arr) continue;
+    for (let s = 0; s < arr.length; s += 1) {
+      await db.manualObservation.create({
+        data: {
+          id: uuidv7(),
+          sheetId,
+          activityId: act.id,
+          sampleIndex: s + 1,
+          durationMs: Math.round(arr[s] * 1000),
+          source: "manual",
+          recordedBy: demoUserId,
+        },
+      });
+    }
+  }
+  // وقفه نمونه ۱: علت متداول با مدت (۵٫۵)
+  await db.manualInterruption.create({
+    data: {
+      id: uuidv7(),
+      sheetId,
+      activityId: acts.find((a) => a.name === "نصب پیچ")!.id,
+      reason: "material-shortage",
+      reasonOther: null,
+      durationMs: 45000,
+      note: "در نمونه ۳، قطعه از قفسه موجود نبود.",
+      sampleIndex: 3,
+      recordedBy: demoUserId,
+    },
+  });
+  // وقفه نمونه ۲: «سایر» با علت دستی + مدت نامشخص (الزام ۵٫۵)
+  await db.manualInterruption.create({
+    data: {
+      id: uuidv7(),
+      sheetId,
+      activityId: acts.find((a) => a.name === "بازرسی نهایی")!.id,
+      reason: "other",
+      reasonOther: "انتظار برای تأیید سرپرست کیفیت",
+      durationMs: null,
+      note: "مدت دقیق ثبت نشده بود — نامشخص صادقانه ثبت می‌شود.",
+      sampleIndex: null,
+      recordedBy: demoUserId,
+    },
+  });
+  await db.auditLog.create({
+    data: {
+      id: uuidv7(),
+      userId: demoUserId,
+      action: "manual.sheet-finalized",
+      entityType: "ManualSheet",
+      entityId: sheetId,
+      projectId,
+      afterJson: JSON.stringify({ title: "اندازه‌گیری خط مونتاژ پنل — نمونه آموزشی", observations: 25, interruptions: 2 }),
+    },
+  });
+  console.log("[seed] tutorial project created: DEMO-102 (stations=4, activities=6, sheet finalized با ۲ وقفه)");
+}
+
 async function main() {
   await seedProfiles();
   const demoUser = await seedDemoUser();
@@ -404,6 +595,7 @@ async function main() {
   if (demoProject) {
     await seedDemoTimingSessions(demoProject.id, demoUser.id);
   }
+  await seedTutorialProject(demoUser.id);
   console.log("[seed] done ✓");
 }
 

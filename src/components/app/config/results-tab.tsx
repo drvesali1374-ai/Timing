@@ -70,7 +70,7 @@ export function ResultsTab({
       {projectScope.length === 0 ? (
         <EmptyState
           title="فرمول سطح پروژه‌ای وجود ندارد"
-          description="فرمول‌های سطح عنصر/چرخه به داده مشاهدات نیاز دارند و در فاز ۴ محاسبه می‌شوند. برای محاسبه فوری، فرمولی با دامنه «پروژه» بسازید."
+          description="فرمول‌های سطح عنصر/چرخه به داده مشاهدات نیاز دارند و پس از ثبت زمان‌ها محاسبه می‌شوند. برای محاسبه فوری، فرمولی با دامنه «پروژه» بسازید."
         />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -92,7 +92,7 @@ export function ResultsTab({
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Clock className="size-4 text-muted-foreground" aria-hidden />
-              فرمول‌های سطح عنصر/چرخه — نیازمند داده مشاهدات (فاز ۴)
+              فرمول‌های سطح عنصر/چرخه — نیازمند داده مشاهدات ثبت‌شده
             </CardTitle>
             <CardDescription>
               این فرمول‌ها روی داده دامنه‌های پایین‌تر اجرا می‌شوند و هنوز داده‌ای برای آن‌ها ثبت نشده است.

@@ -108,7 +108,8 @@ function toProjectDto(row: ProjectRow, templateNames: Map<string, string>, reque
     readiness: computeReadiness({
       hasConfigVersion: row.currentConfigVersion !== null,
       activityCount: row._count?.activities ?? 0, // فاز ۲ — فعالیت‌های فعال پروژه
-      observationCount: 0, // فاز ۴
+      // داده تحلیل‌پذیر: جلسات کرنومتری نهایی‌شده + برگه‌های ثبت دستی نهایی‌شده (ADR-017)
+      observationCount: (row._count?.timingSessions ?? 0) + (row._count?.manualSheets ?? 0),
       standardTimeResultCount: 0, // فاز ۵
       diagramCount: row._count?.diagrams ?? 0, // فاز ۳ — نمودارهای فعال
     }),

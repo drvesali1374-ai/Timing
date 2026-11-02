@@ -17,12 +17,12 @@ import {
   Circle,
   CircleDot,
   Copy,
+  Factory,
   FileClock,
   ListChecks,
   Network,
   Pencil,
   Scale,
-  Sigma,
   Timer,
   UserPlus,
 } from "lucide-react";
@@ -68,17 +68,19 @@ import {
   useRemoveMember,
   useUpdateMemberRole,
 } from "@/hooks/use-api";
+import { useProjectStations } from "@/hooks/use-config";
 import type { MemberDto } from "@/shared/contracts/api";
 import { DemoBadge, ErrorState, FaDate, LoadingBlock, LoadingCards, PageHeader, Spinner, StatusBadge } from "./ui-bits";
 import { Hint } from "./hint";
 import { ProjectEditDialog } from "./project-edit-dialog";
 import { cn } from "@/lib/utils";
 
-export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, onOpenDiagrams, onOpenTiming, onOpenAnalysis, onOpenBalance }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void; onOpenDiagrams: () => void; onOpenTiming: () => void; onOpenAnalysis: () => void; onOpenBalance: () => void }) {
+export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, onOpenStations, onOpenDiagrams, onOpenTiming, onOpenAnalysis, onOpenBalance, onOpenGuide }: { projectId: string; onBack: () => void; onTitle?: (title: string) => void; onOpenConfig: () => void; onOpenStations: () => void; onOpenDiagrams: () => void; onOpenTiming: () => void; onOpenAnalysis: () => void; onOpenBalance: () => void; onOpenGuide: () => void }) {
   const projectQuery = useProject(projectId);
   const versionsQuery = useProjectVersions(projectId);
   const membersQuery = useProjectMembers(projectId);
   const auditQuery = useProjectAudit(projectId);
+  const stationsQuery = useProjectStations(projectId);
 
   const archive = useArchiveProject(projectId);
   const duplicate = useDuplicateProject(projectId);
@@ -133,39 +135,44 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
         title={project.title}
         description={`کد ${project.code} · ساخته‌شده توسط ${project.createdByName ?? "—"} · ${new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" }).format(new Date(project.createdAt))}`}
         actions={
-          // عملیات پروژه — منوی واحد (بند ۵.۱: عملیات کم‌کاربرد/مدیریتی در منوی بیشتر)
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Pencil className="size-4" aria-hidden /> عملیات پروژه
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuLabel>مدیریت پروژه</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {canUpdate ? (
-                <DropdownMenuItem onClick={() => setEditOpen(true)} className="gap-2">
-                  <Pencil className="size-4" aria-hidden /> ویرایش اطلاعات
-                </DropdownMenuItem>
-              ) : null}
-              {canDuplicate ? (
-                <DropdownMenuItem onClick={() => duplicate.mutate()} disabled={duplicate.isPending} className="gap-2">
-                  {duplicate.isPending ? <Spinner /> : <Copy className="size-4" aria-hidden />} تکثیر پروژه
-                </DropdownMenuItem>
-              ) : null}
-              {canArchive ? (
-                project.status === "archived" ? (
-                  <DropdownMenuItem onClick={() => archive.mutate(false)} disabled={archive.isPending} className="gap-2">
-                    <ArchiveRestore className="size-4" aria-hidden /> خروج از بایگانی
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onOpenGuide} className="gap-2">
+              <BookOpen className="size-4" aria-hidden /> راهنمای قدم‌به‌قدم مطالعه
+            </Button>
+            {/* عملیات پروژه — منوی واحد (بند ۵.۱: عملیات کم‌کاربرد/مدیریتی در منوی بیشتر) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Pencil className="size-4" aria-hidden /> عملیات پروژه
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel>مدیریت پروژه</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {canUpdate ? (
+                  <DropdownMenuItem onClick={() => setEditOpen(true)} className="gap-2">
+                    <Pencil className="size-4" aria-hidden /> ویرایش اطلاعات
                   </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem variant="destructive" onClick={() => setConfirmArchive(true)} className="gap-2">
-                    <Archive className="size-4" aria-hidden /> بایگانی پروژه
+                ) : null}
+                {canDuplicate ? (
+                  <DropdownMenuItem onClick={() => duplicate.mutate()} disabled={duplicate.isPending} className="gap-2">
+                    {duplicate.isPending ? <Spinner /> : <Copy className="size-4" aria-hidden />} تکثیر پروژه
                   </DropdownMenuItem>
-                )
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                ) : null}
+                {canArchive ? (
+                  project.status === "archived" ? (
+                    <DropdownMenuItem onClick={() => archive.mutate(false)} disabled={archive.isPending} className="gap-2">
+                      <ArchiveRestore className="size-4" aria-hidden /> خروج از بایگانی
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem variant="destructive" onClick={() => setConfirmArchive(true)} className="gap-2">
+                      <Archive className="size-4" aria-hidden /> بایگانی پروژه
+                    </DropdownMenuItem>
+                  )
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         }
       />
 
@@ -203,11 +210,14 @@ export function ProjectDetailView({ projectId, onBack, onTitle, onOpenConfig, on
 
           <StudyPathStepper
             readiness={project.readiness}
+            stationCount={stationsQuery.data?.length ?? 0}
             onOpenConfig={onOpenConfig}
+            onOpenStations={onOpenStations}
             onOpenDiagrams={onOpenDiagrams}
             onOpenTiming={onOpenTiming}
             onOpenAnalysis={onOpenAnalysis}
             onOpenBalance={onOpenBalance}
+            onOpenGuide={onOpenGuide}
           />
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -374,34 +384,42 @@ interface StepDef {
 
 function StudyPathStepper({
   readiness,
+  stationCount,
   onOpenConfig,
+  onOpenStations,
   onOpenDiagrams,
   onOpenTiming,
   onOpenAnalysis,
   onOpenBalance,
+  onOpenGuide,
 }: {
   readiness: ProjectReadinessDto;
+  stationCount: number;
   onOpenConfig: () => void;
+  onOpenStations: () => void;
   onOpenDiagrams: () => void;
   onOpenTiming: () => void;
   onOpenAnalysis: () => void;
   onOpenBalance: () => void;
+  onOpenGuide: () => void;
 }) {
+  // جریان ساده‌شده برای کاربر تازه‌کار (دستورالعمل ۶٫۱) — نمودار اختیاری است و
+  // کاربر فقط زمان‌خواه می‌تواند مستقیم از ثبت زمان شروع کند.
   const steps: StepDef[] = [
     {
-      key: "diagram",
-      title: "ترسیم نمودار فرایند",
-      desc: "مسیر عملیات را با OPC یا FPC طراحی کنید — اتصال از هر چهار ضلع گام‌ها.",
-      icon: Network,
-      done: readiness.diagramReady,
-      enter: onOpenDiagrams,
-      ctaDone: "مشاهده نمودارها",
-      ctaNext: "شروع طراحی نمودار",
+      key: "stations",
+      title: "خط و ایستگاه‌های کاری",
+      desc: "ایستگاه‌های خط تولید را به ترتیب جریان کار وارد کنید — تکی یا یک‌جا از Excel.",
+      icon: Factory,
+      done: stationCount > 0,
+      enter: onOpenStations,
+      ctaDone: "مشاهده ایستگاه‌ها",
+      ctaNext: "تعریف ایستگاه‌ها",
     },
     {
       key: "activities",
-      title: "فعالیت‌ها و ایستگاه‌ها",
-      desc: "گام‌های نمودار را به فعالیت‌ها و ایستگاه‌های کاری مرتبط و اطلاعات ضروری را تکمیل کنید.",
+      title: "فعالیت‌ها",
+      desc: "کارهای قابل‌اندازه‌گیری هر ایستگاه را تعریف کنید و به ایستگاه متصل کنید.",
       icon: ListChecks,
       done: readiness.measurementReady,
       enter: onOpenConfig,
@@ -409,34 +427,44 @@ function StudyPathStepper({
       ctaNext: "تعریف فعالیت‌ها",
     },
     {
+      key: "diagram",
+      title: "نمودار فرایندی (اختیاری)",
+      desc: "در صورت نیاز، جریان کار را با نمودار OPC/FPC طراحی و به فعالیت‌ها متصل کنید.",
+      icon: Network,
+      done: readiness.diagramReady,
+      enter: onOpenDiagrams,
+      ctaDone: "مشاهده نمودارها",
+      ctaNext: "شروع طراحی نمودار",
+    },
+    {
       key: "timing",
-      title: "زمان‌سنجی",
-      desc: "با کرنومتر، فعالیت‌ها یا عناصر کاری را اندازه‌گیری کنید — آفلاین هم فعال است.",
+      title: "ثبت زمان‌ها",
+      desc: "زمان‌های اندازه‌گیری‌شده خود را در برگه ثبت (جدول فعالیت × نمونه) وارد کنید.",
       icon: Timer,
       done: readiness.analysisReady,
       enter: onOpenTiming,
-      ctaDone: "جلسات زمان‌سنجی",
-      ctaNext: "شروع زمان‌سنجی",
+      ctaDone: "مشاهده برگه‌های ثبت",
+      ctaNext: "ثبت زمان‌ها",
     },
     {
-      key: "params",
-      title: "پارامترها و فرمول‌ها",
-      desc: "در صورت نیاز: پارامترهای سفارشی و فرمول‌های محاسباتی با آزمون زنده.",
-      icon: Sigma,
-      done: readiness.configReady,
-      enter: onOpenConfig,
-      ctaDone: "پیکربندی پیشرفته",
-      ctaNext: "ساخت پارامتر/فرمول",
+      key: "analysis",
+      title: "تحلیل مهندسی زمان",
+      desc: "میانگین/داده پرت و زنجیره زمان (نماینده/نرمال/استاندارد) را ببینید.",
+      icon: BarChart3,
+      done: readiness.approvalReady,
+      enter: onOpenAnalysis,
+      ctaDone: "کارگاه تحلیل",
+      ctaNext: "شروع تحلیل",
     },
     {
       key: "balance",
-      title: "تحلیل و بالانس خط",
-      desc: "نتایج را تحلیل کنید؛ تعداد ایستگاه‌ها، تخصیص فعالیت‌ها و نیروی انسانی را تعیین کنید.",
-      icon: readiness.approvalReady ? Scale : BarChart3,
+      title: "بالانس خط و گزارش",
+      desc: "در صورت نیاز بالانس خط و در پایان گزارش نهایی مطالعه را دریافت کنید.",
+      icon: Scale,
       done: readiness.approvalReady,
-      enter: readiness.approvalReady ? onOpenBalance : onOpenAnalysis,
+      enter: onOpenBalance,
       ctaDone: "کارگاه بالانس خط",
-      ctaNext: "شروع تحلیل",
+      ctaNext: "شروع بالانس خط",
     },
   ];
 
@@ -453,6 +481,9 @@ function StudyPathStepper({
             text="مسیر پیشنهادی انجام یک مطالعه زمان‌سنجی است، نه محدودیت اجباری: با دکمه هر مرحله می‌توانید مستقیم به همان بخش بروید. وضعیت هر مرحله از داده واقعی پروژه به دست می‌آید."
             title="مسیر مطالعه"
           />
+          <Button variant="ghost" size="sm" onClick={onOpenGuide} className="gap-1.5 text-xs text-primary hover:text-primary">
+            <BookOpen className="size-3.5" aria-hidden /> راهنمای کامل قدم‌به‌قدم
+          </Button>
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span>
@@ -488,14 +519,14 @@ function StudyPathStepper({
         </div>
       )}
 
-      <ol className="grid gap-0 sm:grid-cols-2 lg:grid-cols-5">
+      <ol className="grid gap-0 sm:grid-cols-2 lg:grid-cols-6">
         {steps.map((s, i) => {
           const isCurrent = current?.key === s.key;
           return (
             <li
               key={s.key}
               className={cn(
-                "flex flex-col gap-2 border-b border-e p-4 last:border-b-0 last:border-e-0 sm:[&:nth-last-child(-n+1)]:border-e-0 lg:[&:nth-last-child(-n+5)]:border-b-0 lg:[&:nth-last-child(-n+5)]:border-e",
+                "flex flex-col gap-2 border-b border-e p-4 last:border-b-0 last:border-e-0 sm:[&:nth-last-child(-n+1)]:border-e-0 lg:[&:nth-last-child(-n+6)]:border-b-0 lg:[&:nth-last-child(-n+6)]:border-e",
                 i < steps.length - 1 && "lg:border-e",
                 isCurrent && "bg-muted/40",
               )}

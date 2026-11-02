@@ -328,7 +328,7 @@ export function ParameterDialog({
                     با حرف کوچک لاتین شروع شود؛ بخش‌ها با نقطه (مثل oven.cycleTime)
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">ناورداست و بعداً تغییر نمی‌کند</p>
+                  <p className="text-xs text-muted-foreground">این شناسه پس از ایجاد ثابت می‌ماند و قابل تغییر نیست</p>
                 )}
               </div>
               <div className="space-y-1.5">

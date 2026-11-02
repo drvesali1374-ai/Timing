@@ -28,7 +28,7 @@ export function GuideTab({ overview }: GuideTabProps) {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">الگوریتم‌ها (کتابخانه فاز ۶)</CardTitle>
+          <CardTitle className="text-sm">الگوریتم‌های بالانس</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-xs leading-relaxed">
           <div>

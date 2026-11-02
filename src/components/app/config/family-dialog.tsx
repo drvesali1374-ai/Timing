@@ -1,8 +1,10 @@
 "use client";
 
 /**
- * دیالوگ ایجاد/ویرایش خانواده پارامتر — عملیات addFamily/updateFamily با دلیل خودکار.
+ * دیالوگ ایجاد/ویرایش گروه اطلاعات — عملیات addFamily/updateFamily با دلیل خودکار.
  * والد این دیالوگ را فقط هنگام باز‌بودن رندر می‌کند (الگوی mount-fresh).
+ * رفع باگ مقداردهی اولیه (دستورالعمل ۳٫۱): در ویرایش، همه فیلدها با آخرین
+ * مقدار ذخیره‌شده همان رکورد پر می‌شوند — مقداردهی lazy از prop.
  */
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ConfigFamilyDto } from "@/shared/contracts/config";
 import { useApplyConfigOps } from "@/hooks/use-config";
 import { Spinner } from "@/components/app/ui-bits";
+import { FieldHelp } from "@/components/app/field-help";
 
 const STABLE_KEY_RE = /^[a-z][a-zA-Z0-9]*(\.[a-zA-Z][a-zA-Z0-9]*)*$/;
 
@@ -28,9 +31,10 @@ export function FamilyDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const apply = useApplyConfigOps(projectId);
+  // مقداردهی اولیه lazy: در حالت ویرایش از خود رکورد (دستورالعمل ۳٫۱)
   const [stableKey, setStableKey] = useState("");
-  const [nameFa, setNameFa] = useState("");
-  const [description, setDescription] = useState("");
+  const [nameFa, setNameFa] = useState(() => family?.nameFa ?? "");
+  const [description, setDescription] = useState(() => family?.description ?? "");
   const [reason, setReason] = useState("");
 
   const isEdit = !!family;
@@ -68,16 +72,30 @@ export function FamilyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? `ویرایش خانواده «${family.nameFa}»` : "خانواده پارامتر جدید"}</DialogTitle>
+          <DialogTitle>{isEdit ? `ویرایش گروه اطلاعات «${family.nameFa}»` : "گروه اطلاعات جدید"}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "شناسه فنی خانواده تغییر نمی‌کند (ناوردایی). تغییرات به‌صورت نسخه جدید ثبت می‌شود."
-              : "گروهی از پارامترهای مرتبط (مثل تنور، شیفت، نرخ خرابی) — شناسه فنی بعداً تغییر نمی‌کند."}
+              ? "این شناسه پس از ایجاد ثابت می‌ماند و قابل تغییر نیست. تغییرات به‌صورت نسخه جدید ثبت می‌شود."
+              : "گروهی از فیلدهای اطلاعاتی مرتبط (مثل شیفت کاری یا مشخصات تجهیز) — شناسه داخلی بعداً تغییر نمی‌کند."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="family-key">شناسه فنی (stableKey) *</Label>
+            <span className="inline-flex items-center gap-1.5">
+              <Label htmlFor="family-key">شناسه داخلی *</Label>
+              <FieldHelp
+                label="شناسه داخلی"
+                content={{
+                  meaning: "نام فنی کوتاه برای این گروه اطلاعات در سیستم — فقط یک‌بار هنگام ایجاد تعیین می‌شود.",
+                  input: "یک شناسه لاتین کوتاه و بی‌فاصله انتخاب کنید.",
+                  format: "حرف کوچک لاتین شروع، بخش‌ها با نقطه — مثل oven.settings",
+                  example: "برای گروه اطلاعات شیفت کاری: shift.info",
+                  usage: "در فرمول‌ها و فیلدهای اطلاعاتی این گروه با همین نام ارجاع می‌شود.",
+                  effect: "پس از ایجاد قابل تغییر نیست؛ برای تغییر باید گروه جدیدی بسازید.",
+                  required: true,
+                }}
+              />
+            </span>
             <Input
               id="family-key"
               dir="ltr"
@@ -101,21 +119,44 @@ export function FamilyDialog({
             )}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="family-name">نام فارسی *</Label>
+            <span className="inline-flex items-center gap-1.5">
+              <Label htmlFor="family-name">نام فارسی *</Label>
+              <FieldHelp
+                label="نام فارسی"
+                content={{
+                  meaning: "نام نمایشی این گروه اطلاعات که در همه فهرست‌ها دیده می‌شود.",
+                  input: "یک نام فارسی کوتاه و روشن بنویسید.",
+                  example: "«مشخصات شیفت کاری» یا «اطلاعات خط مونتاژ»",
+                  effect: "فقط نمایشی است و روی محاسبات اثر ندارد؛ هر زمان قابل ویرایش است.",
+                  required: true,
+                }}
+              />
+            </span>
             <Input
               id="family-name"
-              placeholder="مثال: مشخصات تنور"
+              placeholder="مثال: مشخصات شیفت کاری"
               value={nameFa}
               onChange={(e) => setNameFa(e.target.value)}
               required
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="family-desc">توضیح</Label>
+            <span className="inline-flex items-center gap-1.5">
+              <Label htmlFor="family-desc">توضیح</Label>
+              <FieldHelp
+                label="توضیح"
+                content={{
+                  meaning: "توضیح کوتاه نقش این گروه اطلاعات در مطالعه.",
+                  input: "یک یا دو جمله درباره اینکه این گروه چه اطلاعاتی را جمع می‌کند.",
+                  example: "تنظیمات شیفت: تعداد شیفت، مدت هر شیفت و زمان‌های استراحت.",
+                  required: false,
+                }}
+              />
+            </span>
             <Textarea
               id="family-desc"
               rows={2}
-              placeholder="توضیح کوتاه نقش این خانواده در مطالعه"
+              placeholder="توضیح کوتاه نقش این گروه اطلاعات در مطالعه"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />

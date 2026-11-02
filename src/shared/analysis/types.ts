@@ -102,7 +102,7 @@ export const CONFIDENCE_LEVELS: readonly number[] = [90, 95, 99];
 /** یک مشاهده عنصر از چرخه نهایی‌شده — ورودی تحلیل (ردیابی کامل). */
 export interface AnalysisObservation {
   sessionId: string;
-  sessionMethod: TimingMethod;
+  sessionMethod: TimingMethod | "manual";
   observer: string;
   cycleSeq: number;
   cycleStatus: CycleStatus;
@@ -110,12 +110,14 @@ export interface AnalysisObservation {
   elementName: string;
   /** مدت فعال عنصر (ms) — TS-003 */
   durationMs: number;
-  /** رویداد قرائت مبنای مشاهده — هویت ردیابی */
+  /** رویداد قرائت مبنای مشاهده — هویت ردیابی (برای داده دستی: شناسه مشاهده) */
   readingEventId: string;
   corrected: boolean;
   flags: IntegrityFlag[];
   /** زمینه جلسه (پارامترهای سفارشی scopeType=session مثل study.operator) */
   sessionContext: Record<string, string>;
+  /** منبع ثبت مشاهده (ADR-017): کرنومتر داخلی یا ورود دستی/چسباندن/درون‌ریزی */
+  source?: "chronometer" | "manual" | "paste" | "import";
 }
 
 /** وضعیت علامت/حذف یک مشاهده — دو عمل جدا (بند ۲ فاز ۵). */
@@ -299,7 +301,11 @@ export interface ElementAnalysis {
 
 export interface SessionAnalysisSummary {
   sessionId: string;
-  method: TimingMethod;
+  method: TimingMethod | "manual";
+  /** منبع داده — کرنومتر یا برگه دستی (ADR-017) */
+  source?: "chronometer" | "manual";
+  /** عنوان برگه (فقط منبع دستی) */
+  title?: string | null;
   observer: string;
   status: string;
   cyclesTotal: number;

@@ -1,7 +1,7 @@
 /**
  * Service Worker پلتفرم زمان‌سنجی صنعتی — پیاده‌سازی ADR-006 (فاز ۷)
  * ----------------------------------------------------------------
- * استراتژی (نسخه ۱.۱.۰ — مقاوم‌سازی در برابر صفحه سفید):
+ * استراتژی (نسخه ۱.۲.۰ — خودترمیمی چانک 404):
  *  - ناوبری (request.mode === 'navigate'): شبکه-اول با سقف زمانی ۸s →
  *    عقب‌گرد به کش → صفحه آفلاین. شبکهٔ معلق هرگز صفحه را قفل نمی‌کند.
  *  - دارایی‌های استاتیک (/_next/static/، آیکون‌ها، فونت‌ها): شبکه-اول →
@@ -9,18 +9,23 @@
  *    هر بازساخت سرور عوض می‌شود؛ کش-اول JS کهنه/ناسازگار سرو می‌کرد و
  *    صفحهٔ سفید می‌ساخت. شبکه-اول + عقب‌گردِ آفلاین صحت را تضمین می‌کند
  *    و آفلاین همچنان کار می‌کند.)
+ *  - **خودترمیمی (v1.2.0):** اگر دارایی /_next/ پس از بازساخت سرور 404/شکست
+ *    خورد و کشی هم نبود، تمام کش‌ها پاک می‌شوند — بازآوری بعدی صفحه از صفر
+ *    شبکه می‌گیرد و صفحه سفید «دائمی» غیرممکن می‌شود. (در dev، pwa-register
+ *    اصلاً SW ثبت نمی‌کند — این لایه برای مرورگرهای گیرکرده با نسخه‌های قدیمی
+ *    و برای production است.)
  *  - API (/api/**): فقط-شبکه — هرگز پاسخ API کش نمی‌شود (یکپارچگی داده)؛
  *    صف‌های آفلاین دادهٔ ساخت‌یافته در IndexedDB (timing-chrono / timing-diagrams)
  *    طبق ADR-013/012 مدیریت می‌شوند، نه در این SW.
  *  - پایان‌های احراز هویت (/api/auth/**): کاملاً دست‌نخورده.
  *  - نسخه‌بندی کش: با تغییر APP_VERSION کش‌های قدیمی در activate پاک می‌شوند
- *    (v1.1.0 → پاک شدن خودکار کش‌های کهنهٔ v1.0.0 در مرورگر همهٔ کاربران).
+ *    (v1.2.0 → پاک شدن خودکار کش‌های کهنهٔ v1.0.0/v1.1.0 در مرورگر همهٔ کاربران).
  *
  * صداقت (قاعده منشور): هیچ «همگام موفق» جعلی ادعا نمی‌شود؛ آفلاین فقط
  * برای پوسته برنامه و دارایی‌هاست، نه داده.
  */
 
-const APP_VERSION = "tazmin-pwa-v1.1.0";
+const APP_VERSION = "tazmin-pwa-v1.2.0";
 const SHELL_CACHE = `${APP_VERSION}-shell`;
 const STATIC_CACHE = `${APP_VERSION}-static`;
 
@@ -35,6 +40,21 @@ async function fetchWithTimeout(req) {
     return await fetch(req, { signal: ctrl.signal });
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * پاک‌سازی کامل همهٔ کش‌های اینorigin — «خودترمیمی».
+ * وقتی دارایی /_next/ پس از بازساخت سرور 404 شد یعنی گراف چانک عوض شده؛
+ * نگه‌داشتن کش‌های ناسازگار فقط بازآوری بد بعدی می‌سازد. پاک‌سازی کامل تضمین
+ * می‌کند بازآوری بعدی از شبکه تازه بخواند.
+ */
+async function purgeAllCaches() {
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } catch (err) {
+    // بهترین تلاش — خطای پاک‌سازی نباید پاسخ اصلی را عوض کند
   }
 }
 
@@ -148,6 +168,7 @@ self.addEventListener("fetch", (event) => {
   if (isStaticAsset(url)) {
     event.respondWith(
       (async () => {
+        const isNextAsset = url.pathname.startsWith("/_next/");
         try {
           const fresh = await fetchWithTimeout(req);
           if (fresh && fresh.status === 200) {
@@ -162,10 +183,16 @@ self.addEventListener("fetch", (event) => {
           }
           // 404/خطای دیگر → کش در صورت وجود (دارایی هش‌شده تغییرنکرده)؛ وگرنه همان پاسخ
           const cached = await caches.match(req);
-          return cached ?? fresh;
+          if (cached) return cached;
+          // چانک /_next/ حذف‌شده پس از بازساخت و کشی هم نیست → گراف چانک عوض
+          // شده؛ کل کش‌ها پاک شوند تا بازآوری بعدی تمیز از شبکه بخواند (خودترمیمی)
+          if (isNextAsset && fresh && fresh.status >= 400) await purgeAllCaches();
+          return fresh;
         } catch (err) {
           const cached = await caches.match(req);
           if (cached) return cached;
+          // شبکه شکست خورد و کشی نیست؛ اگر چانک /_next/ است کش‌ها ناسازگارند → پاک‌سازی
+          if (isNextAsset) await purgeAllCaches();
           return new Response("", { status: 504 });
         }
       })(),

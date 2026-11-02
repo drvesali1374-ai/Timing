@@ -1,27 +1,54 @@
 "use client";
 
 /**
- * ثبت Service Worker پلتفرم (ADR-006 — تحویل فاز ۷).
- * - ثبت غیرمسدودکننده پس از بارگذاری کامل صفحه.
+ * ثبت Service Worker پلتفرم (ADR-۰۰۶ — تحویل فاز ۷).
+ * - **dev:** ثبت SW ممنوع و هر SW/کش موجود خارج و پاک می‌شود — SW در dev عامل
+ *   بازگشت «صفحه سفید» است: پس از هر بازساخت سرور، HTML/چانک کش‌شده کهنه با
+ *   چانک‌های حذف‌شده سرو می‌شد و ماژول‌ها بالا نمی‌آمدند. آفلاین PWA فقط برای
+ *   build تولیدی معنا دارد.
+ * - ثبت غیرمسدودکننده پس از بارگذاری کامل صفحه (فقط production).
  * - اعلان صادقانه وضعیت آنلاین/آفلاین (توست + رویداد سفارری برای کامپوننت‌ها).
  * - هنگام نسخه جدید SW: اعلان «به‌روزرسانی آماده» با فعال‌سازی اضطراری (skipWaiting + reload).
  */
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-type SwStatus = "unsupported" | "registering" | "active" | "failed";
+type SwStatus = "unsupported" | "registering" | "active" | "failed" | "dev";
 
 export function PwaRegister() {
-  // «پشتیبانی‌نشده» در مقداردهی اولیه مشتق می‌شود (نه setState همگام در effect)
-  const [swStatus, setSwStatus] = useState<SwStatus>(() =>
-    typeof window !== "undefined" && !("serviceWorker" in navigator)
-      ? "unsupported"
-      : "registering",
-  );
+  // وضعیت اولیه در مقداردهی اولیه مشتق می‌شود (نه setState همگام در effect):
+  // در dev همیشه «dev» است — SW ثبت نمی‌شود و نشانگری هم نیست.
+  const [swStatus, setSwStatus] = useState<SwStatus>(() => {
+    if (typeof window === "undefined") return "registering"; // SSR — رندر null
+    if (process.env.NODE_ENV !== "production") return "dev";
+    return !("serviceWorker" in navigator) ? "unsupported" : "registering";
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
+
+    // ── محیط توسعه: SW نباید فعال باشد ─────────────────────────────────
+    // ریشه‌یابی صفحه سفید مکرر پس از ریست سرور: SW کش‌شدهٔ ناوبری/چانک کهنه
+    // سرو می‌کرد (چانک‌ها 404) → ماژول‌ها بالا نمی‌آمدند → صفحه سفید دائمی.
+    // در dev هر SW ثبت‌شدهٔ قبلی را خارج و تمام کش‌ها را پاک می‌کنیم.
+    if (process.env.NODE_ENV !== "production") {
+      (async () => {
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          if (regs.length > 0) {
+            await Promise.all(regs.map((r) => r.unregister()));
+            if ("caches" in window) {
+              const keys = await caches.keys();
+              await Promise.all(keys.map((k) => caches.delete(k)));
+            }
+          }
+        } catch {
+          // بهترین تلاش — شکست پاک‌سازی کار اصلی را نمی‌شکند
+        }
+      })();
+      return;
+    }
 
     // آیا از قبل SW کنترل داشته؟ (نصب اول نیست و به‌روزرسانی واقعی است)
     // بدون این تفکیک، clients.claim در نصب اول controllerchange می‌سازد و
@@ -105,6 +132,7 @@ export function PwaRegister() {
   }, []);
 
   // نشانگر ریز برای پوسته (بدون متن مزاحم — فقط aria + title)
+  // در dev نشانگری نیست — SW غیرفعال است (رفتار شبکه خالص)
   if (swStatus === "active") {
     return (
       <span

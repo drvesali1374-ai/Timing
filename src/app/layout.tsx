@@ -122,6 +122,48 @@ export default function RootLayout({
             برای اجرای پلتفرم زمان‌سنجی صنعتی، جاوااسکریپت مرورگر باید فعال باشد.
           </div>
         </noscript>
+        {/*
+          پاک‌کنندهٔ ضدگلولهٔ Service Worker (فقط dev — درون HTML، پیش از هر JS برنامه):
+          اگر مرورگر کاربر SW کهنه‌ای از جلسات قبلی داشته باشد که محتوای ناسازگار
+          سرو می‌کند، کد پاک‌کنندهٔ درون برنامه هرگز اجرا نمی‌شود (مرغ و تخم‌مرغ).
+          این اسکریپت مستقل از بوتِ React اجرا می‌شود: هر SW ثبت‌شده را خارج و
+          تمام کش‌ها را پاک می‌کند و اگر SW این بارگذاری را کنترل می‌کرد، یک‌بار
+          (با گارد حلقهٔ reload) صفحه را تازه بارگذاری می‌کند.
+        */}
+        {process.env.NODE_ENV !== "production" && (
+          <Script
+            id="sw-dev-cleanup"
+            strategy="beforeInteractive"
+            dangerouslySetInnerHTML={{
+              __html: `(function(){
+  try {
+    var ns = navigator.serviceWorker;
+    var hadController = !!(ns && ns.controller);
+    var already = false;
+    try { already = sessionStorage.getItem('__tazminSwCleaned') === '1'; } catch (e) {}
+    var jobs = [];
+    if (ns && ns.getRegistrations) {
+      jobs.push(ns.getRegistrations().then(function(rs){
+        return Promise.all(rs.map(function(r){ return r.unregister(); }));
+      }));
+    }
+    if ('caches' in window) {
+      jobs.push(caches.keys().then(function(ks){
+        return Promise.all(ks.map(function(k){ return caches.delete(k); }));
+      }));
+    }
+    Promise.all(jobs).then(function(){
+      window.__tazminSwCleaned = true;
+      if (hadController && !already) {
+        try { sessionStorage.setItem('__tazminSwCleaned', '1'); } catch (e) {}
+        window.location.reload();
+      }
+    }).catch(function(){});
+  } catch (e) {}
+})();`,
+            }}
+          />
+        )}
         {/* اجرا در HTML اولیه، پیش از هر JS برنامه — حتی اگر React هرجا بالا نیاید فعال می‌ماند */}
         <Script
           id="boot-guard"

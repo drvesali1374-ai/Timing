@@ -1,0 +1,1507 @@
+     1→'use client'
+     2→
+     3→// ═══════════════════════════════════════════════════════════
+     4→// صفحه اختصاصی فعالیت — FR-03 (چهار زبانه)
+     5→// ۱. مشخصات: فرم ذخیره خودکار (expectedUpdatedAt) + مجازهای
+     6→//    مؤثر (FR-04: ارث گروه + بازنویسی با debounce) + عملیات
+     7→// ۲. عناصر کاری: SortableList با D&D، ویرایش autosave، حذف
+     8→//    با شمارش وابستگی‌ها (FR-26)
+     9→// ۳. زمان‌سنجی و ۴. تحلیل نتایج: نمای صادقانه فازهای ۳ و ۴
+    10→// سربرگ: بازگشت + مسیر (ساختار ← ایستگاه ← فعالیت) + نوع
+    11→// فرایندی + وضعیت ارزیابی + «اقدام بعدی» — FR-03
+    12→// ═══════════════════════════════════════════════════════════
+    13→import { useEffect, useMemo, useRef, useState } from 'react'
+    14→import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+    15→import { toast } from 'sonner'
+    16→import {
+    17→  ArrowLeft,
+    18→  BarChart3,
+    19→  CircleCheck,
+    20→  Info,
+    21→  Lightbulb,
+    22→  ListTree,
+    23→  Loader2,
+    24→  Pencil,
+    25→  Plus,
+    26→  Tags,
+    27→  Timer,
+    28→  Trash2,
+    29→  X,
+    30→} from 'lucide-react'
+    31→import { Badge } from '@/components/ui/badge'
+    32→import { Button } from '@/components/ui/button'
+    33→import {
+    34→  Dialog,
+    35→  DialogContent,
+    36→  DialogDescription,
+    37→  DialogFooter,
+    38→  DialogHeader,
+    39→  DialogTitle,
+    40→} from '@/components/ui/dialog'
+    41→import { Input } from '@/components/ui/input'
+    42→import { Label } from '@/components/ui/label'
+    43→import {
+    44→  Select,
+    45→  SelectContent,
+    46→  SelectItem,
+    47→  SelectTrigger,
+    48→  SelectValue,
+    49→} from '@/components/ui/select'
+    50→import { Separator } from '@/components/ui/separator'
+    51→import { Skeleton } from '@/components/ui/skeleton'
+    52→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    53→import { Textarea } from '@/components/ui/textarea'
+    54→import { ConfirmDeleteDialog, EmptyState } from '@/components/common/Feedback'
+    55→import { HelpDot } from '@/components/common/HelpDot'
+    56→import { PercentInput, PersianNumberInput } from '@/components/common/PersianNumberInput'
+    57→import { SaveIndicator } from '@/components/common/SaveIndicator'
+    58→import { SortableList } from '@/components/common/SortableList'
+    59→import { useAutosave, type SaveStatus } from '@/hooks/use-autosave'
+    60→import { useIsMobile } from '@/hooks/use-mobile'
+    61→import { api } from '@/lib/api-client'
+    62→import {
+    63→  allowancesApi,
+    64→  structureApi,
+    65→  type ActivityDto,
+    66→  type EffectiveAllowancesDto,
+    67→  type ElementDto,
+    68→  type GroupDto,
+    69→} from '@/lib/api/endpoints'
+    70→import { qk } from '@/lib/api/keys'
+    71→import {
+    72→  ELEMENT_TYPES,
+    73→  ELEMENT_TYPE_LABELS,
+    74→  PROCESS_TYPES,
+    75→  PROCESS_TYPE_LABELS,
+    76→  PROCESS_TYPE_SYMBOLS,
+    77→  type ElementType,
+    78→  type ProcessType,
+    79→} from '@/domain/types'
+    80→import { useAppStore } from '@/store/app-store'
+    81→import { useDisplayPrefs } from '@/store/display-store'
+    82→import { formatDate, formatDateTime, formatInt, formatPercent, formatTimeValue } from '@/lib/format'
+    83→import { cn } from '@/lib/utils'
+    84→import TimingPendingView from './TimingPendingView'
+    85→import AnalysisPendingView from './AnalysisPendingView'
+    86→
+    87→type Prefs = ReturnType<typeof useDisplayPrefs>
+    88→type TabKey = 'info' | 'elements' | 'timing' | 'analysis'
+    89→
+    90→/** مقدار Sentinel — Radix Select مقدار رشته خالی قبول نمی‌کند */
+    91→const NO_GROUP = 'none'
+    92→/** سقف مقدار اعشاری درصد طبق اعتبارسنجی API (۰٫۹۹۹۹ = ۹۹٫۹۹٪) — FR-15 */
+    93→const MAX_PERCENT_DECIMAL = 0.9999
+    94→/** تأخیر debounce ذخیره بازنویسی مجازها */
+    95→const OVERRIDE_DEBOUNCE_MS = 600
+    96→
+    97→interface ActivityInfoFormState {
+    98→  name: string
+    99→  description: string
+   100→  processType: string
+   101→  groupId: string
+   102→  targetSampleCount: number | null
+   103→}
+   104→
+   105→interface ElementFormState {
+   106→  name: string
+   107→  description: string
+   108→  elementType: string
+   109→}
+   110→
+   111→const EMPTY_ELEMENT_FORM: ElementFormState = { name: '', description: '', elementType: 'MANUAL' }
+   112→
+   113→/** پاسخ GET /api/elements/{id} — فقط برای شمارش وابستگی‌های حذف */
+   114→interface ElementDepsDto {
+   115→  counts: { observations: number; hasRating: boolean }
+   116→}
+   117→
+   118→const elementDepsKey = (id: string) => ['element-depends', id] as const
+   119→
+   120→// ── نگاشت رنگ Badge نوع عنصر — FR-02 ──
+   121→const ELEMENT_TYPE_BADGE: Record<ElementType, string> = {
+   122→  MANUAL: 'border-0 bg-brand-soft text-brand',
+   123→  MACHINE: 'border-0 bg-cyan-soft text-cyan',
+   124→  WAITING: 'border-0 bg-muted text-muted-foreground',
+   125→  OVERLAP: 'border-0 bg-amber-soft text-amber',
+   126→}
+   127→
+   128→// ── محتوای راهنمای آیکونی — FR-28 / ۷.۵ ──
+   129→const TARGET_SAMPLE_HELP = {
+   130→  what: 'تعداد نمونه هدف (تعداد چرخه‌هایی که باید از این فعالیت زمان‌گیری شود) در سطح کل فعالیت تعیین می‌شود، نه جداگانه برای هر اپراتور.',
+   131→  input: 'عدد صحیح بزرگ‌تر یا مساوی ۱؛ خالی بگذارید تا هدفی تعیین نشده باشد.',
+   132→  example: 'مثلاً ۱۵ چرخه برای کل فعالیت — هر اپراتور سهم خود را از همین هدف ثبت می‌کند.',
+   133→  note: 'رسیدن به هدف صرفاً به معنای ثبت تعداد هدف است و معادل اثبات کفایت آماری نیست؛ شاخص‌های پراکندگی و عدم‌قطعیت در مرحله «تحلیل نتایج» نمایش داده می‌شوند.',
+   134→} as const
+   135→
+   136→const ALLOWANCES_HELP = {
+   137→  what: 'مقدار نهایی هر دسته مجاز برای این فعالیت: مقدار گروه به ارث می‌رسد مگر آنکه در ستون «بازنویسی اختصاصی» مقدار دیگری ثبت شود. منبع هر مقدار مشخص است.',
+   138→  input: 'ستون بازنویسی را فقط برای دسته‌هایی که باید با گروه تفاوت داشته باشند پر کنید؛ خالی بگذارید تا مقدار گروه اعمال شود.',
+   139→  example: 'استراحت شخصی ۵٪ + نیازهای طبیعی ۳٪ ⇒ A=۸٪؛ صرفاً مثال است و نرخ مصوب شرکت نیست.',
+   140→  note: 'مجموع A فقط از دسته‌های فعال ساخته می‌شود؛ روش اعمال (درصد از زمان نرمال یا سهم از زمان استاندارد) در سطح پروژه انتخاب می‌شود.',
+   141→} as const
+   142→
+   143→const ACTIVITY_NAME_HELP = {
+   144→  what: 'فعالیت کار قابل‌تعریف و مستقلی در ایستگاه است که از عناصر کاری تشکیل می‌شود؛ این صفحه اختصاصی همین فعالیت است.',
+   145→  input: 'نامی کوتاه و گویا؛ ترجیحاً فعل + مفعول.',
+   146→  example: '«بستن درب پنل» یا «کنترل کیفیت نهایی»',
+   147→  note: 'نوع رویداد فرایندی در نمودارهای فرایند (فاز ۵) با نماد ASCME نمایش داده می‌شود و روی محاسبات زمان اثری ندارد.',
+   148→} as const
+   149→
+   150→const PROCESS_TYPE_HELP = {
+   151→  what: 'دسته‌بندی فرایندی فعالیت مطابق استاندارد نمودار فرایند: عملیات ○، بازرسی □، حمل‌ونقل ⇨، تأخیر D و انبارش ▽.',
+   152→  input: 'ماهیت غالب فعالیت را انتخاب کنید.',
+   153→  example: 'برای کنترل کیفیت «بازرسی» و برای انتقال قطعه «حمل‌ونقل» را انتخاب کنید.',
+   154→} as const
+   155→
+   156→const GROUP_ASSIGN_HELP = {
+   157→  what: 'گروه مجازها مجموعه‌ای از درصدهای مجاز است که فعالیت مقادیر آن را به ارث می‌برد؛ با انتخاب گروه، جدول «مجازهای مؤثر» پایین فعال می‌شود.',
+   158→  input: 'گروه مناسب ماهیت فعالیت را انتخاب کنید یا «بدون گروه» بگذارید.',
+   159→  example: '«کار دستی سبک»، «کار ماشینی سنگین»',
+   160→  note: 'بدون گروه هیچ مجازی اعمال نمی‌شود؛ در همین صفحه می‌توانید پس از انتخاب گروه، مقدار هر دسته را بازنویسی کنید.',
+   161→} as const
+   162→
+   163→const ELEMENT_NAME_HELP = {
+   164→  what: 'عنصر کاری کوچک‌ترین واحد قابل‌اندازه‌گیری فعالیت است؛ شناسه آن پایدار است و تغییر نام، ارتباط تاریخی و گره‌های نموداری را از بین نمی‌برد.',
+   165→  input: 'نامی کوتاه برای بخشی از کار که در یک حرکت اجرا می‌شود.',
+   166→  example: '«برداشتن قطعه از گراناق» یا «بستن چهار پیچ»',
+   167→  note: 'عناصر با کشیدن‌ورها کردن مرتب می‌شوند؛ ترتیب همان ترتیب اجرای کار در چرخه است.',
+   168→} as const
+   169→
+   170→const ELEMENT_TYPE_HELP = {
+   171→  what: 'نوع عنصر تعیین می‌کند زمان آن چگونه در محاسبات رفتار می‌کند: دستی، خودکار ماشین، انتظار، یا هم‌زمان/دارای هم‌پوشانی.',
+   172→  input: 'ماهیت غالب عنصر را انتخاب کنید؛ پیش‌فرض «دستی» است.',
+   173→  example: '«پرس اتوماتیک» → خودکار ماشین؛ «انتظار برای خشک‌شدن رنگ» → انتظار.',
+   174→  note: 'عنصر هم‌زمان/دارای هم‌پوشانی برای کار هم‌زمان اپراتور و ماشین است؛ با بازه شروع/پایان ثبت می‌شود (فاز ۳) و زمان سپری‌شده چرخه از گستره بازه‌ها محاسبه می‌شود نه جمع مدت‌ها.',
+   175→} as const
+   176→
+   177→// ── کمک‌تابع‌ها ──
+   178→function processLabelOf(pt: string): string {
+   179→  return PROCESS_TYPE_LABELS[pt as ProcessType] ?? pt
+   180→}
+   181→
+   182→function processSymbolOf(pt: string): string {
+   183→  return PROCESS_TYPE_SYMBOLS[pt as ProcessType] ?? '○'
+   184→}
+   185→
+   186→function elementTypeLabelOf(et: string): string {
+   187→  return ELEMENT_TYPE_LABELS[et as ElementType] ?? et
+   188→}
+   189→
+   190→function removedCountsText(prefs: Prefs, parts: Array<[string, number]>): string | undefined {
+   191→  const segs = parts.filter(([, n]) => n > 0).map(([label, n]) => `${formatInt(n, prefs)} ${label}`)
+   192→  return segs.length > 0 ? `${segs.join('، ')} نیز به‌طور دائمی حذف شدند.` : undefined
+   193→}
+   194→
+   195→export default function ActivityView({ projectId }: { projectId: string }) {
+   196→  const view = useAppStore((s) => s.view)
+   197→  if (view.name !== 'activity') return null
+   198→  return <ActivityScreen projectId={projectId} activityId={view.activityId} />
+   199→}
+   200→
+   201→// ═══════════════════════════════════════════════════════════
+   202→// صفحه فعالیت — همه قلاب‌ها به‌صورت بدون‌قید فراخوانی می‌شوند
+   203→// ═══════════════════════════════════════════════════════════
+   204→function ActivityScreen({ projectId, activityId }: { projectId: string; activityId: string }) {
+   205→  const prefs = useDisplayPrefs()
+   206→  const isMobile = useIsMobile()
+   207→  const qc = useQueryClient()
+   208→  const navigate = useAppStore((s) => s.navigate)
+   209→  const [tab, setTab] = useState<TabKey>('info')
+   210→  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+   211→
+   212→  // ── داده‌ها ──
+   213→  const elementsQ = useQuery({
+   214→    queryKey: qk.elements(activityId),
+   215→    queryFn: () => structureApi.elements(activityId),
+   216→  })
+   217→  const stationId = elementsQ.data?.activity.stationId ?? null
+   218→  const activityName = elementsQ.data?.activity.name ?? ''
+   219→
+   220→  // نام ایستگاه والد برای مسیر — از درخت ساختار (FR-03)
+   221→  const treeQ = useQuery({
+   222→    queryKey: qk.structure(projectId),
+   223→    queryFn: () => structureApi.tree(projectId),
+   224→  })
+   225→
+   226→  // مشخصات کامل فعالیت (شامل _count.sessions و updatedAt تازه)
+   227→  const actsQ = useQuery({
+   228→    queryKey: qk.activities(stationId ?? 'none'),
+   229→    queryFn: () => structureApi.activities(stationId!),
+   230→    enabled: stationId !== null,
+   231→  })
+   232→
+   233→  const groupsQ = useQuery({
+   234→    queryKey: qk.groups(projectId),
+   235→    queryFn: () => allowancesApi.groups(projectId),
+   236→  })
+   237→  const groups = groupsQ.data?.items ?? []
+   238→
+   239→  const stationName = useMemo(
+   240→    () => treeQ.data?.stations.find((s) => s.id === stationId)?.name ?? null,
+   241→    [treeQ.data, stationId]
+   242→  )
+   243→  const treeActivity = useMemo(
+   244→    () => treeQ.data?.stations.flatMap((s) => s.activities).find((a) => a.id === activityId) ?? null,
+   245→    [treeQ.data, activityId]
+   246→  )
+   247→  const activity = useMemo(
+   248→    () => actsQ.data?.items.find((a) => a.id === activityId) ?? treeActivity,
+   249→    [actsQ.data, treeActivity, activityId]
+   250→  )
+   251→
+   252→  const elements = elementsQ.data?.elements ?? []
+   253→  const ratedCount = elements.filter((e) => e.rating != null).length
+   254→
+   255→  // ── بی‌اعتبارسازی کش ──
+   256→  const invalidateActivityScope = () => {
+   257→    void qc.invalidateQueries({ queryKey: qk.structure(projectId) })
+   258→    void qc.invalidateQueries({ queryKey: ['activities'] })
+   259→    void qc.invalidateQueries({ queryKey: ['elements'] })
+   260→    void qc.invalidateQueries({ queryKey: qk.groups(projectId) })
+   261→    void qc.invalidateQueries({ queryKey: qk.activityAllowances(activityId) })
+   262→    void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+   263→    void qc.invalidateQueries({ queryKey: qk.projects() })
+   264→    void qc.invalidateQueries({ queryKey: qk.ratingMatrix(projectId) })
+   265→  }
+   266→
+   267→  // ── حذف فعالیت — پس از موفقیت به ساختار بازمی‌گردیم ──
+   268→  const deleteActivityMutation = useMutation({
+   269→    mutationFn: () => structureApi.deleteActivity(activityId),
+   270→    onSuccess: (res) => {
+   271→      invalidateActivityScope()
+   272→      toast.success(`فعالیت «${activityName}» به‌طور دائمی حذف شد`, {
+   273→        description: removedCountsText(prefs, [
+   274→          ['عنصر کاری', res.removedCounts.elements],
+   275→          ['جلسه زمان‌سنجی', res.removedCounts.sessions],
+   276→          ['مشاهده', res.removedCounts.observations],
+   277→        ]),
+   278→      })
+   279→      setConfirmDeleteOpen(false)
+   280→      navigate({ name: 'project', projectId, stage: 'structure' })
+   281→    },
+   282→    onError: (err) => toast.error(err instanceof Error ? err.message : 'حذف فعالیت ناموفق بود'),
+   283→  })
+   284→
+   285→  const goBack = () => navigate({ name: 'project', projectId, stage: 'structure' })
+   286→
+   287→  // ── بارگذاری / خطای کل صفحه ──
+   288→  if (elementsQ.isLoading) {
+   289→    return (
+   290→      <div className="animate-view-in mx-auto max-w-5xl space-y-4">
+   291→        <div className="flex items-center gap-2">
+   292→          <Skeleton className="size-9 rounded-lg" />
+   293→          <Skeleton className="h-4 w-64" />
+   294→        </div>
+   295→        <Skeleton className="h-8 w-full rounded-xl" />
+   296→        <Skeleton className="h-72 w-full rounded-2xl" />
+   297→        <Skeleton className="h-48 w-full rounded-2xl" />
+   298→      </div>
+   299→    )
+   300→  }
+   301→
+   302→  if (elementsQ.isError) {
+   303→    return (
+   304→      <div className="animate-view-in mx-auto max-w-3xl">
+   305→        <EmptyState
+   306→          title="بارگذاری فعالیت ناموفق بود"
+   307→          description={elementsQ.error instanceof Error ? elementsQ.error.message : 'خطای نامشخص'}
+   308→          action={
+   309→            <div className="flex flex-wrap justify-center gap-2">
+   310→              <Button variant="outline" onClick={goBack}>
+   311→                بازگشت به ساختار
+   312→              </Button>
+   313→              <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: qk.elements(activityId) })}>
+   314→                تلاش مجدد
+   315→              </Button>
+   316→            </div>
+   317→          }
+   318→        />
+   319→      </div>
+   320→    )
+   321→  }
+   322→
+   323→  return (
+   324→    <div className="animate-view-in mx-auto max-w-5xl space-y-4">
+   325→      {/* سربرگ: بازگشت + مسیر + نوع فرایندی + وضعیت + اقدام بعدی — FR-03 */}
+   326→      <header className="space-y-3">
+   327→        <div className="flex flex-wrap items-center gap-2">
+   328→          <Button variant="outline" size="icon" className="shrink-0" onClick={goBack} aria-label="بازگشت به ساختار تولید">
+   329→            <ArrowLeft className="size-4" aria-hidden />
+   330→          </Button>
+   331→          <nav aria-label="مسیر فعالیت" className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+   332→            ساختار ←{' '}
+   333→            {treeQ.isLoading ? (
+   334→              <Skeleton className="inline-block h-3 w-16 align-middle" />
+   335→            ) : (
+   336→              stationName ?? '—'
+   337→            )}{' '}
+   338→            ← <span className="font-bold text-foreground">{activityName}</span>
+   339→          </nav>
+   340→          {activity ? (
+   341→            <Badge
+   342→              className="shrink-0 border-0 bg-brand-soft text-brand"
+   343→              title={`نوع رویداد فرایندی: ${processLabelOf(activity.processType)}`}
+   344→            >
+   345→              <span className="num font-bold">{processSymbolOf(activity.processType)}</span>
+   346→              {processLabelOf(activity.processType)}
+   347→            </Badge>
+   348→          ) : (
+   349→            <Skeleton className="h-6 w-24 shrink-0 rounded-full" />
+   350→          )}
+   351→        </div>
+   352→
+   353→        <p className="num text-xs text-muted-foreground">
+   354→          وضعیت: {formatInt(ratedCount, prefs)} از {formatInt(elements.length, prefs)} عنصر ارزیابی‌شده
+   355→        </p>
+   356→
+   357→        {/* اقدام بعدی */}
+   358→        {elements.length === 0 ? (
+   359→          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-soft/70 px-3 py-2 text-xs">
+   360→            <Lightbulb className="size-4 shrink-0 text-amber" aria-hidden />
+   361→            <span className="font-bold text-amber">اقدام بعدی:</span>
+   362→            <Button
+   363→              variant="link"
+   364→              size="sm"
+   365→              className="h-auto gap-1 p-0 text-xs font-bold text-amber underline-offset-4"
+   366→              onClick={() => setTab('elements')}
+   367→            >
+   368→              اولین عنصر کاری را در زبانه «عناصر کاری» اضافه کنید
+   369→            </Button>
+   370→          </div>
+   371→        ) : ratedCount < elements.length ? (
+   372→          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-soft/70 px-3 py-2 text-xs">
+   373→            <Lightbulb className="size-4 shrink-0 text-amber" aria-hidden />
+   374→            <span className="font-bold text-amber">اقدام بعدی:</span>
+   375→            <Button
+   376→              variant="link"
+   377→              size="sm"
+   378→              className="h-auto gap-1 p-0 text-xs font-bold text-amber underline-offset-4"
+   379→              onClick={() => navigate({ name: 'project', projectId, stage: 'westinghouse' })}
+   380→            >
+   381→              ارزیابی وستینگهاوس را در مرحله مربوطه کامل کنید
+   382→            </Button>
+   383→            <span className="num text-muted-foreground">
+   384→              ({formatInt(elements.length - ratedCount, prefs)} عنصر بدون ارزیابی)
+   385→            </span>
+   386→          </div>
+   387→        ) : (
+   388→          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-green-soft/70 px-3 py-2 text-xs">
+   389→            <CircleCheck className="size-4 shrink-0 text-green" aria-hidden />
+   390→            <span className="font-bold text-green">همه عناصر این فعالیت ارزیابی شده‌اند.</span>
+   391→            <span className="text-muted-foreground">
+   392→              ثبت مشاهدات در مرحله «زمان‌سنجی» (فاز ۳) انجام می‌شود.
+   393→            </span>
+   394→          </div>
+   395→        )}
+   396→      </header>
+   397→
+   398→      {/* زبانه‌های چهارگانه — FR-03 */}
+   399→      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="gap-4">
+   400→        <TabsList className="scroll-slim sticky top-14 z-30 flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border/60 bg-background/95 p-1 shadow-sm backdrop-blur">
+   401→          <TabsTrigger value="info" className="shrink-0 gap-1.5 px-3 text-xs sm:px-4 sm:text-sm">
+   402→            <Info aria-hidden />
+   403→            مشخصات
+   404→          </TabsTrigger>
+   405→          <TabsTrigger value="elements" className="shrink-0 gap-1.5 px-3 text-xs sm:px-4 sm:text-sm">
+   406→            <ListTree aria-hidden />
+   407→            عناصر کاری
+   408→          </TabsTrigger>
+   409→          <TabsTrigger value="timing" className="shrink-0 gap-1.5 px-3 text-xs sm:px-4 sm:text-sm">
+   410→            <Timer aria-hidden />
+   411→            زمان‌سنجی
+   412→          </TabsTrigger>
+   413→          <TabsTrigger value="analysis" className="shrink-0 gap-1.5 px-3 text-xs sm:px-4 sm:text-sm">
+   414→            <BarChart3 aria-hidden />
+   415→            تحلیل نتایج
+   416→          </TabsTrigger>
+   417→        </TabsList>
+   418→
+   419→        {/* ۱. مشخصات */}
+   420→        <TabsContent value="info" className="space-y-5">
+   421→          {activity ? (
+   422→            <ActivityInfoForm
+   423→              key={activity.id}
+   424→              activity={activity}
+   425→              groups={groups}
+   426→              groupsLoading={groupsQ.isLoading}
+   427→              groupsError={groupsQ.isError}
+   428→              prefs={prefs}
+   429→              onSaved={invalidateActivityScope}
+   430→            />
+   431→          ) : actsQ.isError && treeActivity === null ? (
+   432→            <EmptyState
+   433→              title="بارگذاری مشخصات فعالیت ناموفق بود"
+   434→              description={actsQ.error instanceof Error ? actsQ.error.message : 'خطای نامشخص'}
+   435→              action={
+   436→                <div className="flex flex-wrap justify-center gap-2">
+   437→                  <Button
+   438→                    variant="outline"
+   439→                    onClick={() => qc.invalidateQueries({ queryKey: ['activities'] })}
+   440→                  >
+   441→                    تلاش مجدد
+   442→                  </Button>
+   443→                  <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: qk.structure(projectId) })}>
+   444→                    تازه‌سازی درخت ساختار
+   445→                  </Button>
+   446→                </div>
+   447→              }
+   448→            />
+   449→          ) : (
+   450→            <div className="card-premium space-y-4 p-5">
+   451→              <Skeleton className="h-5 w-36" />
+   452→              <Skeleton className="h-10 w-full rounded-lg" />
+   453→              <Skeleton className="h-20 w-full rounded-lg" />
+   454→              <div className="grid gap-4 sm:grid-cols-2">
+   455→                <Skeleton className="h-10 rounded-lg" />
+   456→                <Skeleton className="h-10 rounded-lg" />
+   457→              </div>
+   458→              <Skeleton className="h-10 w-40 rounded-lg" />
+   459→            </div>
+   460→          )}
+   461→
+   462→          {/* مجازهای مؤثر — FR-04 */}
+   463→          <EffectiveAllowancesSection
+   464→            projectId={projectId}
+   465→            activityId={activityId}
+   466→            prefs={prefs}
+   467→            isMobile={isMobile}
+   468→          />
+   469→
+   470→          {/* عملیات */}
+   471→          <section className="card-premium p-5" aria-label="عملیات فعالیت">
+   472→            <h3 className="text-sm font-extrabold text-red">عملیات</h3>
+   473→            <p className="mt-2 text-xs leading-6 text-muted-foreground">
+   474→              حذف فعالیت دائمی است و همه عناصر کاری، مشاهدات و جلسات زمان‌سنجی آن را نیز حذف می‌کند. پیش از
+   475→              تأیید، شمارش داده‌های وابسته نمایش داده می‌شود و پس از حذف به مرحله «ساختار تولید» بازمی‌گردید.
+   476→            </p>
+   477→            <Button
+   478→              variant="outline"
+   479→              className="mt-3 gap-1.5 text-red hover:text-red"
+   480→              onClick={() => setConfirmDeleteOpen(true)}
+   481→            >
+   482→              <Trash2 className="size-4" aria-hidden />
+   483→              حذف این فعالیت
+   484→            </Button>
+   485→          </section>
+   486→        </TabsContent>
+   487→
+   488→        {/* ۲. عناصر کاری — FR-02 */}
+   489→        <TabsContent value="elements">
+   490→          <ElementsSection
+   491→            projectId={projectId}
+   492→            activityId={activityId}
+   493→            stationId={stationId}
+   494→            elements={elements}
+   495→            prefs={prefs}
+   496→            isMobile={isMobile}
+   497→          />
+   498→        </TabsContent>
+   499→
+   500→        {/* ۳. زمان‌سنجی — فاز ۳ */}
+   501→        <TabsContent value="timing">
+   502→          <TimingPendingView projectId={projectId} />
+   503→        </TabsContent>
+   504→
+   505→        {/* ۴. تحلیل نتایج — فاز ۴ */}
+   506→        <TabsContent value="analysis">
+   507→          <AnalysisPendingView projectId={projectId} />
+   508→        </TabsContent>
+   509→      </Tabs>
+   510→
+   511→      {/* تأیید حذف دائمی فعالیت — FR-26 */}
+   512→      <ConfirmDeleteDialog
+   513→        open={confirmDeleteOpen}
+   514→        onOpenChange={setConfirmDeleteOpen}
+   515→        title="حذف دائمی فعالیت"
+   516→        entityName={activityName}
+   517→        dependencies={{
+   518→          'عنصر کاری': elements.length,
+   519→          'جلسه زمان‌سنجی': activity?._count?.sessions ?? 0,
+   520→        }}
+   521→        onConfirm={() => deleteActivityMutation.mutate()}
+   522→        loading={deleteActivityMutation.isPending}
+   523→      />
+   524→    </div>
+   525→  )
+   526→}
+   527→
+   528→// ═══════════════════════════════════════════════════════════
+   529→// فرم مشخصات فعالیت — ذخیره خودکار با expectedUpdatedAt
+   530→// ═══════════════════════════════════════════════════════════
+   531→function ActivityInfoForm({
+   532→  activity,
+   533→  groups,
+   534→  groupsLoading,
+   535→  groupsError,
+   536→  prefs,
+   537→  onSaved,
+   538→}: {
+   539→  activity: ActivityDto
+   540→  groups: GroupDto[]
+   541→  groupsLoading: boolean
+   542→  groupsError: boolean
+   543→  prefs: Prefs
+   544→  onSaved: () => void
+   545→}) {
+   546→  const [form, setForm] = useState<ActivityInfoFormState>(() => ({
+   547→    name: activity.name,
+   548→    description: activity.description ?? '',
+   549→    processType: activity.processType,
+   550→    groupId: activity.groupId ?? '',
+   551→    targetSampleCount: activity.targetSampleCount,
+   552→  }))
+   553→  const updatedAtRef = useRef(activity.updatedAt)
+   554→
+   555→  const { status, lastError, retry } = useAutosave<ActivityInfoFormState>({
+   556→    data: form,
+   557→    ready: true,
+   558→    save: async (value) => {
+   559→      const res = await structureApi.updateActivity(activity.id, {
+   560→        name: value.name.trim(),
+   561→        description: value.description.trim() || null,
+   562→        processType: value.processType,
+   563→        groupId: value.groupId || null,
+   564→        targetSampleCount: value.targetSampleCount,
+   565→        expectedUpdatedAt: updatedAtRef.current,
+   566→      })
+   567→      updatedAtRef.current = res.activity.updatedAt
+   568→      onSaved()
+   569→    },
+   570→  })
+   571→
+   572→  return (
+   573→    <section className="card-premium p-5" aria-label="مشخصات فعالیت">
+   574→      <div className="flex flex-wrap items-start justify-between gap-2">
+   575→        <div>
+   576→          <h3 className="text-sm font-extrabold">مشخصات فعالیت</h3>
+   577→          <p className="text-xs text-muted-foreground">تغییرات به‌صورت خودکار ذخیره می‌شوند.</p>
+   578→        </div>
+   579→        <SaveIndicator status={status} onRetry={retry} error={lastError} />
+   580→      </div>
+   581→
+   582→      <div className="mt-4 space-y-4">
+   583→        <div className="space-y-1.5">
+   584→          <div className="flex items-center gap-1">
+   585→            <Label htmlFor={`act-name-${activity.id}`}>نام فعالیت</Label>
+   586→            <HelpDot label="نام فعالیت" content={ACTIVITY_NAME_HELP} />
+   587→          </div>
+   588→          <Input
+   589→            id={`act-name-${activity.id}`}
+   590→            value={form.name}
+   591→            onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+   592→            placeholder="مثلاً: بستن درب پنل"
+   593→          />
+   594→        </div>
+   595→
+   596→        <div className="space-y-1.5">
+   597→          <Label htmlFor={`act-desc-${activity.id}`}>شرح فعالیت (اختیاری)</Label>
+   598→          <Textarea
+   599→            id={`act-desc-${activity.id}`}
+   600→            value={form.description}
+   601→            onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+   602→            placeholder="مثلاً: بستن ۴ پیچ با پیچ‌گوشتی برقی"
+   603→            className="min-h-16"
+   604→          />
+   605→        </div>
+   606→
+   607→        <div className="grid gap-4 sm:grid-cols-2">
+   608→          <div className="space-y-1.5">
+   609→            <div className="flex items-center gap-1">
+   610→              <Label>نوع رویداد فرایندی</Label>
+   611→              <HelpDot label="نوع رویداد فرایندی" content={PROCESS_TYPE_HELP} />
+   612→            </div>
+   613→            <Select value={form.processType} onValueChange={(v) => setForm((s) => ({ ...s, processType: v }))}>
+   614→              <SelectTrigger className="w-full" aria-label="نوع رویداد فرایندی">
+   615→                <SelectValue />
+   616→              </SelectTrigger>
+   617→              <SelectContent>
+   618→                {PROCESS_TYPES.map((pt) => (
+   619→                  <SelectItem key={pt} value={pt}>
+   620→                    <span className="num">{PROCESS_TYPE_SYMBOLS[pt]}</span> {PROCESS_TYPE_LABELS[pt]}
+   621→                  </SelectItem>
+   622→                ))}
+   623→              </SelectContent>
+   624→            </Select>
+   625→          </div>
+   626→          <div className="space-y-1.5">
+   627→            <div className="flex items-center gap-1">
+   628→              <Label>گروه مجازها</Label>
+   629→              <HelpDot label="گروه مجازها" content={GROUP_ASSIGN_HELP} />
+   630→            </div>
+   631→            <Select
+   632→              value={form.groupId || NO_GROUP}
+   633→              onValueChange={(v) => setForm((s) => ({ ...s, groupId: v === NO_GROUP ? '' : v }))}
+   634→              disabled={groupsLoading}
+   635→            >
+   636→              <SelectTrigger className="w-full" aria-label="گروه مجازها">
+   637→                <SelectValue />
+   638→              </SelectTrigger>
+   639→              <SelectContent>
+   640→                <SelectItem value={NO_GROUP}>بدون گروه</SelectItem>
+   641→                {groups.map((g) => (
+   642→                  <SelectItem key={g.id} value={g.id}>
+   643→                    {g.name}
+   644→                  </SelectItem>
+   645→                ))}
+   646→              </SelectContent>
+   647→            </Select>
+   648→            {groupsError && (
+   649→              <p className="text-[11px] leading-5 text-red">
+   650→                بارگذاری گروه‌ها ناموفق بود؛ فعلاً تنها «بدون گروه» در دسترس است.
+   651→              </p>
+   652→            )}
+   653→          </div>
+   654→        </div>
+   655→
+   656→        {/* تعداد نمونه هدف — FR-12 */}
+   657→        <div className="space-y-1.5 sm:max-w-60">
+   658→          <div className="flex items-center gap-1">
+   659→            <Label htmlFor={`act-sample-${activity.id}`}>تعداد نمونه هدف</Label>
+   660→            <HelpDot label="تعداد نمونه هدف" content={TARGET_SAMPLE_HELP} />
+   661→          </div>
+   662→          <PersianNumberInput
+   663→            id={`act-sample-${activity.id}`}
+   664→            value={form.targetSampleCount}
+   665→            onChange={(v) => setForm((s) => ({ ...s, targetSampleCount: v }))}
+   666→            decimals={false}
+   667→            min={1}
+   668→            max={10000}
+   669→            suffix="چرخه"
+   670→            aria-label="تعداد نمونه هدف"
+   671→          />
+   672→          <p className="text-[11px] leading-5 text-faint">
+   673→            هدف در سطح کل فعالیت تعیین می‌شود، نه هر اپراتور.
+   674→          </p>
+   675→        </div>
+   676→      </div>
+   677→
+   678→      <p className="num mt-3 text-[11px] text-faint">
+   679→        ایجاد: {formatDate(activity.createdAt, prefs)} · آخرین تغییر: {formatDateTime(activity.updatedAt, prefs)}
+   680→      </p>
+   681→    </section>
+   682→  )
+   683→}
+   684→
+   685→// ═══════════════════════════════════════════════════════════
+   686→// مجازهای مؤثر — FR-04: ارث از گروه + بازنویسی اختصاصی
+   687→// بدون گروه: EmptyState راهنما؛ با گروه: جدول دسکتاپ / کارت موبایل
+   688→// ═══════════════════════════════════════════════════════════
+   689→function EffectiveAllowancesSection({
+   690→  projectId,
+   691→  activityId,
+   692→  prefs,
+   693→  isMobile,
+   694→}: {
+   695→  projectId: string
+   696→  activityId: string
+   697→  prefs: Prefs
+   698→  isMobile: boolean
+   699→}) {
+   700→  const qc = useQueryClient()
+   701→  const navigate = useAppStore((s) => s.navigate)
+   702→
+   703→  const allowQ = useQuery({
+   704→    queryKey: qk.activityAllowances(activityId),
+   705→    queryFn: () => structureApi.effectiveAllowances(activityId),
+   706→  })
+   707→
+   708→  return (
+   709→    <section className="card-premium p-5" aria-label="مجازهای مؤثر فعالیت">
+   710→      <div className="flex flex-wrap items-center justify-between gap-2">
+   711→        <h3 className="flex items-center gap-1.5 text-sm font-extrabold">
+   712→          <Tags className="size-4 text-brand" aria-hidden />
+   713→          مجازهای مؤثر
+   714→          <HelpDot label="مجازهای مؤثر" content={ALLOWANCES_HELP} />
+   715→        </h3>
+   716→        {allowQ.data?.hasGroup ? (
+   717→          <Badge variant="outline" className="text-xs">
+   718→            گروه: {allowQ.data.groupName}
+   719→          </Badge>
+   720→        ) : null}
+   721→      </div>
+   722→
+   723→      {allowQ.isLoading ? (
+   724→        <div className="mt-4 space-y-2">
+   725→          <Skeleton className="h-10 w-full rounded-lg" />
+   726→          <Skeleton className="h-10 w-full rounded-lg" />
+   727→          <Skeleton className="h-10 w-full rounded-lg" />
+   728→          <Skeleton className="h-12 w-full rounded-lg" />
+   729→        </div>
+   730→      ) : allowQ.isError ? (
+   731→        <EmptyState
+   732→          className="mt-3 py-6"
+   733→          title="بارگذاری مجازهای فعالیت ناموفق بود"
+   734→          description={allowQ.error instanceof Error ? allowQ.error.message : 'خطای نامشخص'}
+   735→          action={
+   736→            <Button
+   737→              variant="outline"
+   738→              onClick={() => qc.invalidateQueries({ queryKey: qk.activityAllowances(activityId) })}
+   739→            >
+   740→              تلاش مجدد
+   741→            </Button>
+   742→          }
+   743→        />
+   744→      ) : !allowQ.data.hasGroup ? (
+   745→        <EmptyState
+   746→          className="mt-3 py-6"
+   747→          icon={<Tags className="size-7" aria-hidden />}
+   748→          title="این فعالیت به گروهی تخصیص نیافته؛ مجازی اعمال نمی‌شود"
+   749→          description="مجازها در سطح گروه تعریف می‌شوند و فعالیت مقادیر گروه را به ارث می‌برد. برای فعال‌سازی، در فرم «مشخصات فعالیت» بالا یک گروه مجازها انتخاب کنید؛ گروه‌ها و دسته‌های مجاز در مرحله «گروه‌ها و مجازها» مدیریت می‌شوند."
+   750→          action={
+   751→            <Button
+   752→              variant="outline"
+   753→              size="sm"
+   754→              onClick={() => navigate({ name: 'project', projectId, stage: 'allowances' })}
+   755→            >
+   756→              مدیریت گروه‌ها و مجازها
+   757→            </Button>
+   758→          }
+   759→        />
+   760→      ) : (
+   761→        <AllowancesOverrideEditor
+   762→          key={activityId}
+   763→          activityId={activityId}
+   764→          projectId={projectId}
+   765→          data={allowQ.data}
+   766→          prefs={prefs}
+   767→          isMobile={isMobile}
+   768→        />
+   769→      )}
+   770→    </section>
+   771→  )
+   772→}
+   773→
+   774→// ── ویرایشگر بازنویسی مجازها — debounce ~600ms برای هر تغییر ──
+   775→function AllowancesOverrideEditor({
+   776→  activityId,
+   777→  projectId,
+   778→  data,
+   779→  prefs,
+   780→  isMobile,
+   781→}: {
+   782→  activityId: string
+   783→  projectId: string
+   784→  data: EffectiveAllowancesDto
+   785→  prefs: Prefs
+   786→  isMobile: boolean
+   787→}) {
+   788→  const qc = useQueryClient()
+   789→
+   790→  // درصد کاربر ↔ مقدار اعشاری API — FR-15
+   791→  const [drafts, setDrafts] = useState<Record<string, number | null>>(() =>
+   792→    Object.fromEntries(data.categories.map((c) => [c.categoryId, c.overrideValue]))
+   793→  )
+   794→  const serverRef = useRef<Record<string, number | null>>(
+   795→    Object.fromEntries(data.categories.map((c) => [c.categoryId, c.overrideValue]))
+   796→  )
+   797→
+   798→  // همگام‌سازی محافظه‌کارانه با داده سرور: دسته‌هایی که کاربر
+   799→  // همین الان تغییر نداده از سرور تازه می‌شوند؛ تغییرات در جریان حفظ می‌شوند
+   800→  useEffect(() => {
+   801→    const nextServer = Object.fromEntries(data.categories.map((c) => [c.categoryId, c.overrideValue]))
+   802→    setDrafts((prev) => {
+   803→      const next: Record<string, number | null> = {}
+   804→      let changed = false
+   805→      for (const c of data.categories) {
+   806→        const untouched = !(c.categoryId in prev) || prev[c.categoryId] === serverRef.current[c.categoryId]
+   807→        next[c.categoryId] = untouched ? c.overrideValue : prev[c.categoryId]
+   808→        if (next[c.categoryId] !== prev[c.categoryId]) changed = true
+   809→      }
+   810→      return changed ? next : prev
+   811→    })
+   812→    serverRef.current = nextServer
+   813→  }, [data])
+   814→
+   815→  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+   816→  const [saveError, setSaveError] = useState<string | null>(null)
+   817→  const pendingRef = useRef<Record<string, number | null>>({})
+   818→  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+   819→  const inflightRef = useRef(false)
+   820→
+   821→  useEffect(() => {
+   822→    return () => {
+   823→      if (timerRef.current) clearTimeout(timerRef.current)
+   824→    }
+   825→  }, [])
+   826→
+   827→  const sendOverrides = async (overrides: { categoryId: string; percentValue: number | null }[]) => {
+   828→    if (overrides.length === 0) return
+   829→    if (inflightRef.current) {
+   830→      // درخواست دیگر در جریان است — در صف ادغام می‌شود
+   831→      for (const o of overrides) pendingRef.current[o.categoryId] = o.percentValue
+   832→      return
+   833→    }
+   834→    inflightRef.current = true
+   835→    setSaveStatus('saving')
+   836→    setSaveError(null)
+   837→    let ok = false
+   838→    try {
+   839→      const res = await structureApi.putActivityAllowances(activityId, overrides)
+   840→      qc.setQueryData(qk.activityAllowances(activityId), res)
+   841→      void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+   842→      void qc.invalidateQueries({ queryKey: qk.projects() })
+   843→      setSaveStatus('saved')
+   844→      ok = true
+   845→    } catch (err) {
+   846→      setSaveStatus('error')
+   847→      setSaveError(err instanceof Error ? err.message : 'خطای نامشخص در ذخیره‌سازی')
+   848→      toast.error(err instanceof Error ? err.message : 'ثبت بازنویسی مجاز ناموفق بود')
+   849→      // داده ناموفق برای تلاش مجدد صریح در صف می‌ماند — FR-23
+   850→      for (const o of overrides) pendingRef.current[o.categoryId] = o.percentValue
+   851→      void qc.invalidateQueries({ queryKey: qk.activityAllowances(activityId) })
+   852→    } finally {
+   853→      inflightRef.current = false
+   854→      if (ok) {
+   855→        const pending = Object.entries(pendingRef.current)
+   856→        pendingRef.current = {}
+   857→        if (pending.length > 0) {
+   858→          void sendOverrides(pending.map(([categoryId, percentValue]) => ({ categoryId, percentValue })))
+   859→        }
+   860→      }
+   861→    }
+   862→  }
+   863→
+   864→  const setOverride = (categoryId: string, v: number | null) => {
+   865→    const clamped = v === null ? null : Math.min(v, MAX_PERCENT_DECIMAL)
+   866→    setDrafts((s) => ({ ...s, [categoryId]: clamped }))
+   867→    pendingRef.current[categoryId] = clamped
+   868→    if (timerRef.current) clearTimeout(timerRef.current)
+   869→    timerRef.current = setTimeout(() => {
+   870→      const entries = Object.entries(pendingRef.current)
+   871→      pendingRef.current = {}
+   872→      void sendOverrides(entries.map(([cid, percentValue]) => ({ categoryId: cid, percentValue })))
+   873→    }, OVERRIDE_DEBOUNCE_MS)
+   874→  }
+   875→
+   876→  /** حذف بازنویسی و بازگشت به مقدار گروه — فوری، بدون debounce */
+   877→  const removeOverride = (categoryId: string) => {
+   878→    delete pendingRef.current[categoryId]
+   879→    setDrafts((s) => ({ ...s, [categoryId]: null }))
+   880→    void sendOverrides([{ categoryId, percentValue: null }])
+   881→  }
+   882→
+   883→  const retrySave = () => {
+   884→    const pending = Object.entries(pendingRef.current)
+   885→    if (pending.length === 0) return
+   886→    pendingRef.current = {}
+   887→    setSaveStatus('dirty')
+   888→    void sendOverrides(pending.map(([categoryId, percentValue]) => ({ categoryId, percentValue })))
+   889→  }
+   890→
+   891→  const shareWarning = data.method === 'SHARE_OF_ST' && data.totalA >= 1
+   892→
+   893→  const sourceBadge = (cat: EffectiveAllowancesDto['categories'][number]) => {
+   894→    if (cat.source === 'OVERRIDE') {
+   895→      return (
+   896→        <Badge className="max-w-40 truncate border-0 bg-amber-soft text-amber" title={cat.sourceLabel}>
+   897→          {cat.sourceLabel}
+   898→        </Badge>
+   899→      )
+   900→    }
+   901→    if (cat.source === 'GROUP') {
+   902→      return (
+   903→        <Badge className="max-w-40 truncate border-0 bg-brand-soft text-brand" title={cat.sourceLabel}>
+   904→          {cat.sourceLabel}
+   905→        </Badge>
+   906→      )
+   907→    }
+   908→    return (
+   909→      <Badge variant="outline" className="text-faint">
+   910→        {cat.sourceLabel}
+   911→      </Badge>
+   912→    )
+   913→  }
+   914→
+   915→  const summaryRow = (
+   916→    <div className="flex flex-wrap items-center justify-between gap-2">
+   917→      <span className="text-sm font-bold">جمع A (دسته‌های فعال)</span>
+   918→      <span className="flex flex-wrap items-center gap-1.5">
+   919→        <Badge variant="outline" className="text-[10px]">
+   920→          {data.methodLabel}
+   921→        </Badge>
+   922→        <Badge variant="outline" dir="ltr" className="num font-mono text-[10px]">
+   923→          {data.formula}
+   924→        </Badge>
+   925→        <span className="num text-sm font-extrabold text-brand">{formatPercent(data.totalA, prefs)}</span>
+   926→      </span>
+   927→    </div>
+   928→  )
+   929→
+   930→  const overrideInput = (cat: EffectiveAllowancesDto['categories'][number]) => (
+   931→    <div className="flex items-center gap-1.5">
+   932→      <PercentInput
+   933→        value={drafts[cat.categoryId] ?? null}
+   934→        onChange={(v) => setOverride(cat.categoryId, v)}
+   935→        aria-label={`بازنویسی درصد دسته ${cat.name}`}
+   936→      />
+   937→      {cat.overrideValue !== null && (
+   938→        <Button
+   939→          variant="ghost"
+   940→          size="icon"
+   941→          className="size-7 shrink-0 text-red hover:text-red"
+   942→          onClick={() => removeOverride(cat.categoryId)}
+   943→          aria-label={`حذف بازنویسی دسته ${cat.name}`}
+   944→          title="حذف بازنویسی و بازگشت به مقدار گروه"
+   945→        >
+   946→          <X className="size-3.5" aria-hidden />
+   947→        </Button>
+   948→      )}
+   949→    </div>
+   950→  )
+   951→
+   952→  return (
+   953→    <div className="mt-4 space-y-3">
+   954→      <div className="flex flex-wrap items-center justify-between gap-2">
+   955→        <p className="text-xs leading-6 text-muted-foreground">
+   956→          مقدار خالی در «بازنویسی اختصاصی» یعنی همان مقدار گروه اعمال می‌شود؛ منبع هر مقدار در ستون «منبع»
+   957→          مشخص است.
+   958→        </p>
+   959→        <SaveIndicator status={saveStatus} onRetry={retrySave} error={saveError} />
+   960→      </div>
+   961→
+   962→      {isMobile ? (
+   963→        /* کارت موبایل — FR-30 */
+   964→        <div className="space-y-3">
+   965→          {data.categories.map((cat) => (
+   966→            <div key={cat.categoryId} className={cn('card-premium space-y-2.5 p-4', !cat.isActive && 'opacity-60')}>
+   967→              <div className="flex items-start justify-between gap-2">
+   968→                <div className="min-w-0">
+   969→                  <p className="truncate font-bold">{cat.name}</p>
+   970→                  {cat.code && (
+   971→                    <p className="num text-xs text-faint" dir="ltr">
+   972→                      {cat.code}
+   973→                    </p>
+   974→                  )}
+   975→                </div>
+   976→                {sourceBadge(cat)}
+   977→              </div>
+   978→              {!cat.isActive && (
+   979→                <Badge variant="outline" className="text-faint">
+   980→                  غیرفعال — در A لحاظ نمی‌شود
+   981→                </Badge>
+   982→              )}
+   983→              <Separator />
+   984→              <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+   985→                <div>
+   986→                  <p className="text-faint">مقدار ارثی</p>
+   987→                  <p className="num mt-0.5 font-medium">{formatPercent(cat.groupValue, prefs)}</p>
+   988→                </div>
+   989→                <div>
+   990→                  <p className="text-faint">مقدار مؤثر</p>
+   991→                  <p className="num mt-0.5 font-bold">{formatPercent(cat.effectiveValue, prefs)}</p>
+   992→                </div>
+   993→                <div className="col-span-2">
+   994→                  <p className="mb-1 text-faint">بازنویسی اختصاصی</p>
+   995→                  {overrideInput(cat)}
+   996→                </div>
+   997→              </div>
+   998→            </div>
+   999→          ))}
+  1000→          <div className="card-premium p-4">{summaryRow}</div>
+  1001→        </div>
+  1002→      ) : (
+  1003→        /* جدول دسکتاپ */
+  1004→        <div className="card-premium overflow-hidden">
+  1005→          <div className="scroll-slim overflow-x-auto">
+  1006→            <table className="w-full text-sm">
+  1007→              <thead>
+  1008→                <tr className="border-b bg-surface-2/70 text-right text-xs text-muted-foreground">
+  1009→                  <th className="px-4 py-2.5 font-bold">دسته مجاز</th>
+  1010→                  <th className="px-4 py-2.5 font-bold">منبع</th>
+  1011→                  <th className="px-4 py-2.5 font-bold">مقدار ارثی</th>
+  1012→                  <th className="px-4 py-2.5 font-bold">بازنویسی اختصاصی</th>
+  1013→                  <th className="px-4 py-2.5 font-bold">مقدار مؤثر</th>
+  1014→                </tr>
+  1015→              </thead>
+  1016→              <tbody>
+  1017→                {data.categories.map((cat) => (
+  1018→                  <tr key={cat.categoryId} className={cn('border-b last:border-0', !cat.isActive && 'opacity-60')}>
+  1019→                    <td className="px-4 py-2">
+  1020→                      <span className="font-medium">{cat.name}</span>
+  1021→                      {cat.code && (
+  1022→                        <span className="num ms-2 text-xs text-faint" dir="ltr">
+  1023→                          {cat.code}
+  1024→                        </span>
+  1025→                      )}
+  1026→                      {!cat.isActive && (
+  1027→                        <span className="block text-[10px] text-faint">غیرفعال — در A لحاظ نمی‌شود</span>
+  1028→                      )}
+  1029→                    </td>
+  1030→                    <td className="px-4 py-2">{sourceBadge(cat)}</td>
+  1031→                    <td className="num px-4 py-2 text-muted-foreground">{formatPercent(cat.groupValue, prefs)}</td>
+  1032→                    <td className="w-52 px-4 py-2">{overrideInput(cat)}</td>
+  1033→                    <td className="num px-4 py-2 font-bold">{formatPercent(cat.effectiveValue, prefs)}</td>
+  1034→                  </tr>
+  1035→                ))}
+  1036→                <tr className="border-t-2 bg-surface-2/70">
+  1037→                  <td colSpan={5} className="px-4 py-2.5">
+  1038→                    {summaryRow}
+  1039→                  </td>
+  1040→                </tr>
+  1041→              </tbody>
+  1042→            </table>
+  1043→          </div>
+  1044→        </div>
+  1045→      )}
+  1046→
+  1047→      {shareWarning && (
+  1048→        <p className="rounded-xl bg-red-soft p-3 text-xs font-bold leading-6 text-red" role="alert">
+  1049→          مجموع مجازها باید کمتر از ۱۰۰٪ باشد (قید روش دوم) — جمع فعلی: {formatPercent(data.totalA, prefs)}
+  1050→        </p>
+  1051→      )}
+  1052→    </div>
+  1053→  )
+  1054→}
+  1055→
+  1056→// ═══════════════════════════════════════════════════════════
+  1057→// زبانه عناصر کاری — SortableList با D&D + دیالوگ‌ها
+  1058→// ═══════════════════════════════════════════════════════════
+  1059→function ElementsSection({
+  1060→  projectId,
+  1061→  activityId,
+  1062→  stationId,
+  1063→  elements,
+  1064→  prefs,
+  1065→  isMobile,
+  1066→}: {
+  1067→  projectId: string
+  1068→  activityId: string
+  1069→  stationId: string | null
+  1070→  elements: ElementDto[]
+  1071→  prefs: Prefs
+  1072→  isMobile: boolean
+  1073→}) {
+  1074→  const qc = useQueryClient()
+  1075→
+  1076→  const [createOpen, setCreateOpen] = useState(false)
+  1077→  const [createForm, setCreateForm] = useState<ElementFormState>(EMPTY_ELEMENT_FORM)
+  1078→  const [creating, setCreating] = useState(false)
+  1079→  const [editing, setEditing] = useState<ElementDto | null>(null)
+  1080→  const [deleting, setDeleting] = useState<ElementDto | null>(null)
+  1081→
+  1082→  // شمارش وابستگی‌های حذف — GET /api/elements/{id} (فقط هنگام باز شدن دیالوگ)
+  1083→  const depsQ = useQuery({
+  1084→    queryKey: elementDepsKey(deleting?.id ?? 'none'),
+  1085→    queryFn: () => api.get<ElementDepsDto>(`/api/elements/${deleting!.id}`),
+  1086→    enabled: deleting !== null,
+  1087→  })
+  1088→
+  1089→  const invalidateElements = () => {
+  1090→    void qc.invalidateQueries({ queryKey: qk.elements(activityId) })
+  1091→    void qc.invalidateQueries({ queryKey: qk.structure(projectId) })
+  1092→    if (stationId) void qc.invalidateQueries({ queryKey: qk.activities(stationId) })
+  1093→    void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+  1094→    void qc.invalidateQueries({ queryKey: qk.projects() })
+  1095→    void qc.invalidateQueries({ queryKey: qk.ratingMatrix(projectId) })
+  1096→  }
+  1097→
+  1098→  const createMutation = useMutation({
+  1099→    mutationFn: () =>
+  1100→      structureApi.createElement(activityId, {
+  1101→        name: createForm.name.trim(),
+  1102→        description: createForm.description.trim() || null,
+  1103→        elementType: createForm.elementType,
+  1104→      }),
+  1105→    onSuccess: () => {
+  1106→      invalidateElements()
+  1107→      toast.success('عنصر کاری ثبت شد')
+  1108→      setCreateOpen(false)
+  1109→    },
+  1110→    onError: (err) => toast.error(err instanceof Error ? err.message : 'ثبت عنصر کاری ناموفق بود'),
+  1111→  })
+  1112→
+  1113→  const deleteMutation = useMutation({
+  1114→    mutationFn: (id: string) => structureApi.deleteElement(id),
+  1115→    onSuccess: (res, id) => {
+  1116→      invalidateElements()
+  1117→      const el = elements.find((e) => e.id === id)
+  1118→      const parts: Array<[string, number]> = [['مشاهده', res.removedCounts.observations]]
+  1119→      if (res.removedCounts.hasRating) parts.push(['ارزیابی وستینگهاوس', 1])
+  1120→      toast.success(`عنصر «${el?.name ?? ''}» به‌طور دائمی حذف شد`, {
+  1121→        description: removedCountsText(prefs, parts),
+  1122→      })
+  1123→      setDeleting(null)
+  1124→    },
+  1125→    onError: (err) => toast.error(err instanceof Error ? err.message : 'حذف عنصر کاری ناموفق بود'),
+  1126→  })
+  1127→
+  1128→  const reorderMutation = useMutation({
+  1129→    mutationFn: (ids: string[]) => structureApi.reorderElements(activityId, ids),
+  1130→    onSuccess: () => {
+  1131→      void qc.invalidateQueries({ queryKey: qk.elements(activityId) })
+  1132→      void qc.invalidateQueries({ queryKey: qk.structure(projectId) })
+  1133→    },
+  1134→    onError: (err) => {
+  1135→      toast.error(err instanceof Error ? err.message : 'تغییر ترتیب عناصر ناموفق بود')
+  1136→      void qc.invalidateQueries({ queryKey: qk.elements(activityId) }) // بازگشت به ترتیب سرور
+  1137→    },
+  1138→  })
+  1139→
+  1140→  // جابه‌جایی خوش‌بینانه: کش بلافاصله به‌روز می‌شود و سرور تأیید می‌کند
+  1141→  const handleReorder = (ids: string[]) => {
+  1142→    qc.setQueryData<{ activity: { id: string; name: string }; elements: ElementDto[] }>(
+  1143→      qk.elements(activityId),
+  1144→      (old) => {
+  1145→        if (!old) return old
+  1146→        return {
+  1147→          ...old,
+  1148→          elements: ids.flatMap((id) => {
+  1149→            const e = old.elements.find((x) => x.id === id)
+  1150→            return e ? [e] : []
+  1151→          }),
+  1152→        }
+  1153→      }
+  1154→    )
+  1155→    reorderMutation.mutate(ids)
+  1156→  }
+  1157→
+  1158→  const submitCreate = async () => {
+  1159→    if (!createForm.name.trim()) {
+  1160→      toast.error('نام عنصر کاری الزامی است')
+  1161→      return
+  1162→    }
+  1163→    setCreating(true)
+  1164→    try {
+  1165→      await createMutation.mutateAsync()
+  1166→    } finally {
+  1167→      setCreating(false)
+  1168→    }
+  1169→  }
+  1170→
+  1171→  const openCreate = () => {
+  1172→    setCreateForm(EMPTY_ELEMENT_FORM)
+  1173→    setCreateOpen(true)
+  1174→  }
+  1175→
+  1176→  // وابستگی‌های دیالوگ حذف — FR-26
+  1177→  const deleteDeps: Record<string, number> = {}
+  1178→  const counts = depsQ.data?.counts
+  1179→  if (counts && counts.observations > 0) deleteDeps['مشاهده'] = counts.observations
+  1180→  if (counts?.hasRating) deleteDeps['ارزیابی وستینگهاوس این عنصر'] = 1
+  1181→
+  1182→  return (
+  1183→    <section className="space-y-3" aria-label="عناصر کاری فعالیت">
+  1184→      <div className="flex flex-wrap items-center justify-between gap-2">
+  1185→        <h3 className="flex items-center gap-1.5 text-sm font-extrabold">
+  1186→          <ListTree className="size-4 text-brand" aria-hidden />
+  1187→          عناصر کاری
+  1188→          <Badge variant="secondary" className="num border-0 bg-surface-2">
+  1189→            {formatInt(elements.length, prefs)}
+  1190→          </Badge>
+  1191→          <HelpDot label="عناصر کاری" content={ELEMENT_TYPE_HELP} />
+  1192→        </h3>
+  1193→        <Button onClick={openCreate} className="btn-brand gap-1.5 border-0">
+  1194→          <Plus className="size-4" aria-hidden />
+  1195→          عنصر جدید
+  1196→        </Button>
+  1197→      </div>
+  1198→
+  1199→      {elements.length === 0 ? (
+  1200→        <EmptyState
+  1201→          icon={<ListTree className="size-7" aria-hidden />}
+  1202→          title="هنوز عنصر کاری ثبت نشده است"
+  1203→          description="هر چرخه فعالیت از عناصر کاری تشکیل می‌شود؛ برای زمان‌سنجی (فاز ۳) حداقل به یک عنصر نیاز دارید. نوع عنصر (دستی، خودکار ماشین، انتظار، هم‌زمان) را می‌توانید بعداً نیز تغییر دهید."
+  1204→          action={
+  1205→            <Button onClick={openCreate} className="btn-brand gap-1.5 border-0">
+  1206→              <Plus className="size-4" aria-hidden />
+  1207→              ثبت اولین عنصر کاری
+  1208→            </Button>
+  1209→          }
+  1210→        />
+  1211→      ) : (
+  1212→        <SortableList
+  1213→          items={elements}
+  1214→          onReorder={handleReorder}
+  1215→          renderItem={(element, index) => (
+  1216→            <ElementRow
+  1217→              element={element}
+  1218→              index={index}
+  1219→              prefs={prefs}
+  1220→              isMobile={isMobile}
+  1221→              onEdit={() => setEditing(element)}
+  1222→              onDelete={() => setDeleting(element)}
+  1223→            />
+  1224→          )}
+  1225→        />
+  1226→      )}
+  1227→
+  1228→      {/* دیالوگ ایجاد عنصر کاری */}
+  1229→      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+  1230→        <DialogContent dir="rtl" className="sm:max-w-md">
+  1231→          <DialogHeader>
+  1232→            <DialogTitle>عنصر کاری جدید</DialogTitle>
+  1233→            <DialogDescription>
+  1234→              عنصر در انتهای فهرست افزوده می‌شود و با کشیدن‌ورها کردن قابل جابه‌جایی است.
+  1235→            </DialogDescription>
+  1236→          </DialogHeader>
+  1237→          <div className="space-y-4">
+  1238→            <div className="space-y-1.5">
+  1239→              <div className="flex items-center gap-1">
+  1240→                <Label htmlFor="element-create-name">نام عنصر کاری</Label>
+  1241→                <HelpDot label="نام عنصر کاری" content={ELEMENT_NAME_HELP} />
+  1242→              </div>
+  1243→              <Input
+  1244→                id="element-create-name"
+  1245→                value={createForm.name}
+  1246→                onChange={(e) => setCreateForm((s) => ({ ...s, name: e.target.value }))}
+  1247→                placeholder="مثلاً: برداشتن قطعه از گراناق"
+  1248→              />
+  1249→            </div>
+  1250→            <div className="space-y-1.5">
+  1251→              <Label htmlFor="element-create-desc">شرح عنصر (اختیاری)</Label>
+  1252→              <Textarea
+  1253→                id="element-create-desc"
+  1254→                value={createForm.description}
+  1255→                onChange={(e) => setCreateForm((s) => ({ ...s, description: e.target.value }))}
+  1256→                placeholder="مثلاً: برداشت با دو دست و قراردادن روی میز کار"
+  1257→                className="min-h-16"
+  1258→              />
+  1259→            </div>
+  1260→            <div className="space-y-1.5">
+  1261→              <div className="flex items-center gap-1">
+  1262→                <Label>نوع عنصر کاری</Label>
+  1263→                <HelpDot label="نوع عنصر کاری" content={ELEMENT_TYPE_HELP} />
+  1264→              </div>
+  1265→              <Select
+  1266→                value={createForm.elementType}
+  1267→                onValueChange={(v) => setCreateForm((s) => ({ ...s, elementType: v }))}
+  1268→              >
+  1269→                <SelectTrigger className="w-full" aria-label="نوع عنصر کاری">
+  1270→                  <SelectValue />
+  1271→                </SelectTrigger>
+  1272→                <SelectContent>
+  1273→                  {ELEMENT_TYPES.map((et) => (
+  1274→                    <SelectItem key={et} value={et}>
+  1275→                      {ELEMENT_TYPE_LABELS[et]}
+  1276→                    </SelectItem>
+  1277→                  ))}
+  1278→                </SelectContent>
+  1279→              </Select>
+  1280→            </div>
+  1281→          </div>
+  1282→          <DialogFooter className="gap-2">
+  1283→            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+  1284→              انصراف
+  1285→            </Button>
+  1286→            <Button onClick={submitCreate} disabled={creating} className="btn-brand border-0">
+  1287→              {creating ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Plus className="size-4" aria-hidden />}
+  1288→              ثبت عنصر
+  1289→            </Button>
+  1290→          </DialogFooter>
+  1291→        </DialogContent>
+  1292→      </Dialog>
+  1293→
+  1294→      {/* دیالوگ ویرایش عنصر — ذخیره خودکار */}
+  1295→      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+  1296→        <DialogContent dir="rtl" className="sm:max-w-md">
+  1297→          {editing ? (
+  1298→            <ElementEditForm
+  1299→              key={editing.id}
+  1300→              element={editing}
+  1301→              onClose={() => setEditing(null)}
+  1302→              onSaved={invalidateElements}
+  1303→            />
+  1304→          ) : null}
+  1305→        </DialogContent>
+  1306→      </Dialog>
+  1307→
+  1308→      {/* تأیید حذف دائمی عنصر — FR-26 */}
+  1309→      <ConfirmDeleteDialog
+  1310→        open={deleting !== null}
+  1311→        onOpenChange={(open) => !open && setDeleting(null)}
+  1312→        title="حذف دائمی عنصر کاری"
+  1313→        entityName={deleting?.name ?? ''}
+  1314→        dependencies={deleteDeps}
+  1315→        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
+  1316→        loading={deleteMutation.isPending}
+  1317→      />
+  1318→    </section>
+  1319→  )
+  1320→}
+  1321→
+  1322→// ── ردیف عنصر کاری — دسکتاپ: ردیف فشرده / موبایل: کارت ──
+  1323→function ElementRow({
+  1324→  element,
+  1325→  index,
+  1326→  prefs,
+  1327→  isMobile,
+  1328→  onEdit,
+  1329→  onDelete,
+  1330→}: {
+  1331→  element: ElementDto
+  1332→  index: number
+  1333→  prefs: Prefs
+  1334→  isMobile: boolean
+  1335→  onEdit: () => void
+  1336→  onDelete: () => void
+  1337→}) {
+  1338→  const typeLabel = elementTypeLabelOf(element.elementType)
+  1339→
+  1340→  const typeBadge = (
+  1341→    <Badge
+  1342→      className={cn('shrink-0', ELEMENT_TYPE_BADGE[element.elementType as ElementType] ?? '')}
+  1343→      title={`نوع عنصر: ${typeLabel}`}
+  1344→    >
+  1345→      {typeLabel}
+  1346→    </Badge>
+  1347→  )
+  1348→
+  1349→  const ratingBadge = element.rating ? (
+  1350→    <Badge className="num border-0 bg-green-soft text-green" dir="ltr" title="ضریب ارزیابی وستینگهاوس">
+  1351→      R = {formatTimeValue(element.rating.totalFactor, prefs)}
+  1352→    </Badge>
+  1353→  ) : (
+  1354→    <Badge variant="outline" className="shrink-0 text-faint">
+  1355→      ارزیابی نشده
+  1356→    </Badge>
+  1357→  )
+  1358→
+  1359→  const actions = (
+  1360→    <div className="flex shrink-0 gap-1">
+  1361→      <Button variant="ghost" size="icon" className="size-8" onClick={onEdit} aria-label={`ویرایش عنصر ${element.name}`}>
+  1362→        <Pencil className="size-4" aria-hidden />
+  1363→      </Button>
+  1364→      <Button
+  1365→        variant="ghost"
+  1366→        size="icon"
+  1367→        className="size-8 text-red hover:text-red"
+  1368→        onClick={onDelete}
+  1369→        aria-label={`حذف عنصر ${element.name}`}
+  1370→      >
+  1371→        <Trash2 className="size-4" aria-hidden />
+  1372→      </Button>
+  1373→    </div>
+  1374→  )
+  1375→
+  1376→  if (isMobile) {
+  1377→    return (
+  1378→      <div className="space-y-2.5 rounded-xl border border-border/60 bg-surface-2/50 p-3">
+  1379→        <div className="flex items-start justify-between gap-2">
+  1380→          <div className="flex min-w-0 items-center gap-2">
+  1381→            {typeBadge}
+  1382→            <p className="min-w-0 flex-1 truncate text-sm font-bold">{element.name}</p>
+  1383→          </div>
+  1384→          {actions}
+  1385→        </div>
+  1386→        {element.description && (
+  1387→          <p className="line-clamp-2 text-[11px] leading-5 text-faint">{element.description}</p>
+  1388→        )}
+  1389→        <div className="flex items-center justify-between">
+  1390→          {ratingBadge}
+  1391→          <span className="num text-[11px] text-faint">عنصر {formatInt(index + 1, prefs)}</span>
+  1392→        </div>
+  1393→      </div>
+  1394→    )
+  1395→  }
+  1396→
+  1397→  return (
+  1398→    <div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-surface-2/50 py-2 pl-1.5 pr-3 transition-colors hover:border-brand/40 hover:bg-brand-soft/30">
+  1399→      <span className="num w-4 shrink-0 text-[11px] text-faint">{formatInt(index + 1, prefs)}</span>
+  1400→      {typeBadge}
+  1401→      <div className="min-w-0 flex-1">
+  1402→        <p className="truncate text-sm font-bold">{element.name}</p>
+  1403→        {element.description && (
+  1404→          <p className="truncate text-[11px] text-faint" title={element.description}>
+  1405→            {element.description}
+  1406→          </p>
+  1407→        )}
+  1408→      </div>
+  1409→      {ratingBadge}
+  1410→      {actions}
+  1411→    </div>
+  1412→  )
+  1413→}
+  1414→
+  1415→// ── فرم ویرایش عنصر (داخل دیالوگ) — ذخیره خودکار ──
+  1416→function ElementEditForm({
+  1417→  element,
+  1418→  onClose,
+  1419→  onSaved,
+  1420→}: {
+  1421→  element: ElementDto
+  1422→  onClose: () => void
+  1423→  onSaved: () => void
+  1424→}) {
+  1425→  const [form, setForm] = useState<ElementFormState>(() => ({
+  1426→    name: element.name,
+  1427→    description: element.description ?? '',
+  1428→    elementType: element.elementType,
+  1429→  }))
+  1430→  const updatedAtRef = useRef(element.updatedAt)
+  1431→
+  1432→  const { status, lastError, retry } = useAutosave<ElementFormState>({
+  1433→    data: form,
+  1434→    ready: true,
+  1435→    save: async (value) => {
+  1436→      const res = await structureApi.updateElement(element.id, {
+  1437→        name: value.name.trim(),
+  1438→        description: value.description.trim() || null,
+  1439→        elementType: value.elementType,
+  1440→        expectedUpdatedAt: updatedAtRef.current,
+  1441→      })
+  1442→      updatedAtRef.current = res.element.updatedAt
+  1443→      onSaved()
+  1444→    },
+  1445→  })
+  1446→
+  1447→  return (
+  1448→    <>
+  1449→      <DialogHeader>
+  1450→        <DialogTitle>ویرایش عنصر کاری</DialogTitle>
+  1451→        <DialogDescription>تغییرات به‌صورت خودکار ذخیره می‌شوند.</DialogDescription>
+  1452→      </DialogHeader>
+  1453→      <div className="space-y-4">
+  1454→        <div className="space-y-1.5">
+  1455→          <div className="flex items-center gap-1">
+  1456→            <Label htmlFor={`element-edit-name-${element.id}`}>نام عنصر کاری</Label>
+  1457→            <HelpDot label="نام عنصر کاری" content={ELEMENT_NAME_HELP} />
+  1458→          </div>
+  1459→          <Input
+  1460→            id={`element-edit-name-${element.id}`}
+  1461→            value={form.name}
+  1462→            onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+  1463→            placeholder="مثلاً: برداشتن قطعه از گراناق"
+  1464→          />
+  1465→        </div>
+  1466→        <div className="space-y-1.5">
+  1467→          <Label htmlFor={`element-edit-desc-${element.id}`}>شرح عنصر (اختیاری)</Label>
+  1468→          <Textarea
+  1469→            id={`element-edit-desc-${element.id}`}
+  1470→            value={form.description}
+  1471→            onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+  1472→            placeholder="مثلاً: برداشت با دو دست و قراردادن روی میز کار"
+  1473→            className="min-h-16"
+  1474→          />
+  1475→        </div>
+  1476→        <div className="space-y-1.5">
+  1477→          <div className="flex items-center gap-1">
+  1478→            <Label>نوع عنصر کاری</Label>
+  1479→            <HelpDot label="نوع عنصر کاری" content={ELEMENT_TYPE_HELP} />
+  1480→          </div>
+  1481→          <Select value={form.elementType} onValueChange={(v) => setForm((s) => ({ ...s, elementType: v }))}>
+  1482→            <SelectTrigger className="w-full" aria-label="نوع عنصر کاری">
+  1483→              <SelectValue />
+  1484→            </SelectTrigger>
+  1485→            <SelectContent>
+  1486→              {ELEMENT_TYPES.map((et) => (
+  1487→                <SelectItem key={et} value={et}>
+  1488→                  {ELEMENT_TYPE_LABELS[et]}
+  1489→                </SelectItem>
+  1490→              ))}
+  1491→            </SelectContent>
+  1492→          </Select>
+  1493→          <p className="text-[11px] leading-5 text-faint">
+  1494→            تغییر نوع عنصر بر مدل محاسباتی اثر دارد و وضعیت محاسبات را «نیازمند محاسبه مجدد» می‌کند.
+  1495→          </p>
+  1496→        </div>
+  1497→      </div>
+  1498→      <DialogFooter className="flex-row justify-between gap-2">
+  1499→        <SaveIndicator status={status} onRetry={retry} error={lastError} />
+  1500→        <Button variant="outline" onClick={onClose}>
+  1501→          بستن
+  1502→        </Button>
+  1503→      </DialogFooter>
+  1504→    </>
+  1505→  )
+  1506→}
+  1507→

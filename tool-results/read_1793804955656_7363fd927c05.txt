@@ -1,0 +1,1396 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→// ═══════════════════════════════════════════════════════════
+     4→     4→// نمای ساختار تولید — FR-02 + ۷.۳
+     5→     5→// درخت خط ← ایستگاه ← فعالیت با Drag & Drop (SortableList)؛
+     6→     6→// پنل جزئیات ایستگاه با ذخیره خودکار و کنترل هم‌زمانی
+     7→     7→// (expectedUpdatedAt — ۶.۶)؛ ایجاد/ویرایش/حذف با شمارش
+     8→     8→// وابستگی‌های واقعی (FR-26).
+     9→     9→// دسکتاپ: درخت در ستون راست (w-80) + جزئیات در ستون چپ؛
+    10→    10→// موبایل: درخت تاشو در بالا + جزئیات در پایین — FR-30
+    11→    11→// ═══════════════════════════════════════════════════════════
+    12→    12→import { useMemo, useRef, useState } from 'react'
+    13→    13→import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+    14→    14→import { toast } from 'sonner'
+    15→    15→import {
+    16→    16→  ArrowLeft,
+    17→    17→  ChevronDown,
+    18→    18→  Factory,
+    19→    19→  ListTree,
+    20→    20→  Loader2,
+    21→    21→  MousePointerClick,
+    22→    22→  Pencil,
+    23→    23→  Plus,
+    24→    24→  Trash2,
+    25→    25→  Warehouse,
+    26→    26→} from 'lucide-react'
+    27→    27→import { Badge } from '@/components/ui/badge'
+    28→    28→import { Button } from '@/components/ui/button'
+    29→    29→import {
+    30→    30→  Collapsible,
+    31→    31→  CollapsibleContent,
+    32→    32→  CollapsibleTrigger,
+    33→    33→} from '@/components/ui/collapsible'
+    34→    34→import {
+    35→    35→  Dialog,
+    36→    36→  DialogContent,
+    37→    37→  DialogDescription,
+    38→    38→  DialogFooter,
+    39→    39→  DialogHeader,
+    40→    40→  DialogTitle,
+    41→    41→} from '@/components/ui/dialog'
+    42→    42→import { Input } from '@/components/ui/input'
+    43→    43→import { Label } from '@/components/ui/label'
+    44→    44→import {
+    45→    45→  Select,
+    46→    46→  SelectContent,
+    47→    47→  SelectItem,
+    48→    48→  SelectTrigger,
+    49→    49→  SelectValue,
+    50→    50→} from '@/components/ui/select'
+    51→    51→import { Skeleton } from '@/components/ui/skeleton'
+    52→    52→import { Textarea } from '@/components/ui/textarea'
+    53→    53→import { ConfirmDeleteDialog, EmptyState } from '@/components/common/Feedback'
+    54→    54→import { HelpDot } from '@/components/common/HelpDot'
+    55→    55→import { SaveIndicator } from '@/components/common/SaveIndicator'
+    56→    56→import { SortableList } from '@/components/common/SortableList'
+    57→    57→import { useAutosave } from '@/hooks/use-autosave'
+    58→    58→import { useIsMobile } from '@/hooks/use-mobile'
+    59→    59→import {
+    60→    60→  allowancesApi,
+    61→    61→  projectsApi,
+    62→    62→  structureApi,
+    63→    63→  type ActivityDto,
+    64→    64→  type GroupDto,
+    65→    65→  type StationDto,
+    66→    66→} from '@/lib/api/endpoints'
+    67→    67→import { qk } from '@/lib/api/keys'
+    68→    68→import {
+    69→    69→  PROCESS_TYPES,
+    70→    70→  PROCESS_TYPE_LABELS,
+    71→    71→  PROCESS_TYPE_SYMBOLS,
+    72→    72→  type ProcessType,
+    73→    73→} from '@/domain/types'
+    74→    74→import { useAppStore } from '@/store/app-store'
+    75→    75→import { useDisplayPrefs } from '@/store/display-store'
+    76→    76→import { formatDate, formatDateTime, formatInt } from '@/lib/format'
+    77→    77→import { cn } from '@/lib/utils'
+    78→    78→
+    79→    79→type Prefs = ReturnType<typeof useDisplayPrefs>
+    80→    80→
+    81→    81→// ── وضعیت فرم‌ها ──
+    82→    82→interface StationFormState {
+    83→    83→  name: string
+    84→    84→  description: string
+    85→    85→}
+    86→    86→
+    87→    87→interface ActivityFormState {
+    88→    88→  name: string
+    89→    89→  description: string
+    90→    90→  processType: string
+    91→    91→  groupId: string // '' یعنی بدون گروه
+    92→    92→}
+    93→    93→
+    94→    94→const EMPTY_STATION_FORM: StationFormState = { name: '', description: '' }
+    95→    95→const EMPTY_ACTIVITY_FORM: ActivityFormState = { name: '', description: '', processType: 'OPERATION', groupId: '' }
+    96→    96→/** مقدار Sentinel — Radix Select مقدار رشته خالی قبول نمی‌کند */
+    97→    97→const NO_GROUP = 'none'
+    98→    98→
+    99→    99→// ── محتوای راهنمای آیکونی — FR-28 / ۷.۵ ──
+   100→   100→const LINE_HELP = {
+   101→   101→  what: 'هر پروژه مطالعه زمان‌سنجی دقیقاً یک خط تولید و یک محصول را پوشش می‌دهد؛ ساختار داده از خط آغاز می‌شود: خط ← ایستگاه ← فعالیت ← عنصر کاری ← مشاهده.',
+   102→   102→  input: 'نام خط و محصول در مرحله «مشخصات پروژه» وارد و ویرایش می‌شود.',
+   103→   103→  example: 'خط مونتاژ ماشین لباسشویی — مدل X-۲۰۰',
+   104→   104→  note: 'ترکیب چند خط یا چند محصول در یک پروژه، مقایسه‌پذیری زمان‌های استاندارد را از بین می‌برد؛ برای هر خط/محصول پروژه‌ای جدا بسازید.',
+   105→   105→} as const
+   106→   106→
+   107→   107→const STATION_NAME_HELP = {
+   108→   108→  what: 'ایستگاه بخشی مشخص از خط تولید است که کار در آن انجام می‌شود؛ فعالیت‌های زمان‌سنجی زیر ایستگاه تعریف می‌شوند.',
+   109→   109→  input: 'نام ایستگاه را مطابق نقشه خط یا استقرار فیزیکی وارد کنید.',
+   110→   110→  example: '«ایستگاه برش ورق» یا «میز مونتاژ شماره ۳»',
+   111→   111→  note: 'حذف ایستگاه همه فعالیت‌ها، عناصر کاری، جلسات و مشاهدات زیرمجموعه را دائمی حذف می‌کند. ترتیب ایستگاه‌ها با کشیدن‌ورها کردن (Drag & Drop) تغییر می‌کند.',
+   112→   112→} as const
+   113→   113→
+   114→   114→const ACTIVITY_NAME_HELP = {
+   115→   115→  what: 'فعالیت کار قابل‌تعریف و مستقلی در ایستگاه است که از عناصر کاری تشکیل می‌شود و صفحه اختصاصی چهارزبانه دارد: مشخصات، عناصر کاری، زمان‌سنجی و تحلیل نتایج.',
+   116→   116→  input: 'نامی کوتاه و گویا؛ ترجیحاً فعل + مفعول.',
+   117→   117→  example: '«بستن درب پنل» یا «کنترل کیفیت نهایی»',
+   118→   118→  note: 'نوع رویداد فرایندی فعالیت در نمودارهای فرایند (فاز ۵) با نماد ASCME نمایش داده می‌شود.',
+   119→   119→} as const
+   120→   120→
+   121→   121→const PROCESS_TYPE_HELP = {
+   122→   122→  what: 'دسته‌بندی فرایندی فعالیت مطابق استاندارد نمودار فرایند: عملیات ○، بازرسی □، حمل‌ونقل ⇨، تأخیر D و انبارش ▽.',
+   123→   123→  input: 'ماهیت غالب فعالیت را انتخاب کنید؛ پیش‌فرض «عملیات» است.',
+   124→   124→  example: 'برای کنترل کیفیت «بازرسی» و برای انتقال قطعه بین ایستگاه‌ها «حمل‌ونقل» را انتخاب کنید.',
+   125→   125→  note: 'این نوع صرفاً دسته‌بندی و نمادگذاری است و روی محاسبات زمان اثری ندارد.',
+   126→   126→} as const
+   127→   127→
+   128→   128→const GROUP_ASSIGN_HELP = {
+   129→   129→  what: 'گروه مجازها مجموعه‌ای از درصدهای مجاز (مانند نیازهای شخصی و خستگی) است که فعالیت‌های مشابه مقادیر آن را به ارث می‌برند.',
+   130→   130→  input: 'گروه مناسب ماهیت فعالیت را انتخاب کنید یا «بدون گروه» بگذارید.',
+   131→   131→  example: '«کار دستی سبک»، «کار ماشینی سنگین»',
+   132→   132→  note: 'بدون گروه، هیچ مجازی برای فعالیت اعمال نمی‌شود؛ در صفحه فعالیت می‌توانید مقدار هر دسته را بازنویسی کنید.',
+   133→   133→} as const
+   134→   134→
+   135→   135→// ── کمک‌تابع‌ها ──
+   136→   136→function activityElementCount(a: ActivityDto): number {
+   137→   137→  return a._count?.workElements ?? a.elements?.length ?? 0
+   138→   138→}
+   139→   139→
+   140→   140→function processLabelOf(pt: string): string {
+   141→   141→  return PROCESS_TYPE_LABELS[pt as ProcessType] ?? pt
+   142→   142→}
+   143→   143→
+   144→   144→function processSymbolOf(pt: string): string {
+   145→   145→  return PROCESS_TYPE_SYMBOLS[pt as ProcessType] ?? '○'
+   146→   146→}
+   147→   147→
+   148→   148→/** توضیح فارسی شمارش داده‌های حذف‌شده برای toast — اعداد واقعی Backend */
+   149→   149→function removedCountsText(prefs: Prefs, parts: Array<[string, number]>): string | undefined {
+   150→   150→  const segs = parts.filter(([, n]) => n > 0).map(([label, n]) => `${formatInt(n, prefs)} ${label}`)
+   151→   151→  return segs.length > 0 ? `${segs.join('، ')} نیز به‌طور دائمی حذف شدند.` : undefined
+   152→   152→}
+   153→   153→
+   154→   154→export default function StructureView({ projectId }: { projectId: string }) {
+   155→   155→  const prefs = useDisplayPrefs()
+   156→   156→  const isMobile = useIsMobile()
+   157→   157→  const qc = useQueryClient()
+   158→   158→  const selectedStationId = useAppStore((s) => s.selectedStationId)
+   159→   159→  const setSelectedStation = useAppStore((s) => s.setSelectedStation)
+   160→   160→  const openActivity = useAppStore((s) => s.openActivity)
+   161→   161→
+   162→   162→  // ── وضعیت محلی ──
+   163→   163→  const [treeOpen, setTreeOpen] = useState(true) // درخت تاشوی موبایل
+   164→   164→  const [openMap, setOpenMap] = useState<Record<string, boolean>>({}) // ایستگاه‌های باز (پیش‌فرض: باز)
+   165→   165→  const [stationCreateOpen, setStationCreateOpen] = useState(false)
+   166→   166→  const [stationCreateForm, setStationCreateForm] = useState<StationFormState>(EMPTY_STATION_FORM)
+   167→   167→  const [stationCreating, setStationCreating] = useState(false)
+   168→   168→  const [stationDialogOpen, setStationDialogOpen] = useState(false)
+   169→   169→  const [activityEditor, setActivityEditor] = useState<{
+   170→   170→    stationId: string
+   171→   171→    activity: ActivityDto | null
+   172→   172→  } | null>(null)
+   173→   173→  const [activityCreateForm, setActivityCreateForm] = useState<ActivityFormState>(EMPTY_ACTIVITY_FORM)
+   174→   174→  const [activityCreating, setActivityCreating] = useState(false)
+   175→   175→  const [deletingStation, setDeletingStation] = useState<StationDto | null>(null)
+   176→   176→  const [deletingActivity, setDeletingActivity] = useState<ActivityDto | null>(null)
+   177→   177→
+   178→   178→  // ── داده‌ها ──
+   179→   179→  const treeQuery = useQuery({
+   180→   180→    queryKey: qk.structure(projectId),
+   181→   181→    queryFn: () => structureApi.tree(projectId),
+   182→   182→  })
+   183→   183→  const lineQuery = useQuery({
+   184→   184→    queryKey: qk.project(projectId),
+   185→   185→    queryFn: () => projectsApi.get(projectId),
+   186→   186→    select: (d) => ({ lineName: d.project.lineName, productName: d.project.productName }),
+   187→   187→  })
+   188→   188→  const groupsQuery = useQuery({
+   189→   189→    queryKey: qk.groups(projectId),
+   190→   190→    queryFn: () => allowancesApi.groups(projectId),
+   191→   191→  })
+   192→   192→  // درخت، _count.sessions را برنمی‌گرداند؛ هنگام باز شدن دیالوگ تأیید حذف،
+   193→   193→  // فهرست ایستگاه‌ها (که شمارش جلسات دارد) به‌صورت تازه بارگذاری می‌شود — FR-26
+   194→   194→  const deleteDepsQuery = useQuery({
+   195→   195→    queryKey: qk.stations(projectId),
+   196→   196→    queryFn: () => structureApi.stations(projectId),
+   197→   197→    enabled: deletingStation !== null || deletingActivity !== null,
+   198→   198→  })
+   199→   199→
+   200→   200→  const stations = treeQuery.data?.stations ?? []
+   201→   201→  const groups = groupsQuery.data?.items ?? []
+   202→   202→  const selectedStation = useMemo(
+   203→   203→    () => stations.find((s) => s.id === selectedStationId) ?? null,
+   204→   204→    [stations, selectedStationId]
+   205→   205→  )
+   206→   206→  const totalActivities = useMemo(() => stations.reduce((sum, s) => sum + s.activities.length, 0), [stations])
+   207→   207→  const totalElements = useMemo(
+   208→   208→    () => stations.reduce((sum, s) => sum + s.activities.reduce((x, a) => x + activityElementCount(a), 0), 0),
+   209→   209→    [stations]
+   210→   210→  )
+   211→   211→
+   212→   212→  // ── بی‌اعتبارسازی کش ──
+   213→   213→  const invalidateStructureMeta = () => {
+   214→   214→    void qc.invalidateQueries({ queryKey: qk.structure(projectId) })
+   215→   215→    void qc.invalidateQueries({ queryKey: qk.stations(projectId) })
+   216→   216→    void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+   217→   217→    void qc.invalidateQueries({ queryKey: qk.projects() })
+   218→   218→  }
+   219→   219→  const invalidateActivityData = () => {
+   220→   220→    invalidateStructureMeta()
+   221→   221→    void qc.invalidateQueries({ queryKey: ['activities'] })
+   222→   222→    void qc.invalidateQueries({ queryKey: ['elements'] })
+   223→   223→    void qc.invalidateQueries({ queryKey: qk.groups(projectId) })
+   224→   224→  }
+   225→   225→  const onActivitySaved = (activityId: string) => {
+   226→   226→    invalidateActivityData()
+   227→   227→    void qc.invalidateQueries({ queryKey: qk.activityAllowances(activityId) })
+   228→   228→  }
+   229→   229→
+   230→   230→  // ── جهش‌ها ──
+   231→   231→  const createStationMutation = useMutation({
+   232→   232→    mutationFn: () =>
+   233→   233→      structureApi.createStation(projectId, {
+   234→   234→        name: stationCreateForm.name.trim(),
+   235→   235→        description: stationCreateForm.description.trim() || null,
+   236→   236→      }),
+   237→   237→    onSuccess: (res) => {
+   238→   238→      invalidateStructureMeta()
+   239→   239→      toast.success('ایستگاه ثبت شد')
+   240→   240→      setSelectedStation(res.station.id)
+   241→   241→      setStationCreateOpen(false)
+   242→   242→    },
+   243→   243→    onError: (err) => toast.error(err instanceof Error ? err.message : 'ثبت ایستگاه ناموفق بود'),
+   244→   244→  })
+   245→   245→
+   246→   246→  const deleteStationMutation = useMutation({
+   247→   247→    mutationFn: (station: StationDto) => structureApi.deleteStation(station.id),
+   248→   248→    onSuccess: (res, station) => {
+   249→   249→      invalidateStructureMeta()
+   250→   250→      if (selectedStationId === station.id) setSelectedStation(null)
+   251→   251→      toast.success(`ایستگاه «${station.name}» به‌طور دائمی حذف شد`, {
+   252→   252→        description: removedCountsText(prefs, [
+   253→   253→          ['فعالیت', res.removedCounts.activities],
+   254→   254→          ['عنصر کاری', res.removedCounts.elements],
+   255→   255→          ['جلسه زمان‌سنجی', res.removedCounts.sessions],
+   256→   256→          ['مشاهده', res.removedCounts.observations],
+   257→   257→        ]),
+   258→   258→      })
+   259→   259→      setDeletingStation(null)
+   260→   260→    },
+   261→   261→    onError: (err) => toast.error(err instanceof Error ? err.message : 'حذف ایستگاه ناموفق بود'),
+   262→   262→  })
+   263→   263→
+   264→   264→  const createActivityMutation = useMutation({
+   265→   265→    mutationFn: (vars: { stationId: string; body: Record<string, unknown> }) =>
+   266→   266→      structureApi.createActivity(vars.stationId, vars.body),
+   267→   267→    onSuccess: () => {
+   268→   268→      invalidateActivityData()
+   269→   269→      toast.success('فعالیت ثبت شد')
+   270→   270→      setActivityEditor(null)
+   271→   271→    },
+   272→   272→    onError: (err) => toast.error(err instanceof Error ? err.message : 'ثبت فعالیت ناموفق بود'),
+   273→   273→  })
+   274→   274→
+   275→   275→  const deleteActivityMutation = useMutation({
+   276→   276→    mutationFn: (activity: ActivityDto) => structureApi.deleteActivity(activity.id),
+   277→   277→    onSuccess: (res, activity) => {
+   278→   278→      invalidateActivityData()
+   279→   279→      toast.success(`فعالیت «${activity.name}» به‌طور دائمی حذف شد`, {
+   280→   280→        description: removedCountsText(prefs, [
+   281→   281→          ['عنصر کاری', res.removedCounts.elements],
+   282→   282→          ['جلسه زمان‌سنجی', res.removedCounts.sessions],
+   283→   283→          ['مشاهده', res.removedCounts.observations],
+   284→   284→        ]),
+   285→   285→      })
+   286→   286→      setDeletingActivity(null)
+   287→   287→    },
+   288→   288→    onError: (err) => toast.error(err instanceof Error ? err.message : 'حذف فعالیت ناموفق بود'),
+   289→   289→  })
+   290→   290→
+   291→   291→  // ── جابه‌جایی خوش‌بینانه: کش بلافاصله به‌روز می‌شود و سرور تأیید می‌کند ──
+   292→   292→  const reorderStationsMutation = useMutation({
+   293→   293→    mutationFn: (ids: string[]) => structureApi.reorderStations(projectId, ids),
+   294→   294→    onSuccess: () => {
+   295→   295→      void qc.invalidateQueries({ queryKey: qk.structure(projectId) })
+   296→   296→      void qc.invalidateQueries({ queryKey: qk.stations(projectId) })
+   297→   297→    },
+   298→   298→    onError: (err) => {
+   299→   299→      toast.error(err instanceof Error ? err.message : 'تغییر ترتیب ایستگاه‌ها ناموفق بود')
+   300→   300→      invalidateStructureMeta() // بازگشت به ترتیب واقعی سرور
+   301→   301→    },
+   302→   302→  })
+   303→   303→
+   304→   304→  const reorderActivitiesMutation = useMutation({
+   305→   305→    mutationFn: (vars: { stationId: string; ids: string[] }) =>
+   306→   306→      structureApi.reorderActivities(vars.stationId, vars.ids),
+   307→   307→    onSuccess: () => {
+   308→   308→      void qc.invalidateQueries({ queryKey: qk.structure(projectId) })
+   309→   309→      void qc.invalidateQueries({ queryKey: ['activities'] })
+   310→   310→    },
+   311→   311→    onError: (err) => {
+   312→   312→      toast.error(err instanceof Error ? err.message : 'تغییر ترتیب فعالیت‌ها ناموفق بود')
+   313→   313→      invalidateStructureMeta()
+   314→   314→    },
+   315→   315→  })
+   316→   316→
+   317→   317→  const handleReorderStations = (ids: string[]) => {
+   318→   318→    qc.setQueryData<{ stations: StationDto[] }>(qk.structure(projectId), (old) => {
+   319→   319→      if (!old) return old
+   320→   320→      return {
+   321→   321→        stations: ids.flatMap((id) => {
+   322→   322→          const s = old.stations.find((x) => x.id === id)
+   323→   323→          return s ? [s] : []
+   324→   324→        }),
+   325→   325→      }
+   326→   326→    })
+   327→   327→    reorderStationsMutation.mutate(ids)
+   328→   328→  }
+   329→   329→
+   330→   330→  const handleReorderActivities = (stationId: string, ids: string[]) => {
+   331→   331→    qc.setQueryData<{ stations: StationDto[] }>(qk.structure(projectId), (old) => {
+   332→   332→      if (!old) return old
+   333→   333→      return {
+   334→   334→        stations: old.stations.map((s) =>
+   335→   335→          s.id !== stationId
+   336→   336→            ? s
+   337→   337→            : {
+   338→   338→                ...s,
+   339→   339→                activities: ids.flatMap((id) => {
+   340→   340→                  const a = s.activities.find((x) => x.id === id)
+   341→   341→                  return a ? [a] : []
+   342→   342→                }),
+   343→   343→              }
+   344→   344→        ),
+   345→   345→      }
+   346→   346→    })
+   347→   347→    reorderActivitiesMutation.mutate({ stationId, ids })
+   348→   348→  }
+   349→   349→
+   350→   350→  // ── کنش‌ها ──
+   351→   351→  const selectStation = (stationId: string) => {
+   352→   352→    setSelectedStation(stationId)
+   353→   353→    setStationDialogOpen(false)
+   354→   354→    if (isMobile) setTreeOpen(false)
+   355→   355→  }
+   356→   356→
+   357→   357→  const openEditStation = (station: StationDto) => {
+   358→   358→    // فرم ویرایش در پنل جزئیات رندر می‌شود؛ انتخاب + باز کردن دیالوگ مشترک
+   359→   359→    setSelectedStation(station.id)
+   360→   360→    setStationDialogOpen(true)
+   361→   361→  }
+   362→   362→
+   363→   363→  const openStationCreate = () => {
+   364→   364→    setStationCreateForm(EMPTY_STATION_FORM)
+   365→   365→    setStationCreateOpen(true)
+   366→   366→  }
+   367→   367→
+   368→   368→  const submitStationCreate = async () => {
+   369→   369→    if (!stationCreateForm.name.trim()) {
+   370→   370→      toast.error('نام ایستگاه الزامی است')
+   371→   371→      return
+   372→   372→    }
+   373→   373→    setStationCreating(true)
+   374→   374→    try {
+   375→   375→      await createStationMutation.mutateAsync()
+   376→   376→    } finally {
+   377→   377→      setStationCreating(false)
+   378→   378→    }
+   379→   379→  }
+   380→   380→
+   381→   381→  const openActivityCreate = (stationId: string) => {
+   382→   382→    setActivityCreateForm(EMPTY_ACTIVITY_FORM)
+   383→   383→    setActivityEditor({ stationId, activity: null })
+   384→   384→  }
+   385→   385→
+   386→   386→  const submitActivityCreate = async () => {
+   387→   387→    if (!activityEditor || activityEditor.activity) return
+   388→   388→    if (!activityCreateForm.name.trim()) {
+   389→   389→      toast.error('نام فعالیت الزامی است')
+   390→   390→      return
+   391→   391→    }
+   392→   392→    setActivityCreating(true)
+   393→   393→    try {
+   394→   394→      await createActivityMutation.mutateAsync({
+   395→   395→        stationId: activityEditor.stationId,
+   396→   396→        body: {
+   397→   397→          name: activityCreateForm.name.trim(),
+   398→   398→          description: activityCreateForm.description.trim() || null,
+   399→   399→          processType: activityCreateForm.processType,
+   400→   400→          groupId: activityCreateForm.groupId || null,
+   401→   401→        },
+   402→   402→      })
+   403→   403→    } finally {
+   404→   404→      setActivityCreating(false)
+   405→   405→    }
+   406→   406→  }
+   407→   407→
+   408→   408→  // ── شمارش وابستگی‌ها پیش از حذف — FR-26 ──
+   409→   409→  const stationDeleteDeps = useMemo(() => {
+   410→   410→    if (!deletingStation) return {}
+   411→   411→    const acts = deletingStation.activities
+   412→   412→    const activityCount = acts.length
+   413→   413→    const elementCount = acts.reduce((sum, a) => sum + activityElementCount(a), 0)
+   414→   414→    // شمارش جلسات از پرس‌وجوی به‌هنگام (درخت این شمارش را ندارد)
+   415→   415→    const detailed = deleteDepsQuery.data?.items.find((s) => s.id === deletingStation.id)
+   416→   416→    const sessionCount = (detailed ?? deletingStation).activities.reduce(
+   417→   417→      (sum, a) => sum + (a._count?.sessions ?? 0),
+   418→   418→      0
+   419→   419→    )
+   420→   420→    const deps: Record<string, number> = {}
+   421→   421→    if (activityCount > 0) deps['فعالیت'] = activityCount
+   422→   422→    if (elementCount > 0) deps['عنصر کاری'] = elementCount
+   423→   423→    if (sessionCount > 0) deps['جلسه زمان‌سنجی'] = sessionCount
+   424→   424→    return deps
+   425→   425→  }, [deletingStation, deleteDepsQuery.data])
+   426→   426→
+   427→   427→  const activityDeleteDeps = useMemo(() => {
+   428→   428→    if (!deletingActivity) return {}
+   429→   429→    const elementCount = activityElementCount(deletingActivity)
+   430→   430→    const stationDetailed = deleteDepsQuery.data?.items.find((s) => s.id === deletingActivity.stationId)
+   431→   431→    const sessionCount =
+   432→   432→      stationDetailed?.activities.find((a) => a.id === deletingActivity.id)?._count?.sessions ??
+   433→   433→      deletingActivity._count?.sessions ??
+   434→   434→      0
+   435→   435→    const deps: Record<string, number> = {}
+   436→   436→    if (elementCount > 0) deps['عنصر کاری'] = elementCount
+   437→   437→    if (sessionCount > 0) deps['جلسه زمان‌سنجی'] = sessionCount
+   438→   438→    return deps
+   439→   439→  }, [deletingActivity, deleteDepsQuery.data])
+   440→   440→
+   441→   441→  const editorStationName = activityEditor
+   442→   442→    ? stations.find((s) => s.id === activityEditor.stationId)?.name ?? ''
+   443→   443→    : ''
+   444→   444→
+   445→   445→  // ── پروپ‌های مشترک درخت (نمونه موبایل و دسکتاپ) ──
+   446→   446→  const treeProps = {
+   447→   447→    stations,
+   448→   448→    prefs,
+   449→   449→    openMap,
+   450→   450→    lineName: lineQuery.data?.lineName ?? null,
+   451→   451→    productName: lineQuery.data?.productName ?? null,
+   452→   452→    lineLoading: lineQuery.isLoading,
+   453→   453→    selectedStationId,
+   454→   454→    onStationOpenChange: (stationId: string, open: boolean) =>
+   455→   455→      setOpenMap((m) => ({ ...m, [stationId]: open })),
+   456→   456→    onSelectStation: selectStation,
+   457→   457→    onEditStation: openEditStation,
+   458→   458→    onDeleteStation: (station: StationDto) => setDeletingStation(station),
+   459→   459→    onOpenActivity: (activityId: string) => openActivity(projectId, activityId),
+   460→   460→    onEditActivity: (activity: ActivityDto) =>
+   461→   461→      setActivityEditor({ stationId: activity.stationId, activity }),
+   462→   462→    onDeleteActivity: (activity: ActivityDto) => setDeletingActivity(activity),
+   463→   463→    onNewActivity: openActivityCreate,
+   464→   464→    onReorderStations: handleReorderStations,
+   465→   465→    onReorderActivities: handleReorderActivities,
+   466→   466→    onNewStation: openStationCreate,
+   467→   467→  }
+   468→   468→
+   469→   469→  return (
+   470→   470→    <div className="animate-view-in mx-auto max-w-6xl space-y-5">
+   471→   471→      {/* سربرگ بخش */}
+   472→   472→      <div className="flex flex-wrap items-center justify-between gap-3">
+   473→   473→        <div className="flex items-center gap-3">
+   474→   474→          <div className="chip-icon bg-brand-soft text-brand">
+   475→   475→            <ListTree className="size-6" aria-hidden />
+   476→   476→          </div>
+   477→   477→          <div>
+   478→   478→            <h1 className="text-xl font-extrabold">ساختار تولید</h1>
+   479→   479→            <p className="num text-xs text-muted-foreground">
+   480→   480→              {formatInt(stations.length, prefs)} ایستگاه · {formatInt(totalActivities, prefs)} فعالیت ·{' '}
+   481→   481→              {formatInt(totalElements, prefs)} عنصر کاری
+   482→   482→            </p>
+   483→   483→          </div>
+   484→   484→        </div>
+   485→   485→      </div>
+   486→   486→
+   487→   487→      {/* محتوا */}
+   488→   488→      {treeQuery.isLoading ? (
+   489→   489→        <div className="grid items-start gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
+   490→   490→          <Skeleton className="h-[30rem] w-full rounded-2xl" />
+   491→   491→          <div className="space-y-4">
+   492→   492→            <Skeleton className="h-56 w-full rounded-2xl" />
+   493→   493→            <Skeleton className="h-64 w-full rounded-2xl" />
+   494→   494→          </div>
+   495→   495→        </div>
+   496→   496→      ) : treeQuery.isError ? (
+   497→   497→        <EmptyState
+   498→   498→          title="بارگذاری ساختار تولید ناموفق بود"
+   499→   499→          description={treeQuery.error instanceof Error ? treeQuery.error.message : 'خطای نامشخص'}
+   500→   500→          action={
+   501→   501→            <Button
+   502→   502→              variant="outline"
+   503→   503→              onClick={() => qc.invalidateQueries({ queryKey: qk.structure(projectId) })}
+   504→   504→            >
+   505→   505→              تلاش مجدد
+   506→   506→            </Button>
+   507→   507→          }
+   508→   508→        />
+   509→   509→      ) : (
+   510→   510→        <div className="grid items-start gap-5 lg:grid-cols-[20rem_minmax(0,1fr)]">
+   511→   511→          {/* ستون راست (RTL): درخت ساختار — موبایل: تاشو در بالا */}
+   512→   512→          <div className="lg:sticky lg:top-20">
+   513→   513→            <div className="lg:hidden">
+   514→   514→              <Collapsible open={treeOpen} onOpenChange={setTreeOpen}>
+   515→   515→                <div className="card-premium overflow-hidden">
+   516→   516→                  <CollapsibleTrigger asChild>
+   517→   517→                    <button
+   518→   518→                      type="button"
+   519→   519→                      className="flex w-full items-center justify-between gap-2 p-4 text-sm font-bold"
+   520→   520→                      aria-label={treeOpen ? 'بستن درخت ساختار' : 'باز کردن درخت ساختار'}
+   521→   521→                    >
+   522→   522→                      <span className="flex items-center gap-2">
+   523→   523→                        <ListTree className="size-4 text-brand" aria-hidden />
+   524→   524→                        درخت ساختار
+   525→   525→                        <Badge variant="secondary" className="num border-0 bg-surface-2">
+   526→   526→                          {formatInt(stations.length, prefs)}
+   527→   527→                        </Badge>
+   528→   528→                      </span>
+   529→   529→                      <ChevronDown
+   530→   530→                        className={cn('size-4 text-muted-foreground transition-transform', !treeOpen && '-rotate-90')}
+   531→   531→                        aria-hidden
+   532→   532→                      />
+   533→   533→                    </button>
+   534→   534→                  </CollapsibleTrigger>
+   535→   535→                  <CollapsibleContent>
+   536→   536→                    <div className="border-t">
+   537→   537→                      <StructureTree {...treeProps} />
+   538→   538→                    </div>
+   539→   539→                  </CollapsibleContent>
+   540→   540→                </div>
+   541→   541→              </Collapsible>
+   542→   542→            </div>
+   543→   543→            <div className="hidden lg:block">
+   544→   544→              <div className="card-premium overflow-hidden">
+   545→   545→                <StructureTree {...treeProps} />
+   546→   546→              </div>
+   547→   547→            </div>
+   548→   548→          </div>
+   549→   549→
+   550→   550→          {/* ستون چپ (RTL): جزئیات ایستگاه انتخاب‌شده */}
+   551→   551→          <div className="min-w-0">
+   552→   552→            {stations.length === 0 ? (
+   553→   553→              <EmptyState
+   554→   554→                icon={<Warehouse className="size-7" aria-hidden />}
+   555→   555→                title="هنوز ایستگاهی ثبت نشده است"
+   556→   556→                description="ساختار تولید از ایستگاه‌ها شکل می‌گیرد؛ هر ایستگاه فعالیت‌ها و هر فعالیت، عناصر کاری خود را دارد. با ثبت اولین ایستگاه، درخت ساختار و پنل جزئیات فعال می‌شود."
+   557→   557→                action={
+   558→   558→                  <Button onClick={openStationCreate} className="btn-brand gap-1.5 border-0">
+   559→   559→                    <Plus className="size-4" aria-hidden />
+   560→   560→                    ثبت اولین ایستگاه
+   561→   561→                  </Button>
+   562→   562→                }
+   563→   563→              />
+   564→   564→            ) : selectedStation ? (
+   565→   565→              <StationDetailsPanel
+   566→   566→                key={selectedStation.id}
+   567→   567→                station={selectedStation}
+   568→   568→                prefs={prefs}
+   569→   569→                dialogOpen={stationDialogOpen}
+   570→   570→                onDialogOpenChange={setStationDialogOpen}
+   571→   571→                onSaved={invalidateStructureMeta}
+   572→   572→                onNewActivity={() => openActivityCreate(selectedStation.id)}
+   573→   573→                onOpenActivity={(activityId) => openActivity(projectId, activityId)}
+   574→   574→                onDeleteStation={() => setDeletingStation(selectedStation)}
+   575→   575→              />
+   576→   576→            ) : (
+   577→   577→              <div className="card-premium p-8">
+   578→   578→                <div className="flex flex-col items-center gap-3 text-center">
+   579→   579→                  <div className="chip-icon bg-cyan-soft text-cyan">
+   580→   580→                    <MousePointerClick className="size-6" aria-hidden />
+   581→   581→                  </div>
+   582→   582→                  <div className="space-y-1">
+   583→   583→                    <p className="font-bold">ایستگاهی را از درخت انتخاب کنید</p>
+   584→   584→                    <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
+   585→   585→                      با انتخاب هر ایستگاه، فرم ویرایش آن و فهرست فعالیت‌هایش در این بخش نمایش داده می‌شود. برای
+   586→   586→                      مشاهده عناصر کاری و مجازها، روی فعالیت کلیک کنید تا صفحه اختصاصی آن باز شود.
+   587→   587→                    </p>
+   588→   588→                  </div>
+   589→   589→                  <div className="flex flex-wrap justify-center gap-2">
+   590→   590→                    <Button variant="outline" size="sm" onClick={() => setSelectedStation(stations[0].id)}>
+   591→   591→                      انتخاب اولین ایستگاه
+   592→   592→                    </Button>
+   593→   593→                    <Button variant="ghost" size="sm" onClick={openStationCreate} className="gap-1.5">
+   594→   594→                      <Plus className="size-4" aria-hidden />
+   595→   595→                      ایستگاه جدید
+   596→   596→                    </Button>
+   597→   597→                  </div>
+   598→   598→                </div>
+   599→   599→              </div>
+   600→   600→            )}
+   601→   601→          </div>
+   602→   602→        </div>
+   603→   603→      )}
+   604→   604→
+   605→   605→      {/* دیالوگ ایجاد ایستگاه */}
+   606→   606→      <Dialog open={stationCreateOpen} onOpenChange={setStationCreateOpen}>
+   607→   607→        <DialogContent dir="rtl" className="sm:max-w-md">
+   608→   608→          <DialogHeader>
+   609→   609→            <DialogTitle>ایستگاه جدید</DialogTitle>
+   610→   610→            <DialogDescription>
+   611→   611→              ایستگاه در انتهای فهرست افزوده می‌شود و با کشیدن‌ورها کردن قابل جابه‌جایی است.
+   612→   612→            </DialogDescription>
+   613→   613→          </DialogHeader>
+   614→   614→          <div className="space-y-4">
+   615→   615→            <div className="space-y-1.5">
+   616→   616→              <div className="flex items-center gap-1">
+   617→   617→                <Label htmlFor="station-create-name">نام ایستگاه</Label>
+   618→   618→                <HelpDot label="نام ایستگاه" content={STATION_NAME_HELP} />
+   619→   619→              </div>
+   620→   620→              <Input
+   621→   621→                id="station-create-name"
+   622→   622→                value={stationCreateForm.name}
+   623→   623→                onChange={(e) => setStationCreateForm((s) => ({ ...s, name: e.target.value }))}
+   624→   624→                placeholder="مثلاً: ایستگاه برش ورق"
+   625→   625→              />
+   626→   626→            </div>
+   627→   627→            <div className="space-y-1.5">
+   628→   628→              <Label htmlFor="station-create-desc">شرح ایستگاه (اختیاری)</Label>
+   629→   629→              <Textarea
+   630→   630→                id="station-create-desc"
+   631→   631→                value={stationCreateForm.description}
+   632→   632→                onChange={(e) => setStationCreateForm((s) => ({ ...s, description: e.target.value }))}
+   633→   633→                placeholder="مثلاً: برش ورق گالوانیزه با گیوتین ۳ متری"
+   634→   634→                className="min-h-16"
+   635→   635→              />
+   636→   636→            </div>
+   637→   637→          </div>
+   638→   638→          <DialogFooter className="gap-2">
+   639→   639→            <Button variant="outline" onClick={() => setStationCreateOpen(false)}>
+   640→   640→              انصراف
+   641→   641→            </Button>
+   642→   642→            <Button onClick={submitStationCreate} disabled={stationCreating} className="btn-brand border-0">
+   643→   643→              {stationCreating ? (
+   644→   644→                <Loader2 className="size-4 animate-spin" aria-hidden />
+   645→   645→              ) : (
+   646→   646→                <Plus className="size-4" aria-hidden />
+   647→   647→              )}
+   648→   648→              ثبت ایستگاه
+   649→   649→            </Button>
+   650→   650→          </DialogFooter>
+   651→   651→        </DialogContent>
+   652→   652→      </Dialog>
+   653→   653→
+   654→   654→      {/* دیالوگ ایجاد/ویرایش فعالیت */}
+   655→   655→      <Dialog open={activityEditor !== null} onOpenChange={(open) => !open && setActivityEditor(null)}>
+   656→   656→        <DialogContent dir="rtl" className="sm:max-w-md">
+   657→   657→          {activityEditor?.activity ? (
+   658→   658→            <ActivityEditForm
+   659→   659→              key={activityEditor.activity.id}
+   660→   660→              activity={activityEditor.activity}
+   661→   661→              groups={groups}
+   662→   662→              groupsLoading={groupsQuery.isLoading}
+   663→   663→              groupsError={groupsQuery.isError}
+   664→   664→              onClose={() => setActivityEditor(null)}
+   665→   665→              onSaved={onActivitySaved}
+   666→   666→            />
+   667→   667→          ) : activityEditor ? (
+   668→   668→            <>
+   669→   669→              <DialogHeader>
+   670→   670→                <DialogTitle>فعالیت جدید</DialogTitle>
+   671→   671→                <DialogDescription>
+   672→   672→                  {editorStationName ? `در ایستگاه «${editorStationName}» — ` : ''}
+   673→   673→                  فعالیت در انتهای فهرست افزوده می‌شود.
+   674→   674→                </DialogDescription>
+   675→   675→              </DialogHeader>
+   676→   676→              <div className="space-y-4">
+   677→   677→                <div className="space-y-1.5">
+   678→   678→                  <div className="flex items-center gap-1">
+   679→   679→                    <Label htmlFor="activity-create-name">نام فعالیت</Label>
+   680→   680→                    <HelpDot label="نام فعالیت" content={ACTIVITY_NAME_HELP} />
+   681→   681→                  </div>
+   682→   682→                  <Input
+   683→   683→                    id="activity-create-name"
+   684→   684→                    value={activityCreateForm.name}
+   685→   685→                    onChange={(e) => setActivityCreateForm((s) => ({ ...s, name: e.target.value }))}
+   686→   686→                    placeholder="مثلاً: بستن درب پنل"
+   687→   687→                  />
+   688→   688→                </div>
+   689→   689→                <div className="space-y-1.5">
+   690→   690→                  <Label htmlFor="activity-create-desc">شرح فعالیت (اختیاری)</Label>
+   691→   691→                  <Textarea
+   692→   692→                    id="activity-create-desc"
+   693→   693→                    value={activityCreateForm.description}
+   694→   694→                    onChange={(e) => setActivityCreateForm((s) => ({ ...s, description: e.target.value }))}
+   695→   695→                    placeholder="مثلاً: بستن ۴ پیچ با پیچ‌گوشتی برقی"
+   696→   696→                    className="min-h-16"
+   697→   697→                  />
+   698→   698→                </div>
+   699→   699→                <div className="grid gap-4 sm:grid-cols-2">
+   700→   700→                  <div className="space-y-1.5">
+   701→   701→                    <div className="flex items-center gap-1">
+   702→   702→                      <Label>نوع رویداد فرایندی</Label>
+   703→   703→                      <HelpDot label="نوع رویداد فرایندی" content={PROCESS_TYPE_HELP} />
+   704→   704→                    </div>
+   705→   705→                    <Select
+   706→   706→                      value={activityCreateForm.processType}
+   707→   707→                      onValueChange={(v) => setActivityCreateForm((s) => ({ ...s, processType: v }))}
+   708→   708→                    >
+   709→   709→                      <SelectTrigger className="w-full" aria-label="نوع رویداد فرایندی">
+   710→   710→                        <SelectValue />
+   711→   711→                      </SelectTrigger>
+   712→   712→                      <SelectContent>
+   713→   713→                        {PROCESS_TYPES.map((pt) => (
+   714→   714→                          <SelectItem key={pt} value={pt}>
+   715→   715→                            <span className="num">{PROCESS_TYPE_SYMBOLS[pt]}</span> {PROCESS_TYPE_LABELS[pt]}
+   716→   716→                          </SelectItem>
+   717→   717→                        ))}
+   718→   718→                      </SelectContent>
+   719→   719→                    </Select>
+   720→   720→                  </div>
+   721→   721→                  <div className="space-y-1.5">
+   722→   722→                    <div className="flex items-center gap-1">
+   723→   723→                      <Label>گروه مجازها</Label>
+   724→   724→                      <HelpDot label="گروه مجازها" content={GROUP_ASSIGN_HELP} />
+   725→   725→                    </div>
+   726→   726→                    <Select
+   727→   727→                      value={activityCreateForm.groupId || NO_GROUP}
+   728→   728→                      onValueChange={(v) =>
+   729→   729→                        setActivityCreateForm((s) => ({ ...s, groupId: v === NO_GROUP ? '' : v }))
+   730→   730→                      }
+   731→   731→                      disabled={groupsQuery.isLoading}
+   732→   732→                    >
+   733→   733→                      <SelectTrigger className="w-full" aria-label="گروه مجازها">
+   734→   734→                        <SelectValue />
+   735→   735→                      </SelectTrigger>
+   736→   736→                      <SelectContent>
+   737→   737→                        <SelectItem value={NO_GROUP}>بدون گروه</SelectItem>
+   738→   738→                        {groups.map((g) => (
+   739→   739→                          <SelectItem key={g.id} value={g.id}>
+   740→   740→                            {g.name}
+   741→   741→                          </SelectItem>
+   742→   742→                        ))}
+   743→   743→                      </SelectContent>
+   744→   744→                    </Select>
+   745→   745→                    {groupsQuery.isError && (
+   746→   746→                      <p className="text-[11px] leading-5 text-red">
+   747→   747→                        بارگذاری گروه‌ها ناموفق بود؛ فعلاً تنها «بدون گروه» در دسترس است.
+   748→   748→                      </p>
+   749→   749→                    )}
+   750→   750→                  </div>
+   751→   751→                </div>
+   752→   752→              </div>
+   753→   753→              <DialogFooter className="gap-2">
+   754→   754→                <Button variant="outline" onClick={() => setActivityEditor(null)}>
+   755→   755→                  انصراف
+   756→   756→                </Button>
+   757→   757→                <Button onClick={submitActivityCreate} disabled={activityCreating} className="btn-brand border-0">
+   758→   758→                  {activityCreating ? (
+   759→   759→                    <Loader2 className="size-4 animate-spin" aria-hidden />
+   760→   760→                  ) : (
+   761→   761→                    <Plus className="size-4" aria-hidden />
+   762→   762→                  )}
+   763→   763→                  ثبت فعالیت
+   764→   764→                </Button>
+   765→   765→              </DialogFooter>
+   766→   766→            </>
+   767→   767→          ) : null}
+   768→   768→        </DialogContent>
+   769→   769→      </Dialog>
+   770→   770→
+   771→   771→      {/* تأیید حذف دائمی ایستگاه — FR-26 */}
+   772→   772→      <ConfirmDeleteDialog
+   773→   773→        open={deletingStation !== null}
+   774→   774→        onOpenChange={(open) => !open && setDeletingStation(null)}
+   775→   775→        title="حذف دائمی ایستگاه"
+   776→   776→        entityName={deletingStation?.name ?? ''}
+   777→   777→        dependencies={stationDeleteDeps}
+   778→   778→        onConfirm={() => deletingStation && deleteStationMutation.mutate(deletingStation)}
+   779→   779→        loading={deleteStationMutation.isPending}
+   780→   780→      />
+   781→   781→
+   782→   782→      {/* تأیید حذف دائمی فعالیت — FR-26 */}
+   783→   783→      <ConfirmDeleteDialog
+   784→   784→        open={deletingActivity !== null}
+   785→   785→        onOpenChange={(open) => !open && setDeletingActivity(null)}
+   786→   786→        title="حذف دائمی فعالیت"
+   787→   787→        entityName={deletingActivity?.name ?? ''}
+   788→   788→        dependencies={activityDeleteDeps}
+   789→   789→        onConfirm={() => deletingActivity && deleteActivityMutation.mutate(deletingActivity)}
+   790→   790→        loading={deleteActivityMutation.isPending}
+   791→   791→      />
+   792→   792→    </div>
+   793→   793→  )
+   794→   794→}
+   795→   795→
+   796→   796→// ═══════════════════════════════════════════════════════════
+   797→   797→// درخت ساختار — ریشه: خط تولید؛ ایستگاه‌ها و فعالیت‌ها با D&D
+   798→   798→// فعالیت‌های هر ایستگاه داخل Collapsible باز/بسته می‌شوند
+   799→   799→// ═══════════════════════════════════════════════════════════
+   800→   800→function StructureTree({
+   801→   801→  stations,
+   802→   802→  prefs,
+   803→   803→  openMap,
+   804→   804→  lineName,
+   805→   805→  productName,
+   806→   806→  lineLoading,
+   807→   807→  selectedStationId,
+   808→   808→  onStationOpenChange,
+   809→   809→  onSelectStation,
+   810→   810→  onEditStation,
+   811→   811→  onDeleteStation,
+   812→   812→  onOpenActivity,
+   813→   813→  onEditActivity,
+   814→   814→  onDeleteActivity,
+   815→   815→  onNewActivity,
+   816→   816→  onReorderStations,
+   817→   817→  onReorderActivities,
+   818→   818→  onNewStation,
+   819→   819→}: {
+   820→   820→  stations: StationDto[]
+   821→   821→  prefs: Prefs
+   822→   822→  openMap: Record<string, boolean>
+   823→   823→  lineName: string | null
+   824→   824→  productName: string | null
+   825→   825→  lineLoading: boolean
+   826→   826→  selectedStationId: string | null
+   827→   827→  onStationOpenChange: (stationId: string, open: boolean) => void
+   828→   828→  onSelectStation: (stationId: string) => void
+   829→   829→  onEditStation: (station: StationDto) => void
+   830→   830→  onDeleteStation: (station: StationDto) => void
+   831→   831→  onOpenActivity: (activityId: string) => void
+   832→   832→  onEditActivity: (activity: ActivityDto) => void
+   833→   833→  onDeleteActivity: (activity: ActivityDto) => void
+   834→   834→  onNewActivity: (stationId: string) => void
+   835→   835→  onReorderStations: (ids: string[]) => void
+   836→   836→  onReorderActivities: (stationId: string, ids: string[]) => void
+   837→   837→  onNewStation: () => void
+   838→   838→}) {
+   839→   839→  return (
+   840→   840→    <div>
+   841→   841→      {/* ریشه درخت: خط تولید — یک خط، یک محصول */}
+   842→   842→      <div className="border-b bg-gradient-to-l from-brand-soft/70 to-transparent p-4">
+   843→   843→        <div className="flex items-center gap-2.5">
+   844→   844→          <div className="chip-icon bg-brand-soft text-brand">
+   845→   845→            <Factory className="size-5" aria-hidden />
+   846→   846→          </div>
+   847→   847→          <div className="min-w-0 flex-1">
+   848→   848→            {lineLoading ? (
+   849→   849→              <Skeleton className="h-5 w-28" />
+   850→   850→            ) : (
+   851→   851→              <p className="truncate font-extrabold" title={lineName ?? undefined}>
+   852→   852→                {lineName ?? 'خط تولید'}
+   853→   853→              </p>
+   854→   854→            )}
+   855→   855→            <p className="truncate text-xs text-muted-foreground" title={productName ?? undefined}>
+   856→   856→              محصول: {productName ?? '—'}
+   857→   857→            </p>
+   858→   858→          </div>
+   859→   859→          <HelpDot label="خط تولید و محصول" content={LINE_HELP} />
+   860→   860→        </div>
+   861→   861→        <div className="mt-2.5">
+   862→   862→          <Badge className="border-0 bg-brand-soft text-brand">یک خط — یک محصول</Badge>
+   863→   863→        </div>
+   864→   864→      </div>
+   865→   865→
+   866→   866→      {/* ایستگاه‌ها — قابل مرتب‌سازی با Drag & Drop */}
+   867→   867→      <div className="scroll-slim max-h-[24rem] overflow-y-auto p-3 lg:max-h-[calc(100vh-19rem)]">
+   868→   868→        {stations.length === 0 ? (
+   869→   869→          <div className="space-y-2 rounded-xl border border-dashed p-4 text-center">
+   870→   870→            <p className="text-xs leading-6 text-muted-foreground">هنوز ایستگاهی ثبت نشده است.</p>
+   871→   871→            <Button size="sm" onClick={onNewStation} className="btn-brand gap-1.5 border-0">
+   872→   872→              <Plus className="size-3.5" aria-hidden />
+   873→   873→              ثبت اولین ایستگاه
+   874→   874→            </Button>
+   875→   875→          </div>
+   876→   876→        ) : (
+   877→   877→          <SortableList
+   878→   878→            items={stations}
+   879→   879→            onReorder={onReorderStations}
+   880→   880→            renderItem={(station, index) => {
+   881→   881→              const isSelected = station.id === selectedStationId
+   882→   882→              const isOpen = openMap[station.id] !== false
+   883→   883→              return (
+   884→   884→                <Collapsible
+   885→   885→                  key={station.id}
+   886→   886→                  open={isOpen}
+   887→   887→                  onOpenChange={(open) => onStationOpenChange(station.id, open)}
+   888→   888→                >
+   889→   889→                  <div
+   890→   890→                    className={cn(
+   891→   891→                      'overflow-hidden rounded-xl border transition-colors',
+   892→   892→                      isSelected
+   893→   893→                        ? 'border-brand bg-brand-soft/30'
+   894→   894→                        : 'border-border/60 hover:border-brand/40 hover:bg-muted/40'
+   895→   895→                    )}
+   896→   896→                  >
+   897→   897→                    <div className="flex items-center gap-0.5 py-0.5 pl-1">
+   898→   898→                      <CollapsibleTrigger asChild>
+   899→   899→                        <Button
+   900→   900→                          variant="ghost"
+   901→   901→                          size="icon"
+   902→   902→                          className="size-7 shrink-0 text-faint"
+   903→   903→                          aria-label={isOpen ? `بستن فعالیت‌های ${station.name}` : `باز کردن فعالیت‌های ${station.name}`}
+   904→   904→                        >
+   905→   905→                          <ChevronDown
+   906→   906→                            className={cn('size-4 transition-transform', !isOpen && '-rotate-90')}
+   907→   907→                            aria-hidden
+   908→   908→                          />
+   909→   909→                        </Button>
+   910→   910→                      </CollapsibleTrigger>
+   911→   911→                      <button
+   912→   912→                        type="button"
+   913→   913→                        onClick={() => onSelectStation(station.id)}
+   914→   914→                        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-2 text-right focus-visible:outline-2 focus-visible:outline-ring"
+   915→   915→                        aria-current={isSelected ? true : undefined}
+   916→   916→                      >
+   917→   917→                        <span className="num w-4 shrink-0 text-[11px] text-faint">
+   918→   918→                          {formatInt(index + 1, prefs)}
+   919→   919→                        </span>
+   920→   920→                        <Warehouse className="size-4 shrink-0 text-brand" aria-hidden />
+   921→   921→                        <span className="truncate text-sm font-bold">{station.name}</span>
+   922→   922→                      </button>
+   923→   923→                      <Badge
+   924→   924→                        variant="secondary"
+   925→   925→                        className="num shrink-0 border-0 bg-surface-2 text-[11px] text-muted-foreground"
+   926→   926→                      >
+   927→   927→                        {formatInt(station.activities.length, prefs)} فعالیت
+   928→   928→                      </Badge>
+   929→   929→                      <Button
+   930→   930→                        variant="ghost"
+   931→   931→                        size="icon"
+   932→   932→                        className="size-7 shrink-0"
+   933→   933→                        onClick={() => onEditStation(station)}
+   934→   934→                        aria-label={`ویرایش ایستگاه ${station.name}`}
+   935→   935→                      >
+   936→   936→                        <Pencil className="size-3.5" aria-hidden />
+   937→   937→                      </Button>
+   938→   938→                      <Button
+   939→   939→                        variant="ghost"
+   940→   940→                        size="icon"
+   941→   941→                        className="size-7 shrink-0 text-red hover:text-red"
+   942→   942→                        onClick={() => onDeleteStation(station)}
+   943→   943→                        aria-label={`حذف ایستگاه ${station.name}`}
+   944→   944→                      >
+   945→   945→                        <Trash2 className="size-3.5" aria-hidden />
+   946→   946→                      </Button>
+   947→   947→                    </div>
+   948→   948→
+   949→   949→                    <CollapsibleContent>
+   950→   950→                      <div className="border-t border-dashed px-2 pb-2 pr-2 pt-2">
+   951→   951→                        {station.activities.length === 0 ? (
+   952→   952→                          <p className="py-1.5 text-center text-[11px] text-faint">فعالیتی ثبت نشده است</p>
+   953→   953→                        ) : (
+   954→   954→                          <SortableList
+   955→   955→                            items={station.activities}
+   956→   956→                            onReorder={(ids) => onReorderActivities(station.id, ids)}
+   957→   957→                            className="space-y-1.5"
+   958→   958→                            renderItem={(activity, actIndex) => (
+   959→   959→                              <div className="flex items-center gap-1 rounded-lg border border-transparent bg-surface-2/70 pl-1 transition-colors hover:border-brand/40 hover:bg-brand-soft/40">
+   960→   960→                                <button
+   961→   961→                                  type="button"
+   962→   962→                                  onClick={() => onOpenActivity(activity.id)}
+   963→   963→                                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-right focus-visible:outline-2 focus-visible:outline-ring"
+   964→   964→                                  aria-label={`باز کردن صفحه فعالیت ${activity.name}`}
+   965→   965→                                >
+   966→   966→                                  <span className="num w-3.5 shrink-0 text-[10px] text-faint">
+   967→   967→                                    {formatInt(actIndex + 1, prefs)}
+   968→   968→                                  </span>
+   969→   969→                                  <span
+   970→   970→                                    className="num flex size-6 shrink-0 items-center justify-center rounded-md bg-background text-sm font-bold text-brand"
+   971→   971→                                    title={processLabelOf(activity.processType)}
+   972→   972→                                  >
+   973→   973→                                    {processSymbolOf(activity.processType)}
+   974→   974→                                  </span>
+   975→   975→                                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+   976→   976→                                    {activity.name}
+   977→   977→                                  </span>
+   978→   978→                                  {activity.group && (
+   979→   979→                                    <Badge
+   980→   980→                                      className="max-w-24 shrink-0 truncate border-0 bg-cyan-soft text-cyan"
+   981→   981→                                      title={`گروه مجازها: ${activity.group.name}`}
+   982→   982→                                    >
+   983→   983→                                      {activity.group.name}
+   984→   984→                                    </Badge>
+   985→   985→                                  )}
+   986→   986→                                  <span className="num shrink-0 text-[11px] text-faint">
+   987→   987→                                    {formatInt(activityElementCount(activity), prefs)} عنصر
+   988→   988→                                  </span>
+   989→   989→                                </button>
+   990→   990→                                <Button
+   991→   991→                                  variant="ghost"
+   992→   992→                                  size="icon"
+   993→   993→                                  className="size-7 shrink-0"
+   994→   994→                                  onClick={() => onEditActivity(activity)}
+   995→   995→                                  aria-label={`ویرایش فعالیت ${activity.name}`}
+   996→   996→                                >
+   997→   997→                                  <Pencil className="size-3.5" aria-hidden />
+   998→   998→                                </Button>
+   999→   999→                                <Button
+  1000→  1000→                                  variant="ghost"
+  1001→  1001→                                  size="icon"
+  1002→  1002→                                  className="size-7 shrink-0 text-red hover:text-red"
+  1003→  1003→                                  onClick={() => onDeleteActivity(activity)}
+  1004→  1004→                                  aria-label={`حذف فعالیت ${activity.name}`}
+  1005→  1005→                                >
+  1006→  1006→                                  <Trash2 className="size-3.5" aria-hidden />
+  1007→  1007→                                </Button>
+  1008→  1008→                              </div>
+  1009→  1009→                            )}
+  1010→  1010→                          />
+  1011→  1011→                        )}
+  1012→  1012→                        <Button
+  1013→  1013→                          variant="ghost"
+  1014→  1014→                          size="sm"
+  1015→  1015→                          className="mt-1.5 w-full gap-1 text-xs text-muted-foreground"
+  1016→  1016→                          onClick={() => onNewActivity(station.id)}
+  1017→  1017→                        >
+  1018→  1018→                          <Plus className="size-3.5" aria-hidden />
+  1019→  1019→                          فعالیت جدید
+  1020→  1020→                        </Button>
+  1021→  1021→                      </div>
+  1022→  1022→                    </CollapsibleContent>
+  1023→  1023→                  </div>
+  1024→  1024→                </Collapsible>
+  1025→  1025→              )
+  1026→  1026→            }}
+  1027→  1027→          />
+  1028→  1028→        )}
+  1029→  1029→      </div>
+  1030→  1030→
+  1031→  1031→      {/* افزودن ایستگاه جدید */}
+  1032→  1032→      <div className="border-t p-3">
+  1033→  1033→        <Button variant="outline" className="w-full gap-1.5" onClick={onNewStation}>
+  1034→  1034→          <Plus className="size-4" aria-hidden />
+  1035→  1035→          ایستگاه جدید
+  1036→  1036→        </Button>
+  1037→  1037→      </div>
+  1038→  1038→    </div>
+  1039→  1039→  )
+  1040→  1040→}
+  1041→  1041→
+  1042→  1042→// ═══════════════════════════════════════════════════════════
+  1043→  1043→// پنل جزئیات ایستگاه — فرم ویرایش با ذخیره خودکار (FR-23)
+  1044→  1044→// دیالوگ ویرایش همان فرم مشترک را نمایش می‌دهد تا تنها یک
+  1045→  1045→// نمونه autosave برای هر ایستگاه فعال باشد (کنترل هم‌زمانی)
+  1046→  1046→// ═══════════════════════════════════════════════════════════
+  1047→  1047→function StationDetailsPanel({
+  1048→  1048→  station,
+  1049→  1049→  prefs,
+  1050→  1050→  dialogOpen,
+  1051→  1051→  onDialogOpenChange,
+  1052→  1052→  onSaved,
+  1053→  1053→  onNewActivity,
+  1054→  1054→  onOpenActivity,
+  1055→  1055→  onDeleteStation,
+  1056→  1056→}: {
+  1057→  1057→  station: StationDto
+  1058→  1058→  prefs: Prefs
+  1059→  1059→  dialogOpen: boolean
+  1060→  1060→  onDialogOpenChange: (open: boolean) => void
+  1061→  1061→  onSaved: () => void
+  1062→  1062→  onNewActivity: () => void
+  1063→  1063→  onOpenActivity: (activityId: string) => void
+  1064→  1064→  onDeleteStation: () => void
+  1065→  1065→}) {
+  1066→  1066→  // فرم یک‌بار از داده اولیه مقداردهی می‌شود؛ ref آخرین updatedAt را
+  1067→  1067→  // برای کنترل هم‌زمانی (expectedUpdatedAt) نگه می‌دارد — ۶.۶
+  1068→  1068→  const [form, setForm] = useState<StationFormState>(() => ({
+  1069→  1069→    name: station.name,
+  1070→  1070→    description: station.description ?? '',
+  1071→  1071→  }))
+  1072→  1072→  const updatedAtRef = useRef(station.updatedAt)
+  1073→  1073→
+  1074→  1074→  const { status, lastError, retry } = useAutosave<StationFormState>({
+  1075→  1075→    data: form,
+  1076→  1076→    ready: true,
+  1077→  1077→    save: async (value) => {
+  1078→  1078→      const res = await structureApi.updateStation(station.id, {
+  1079→  1079→        name: value.name.trim(),
+  1080→  1080→        description: value.description.trim() || null,
+  1081→  1081→        expectedUpdatedAt: updatedAtRef.current,
+  1082→  1082→      })
+  1083→  1083→      updatedAtRef.current = res.station.updatedAt
+  1084→  1084→      onSaved()
+  1085→  1085→    },
+  1086→  1086→  })
+  1087→  1087→
+  1088→  1088→  const totalElements = station.activities.reduce((sum, a) => sum + activityElementCount(a), 0)
+  1089→  1089→
+  1090→  1090→  const nameField = (id: string) => (
+  1091→  1091→    <div className="space-y-1.5">
+  1092→  1092→      <div className="flex items-center gap-1">
+  1093→  1093→        <Label htmlFor={id}>نام ایستگاه</Label>
+  1094→  1094→        <HelpDot label="نام ایستگاه" content={STATION_NAME_HELP} />
+  1095→  1095→      </div>
+  1096→  1096→      <Input
+  1097→  1097→        id={id}
+  1098→  1098→        value={form.name}
+  1099→  1099→        onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+  1100→  1100→        placeholder="مثلاً: ایستگاه برش ورق"
+  1101→  1101→      />
+  1102→  1102→    </div>
+  1103→  1103→  )
+  1104→  1104→
+  1105→  1105→  const descField = (id: string) => (
+  1106→  1106→    <div className="space-y-1.5">
+  1107→  1107→      <Label htmlFor={id}>شرح ایستگاه (اختیاری)</Label>
+  1108→  1108→      <Textarea
+  1109→  1109→        id={id}
+  1110→  1110→        value={form.description}
+  1111→  1111→        onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+  1112→  1112→        placeholder="مثلاً: برش ورق گالوانیزه با گیوتین ۳ متری"
+  1113→  1113→        className="min-h-20"
+  1114→  1114→      />
+  1115→  1115→    </div>
+  1116→  1116→  )
+  1117→  1117→
+  1118→  1118→  return (
+  1119→  1119→    <div className="space-y-5">
+  1120→  1120→      {/* کارت ایستگاه — فرم ویرایش با ذخیره خودکار */}
+  1121→  1121→      <section className="card-premium p-5" aria-label={`جزئیات ایستگاه ${station.name}`}>
+  1122→  1122→        <div className="flex flex-wrap items-start justify-between gap-3">
+  1123→  1123→          <div className="flex min-w-0 items-center gap-3">
+  1124→  1124→            <div className="chip-icon bg-brand-soft text-brand">
+  1125→  1125→              <Warehouse className="size-6" aria-hidden />
+  1126→  1126→            </div>
+  1127→  1127→            <div className="min-w-0">
+  1128→  1128→              <h2 className="truncate text-lg font-extrabold">{station.name}</h2>
+  1129→  1129→              <p className="num text-xs text-muted-foreground">
+  1130→  1130→                {formatInt(station.activities.length, prefs)} فعالیت · {formatInt(totalElements, prefs)} عنصر کاری
+  1131→  1131→              </p>
+  1132→  1132→            </div>
+  1133→  1133→          </div>
+  1134→  1134→          <div className="flex items-center gap-1.5">
+  1135→  1135→            <SaveIndicator status={status} onRetry={retry} error={lastError} />
+  1136→  1136→            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => onDialogOpenChange(true)}>
+  1137→  1137→              <Pencil className="size-3.5" aria-hidden />
+  1138→  1138→              ویرایش
+  1139→  1139→            </Button>
+  1140→  1140→            <Button
+  1141→  1141→              variant="ghost"
+  1142→  1142→              size="icon"
+  1143→  1143→              className="size-8 text-red hover:text-red"
+  1144→  1144→              onClick={onDeleteStation}
+  1145→  1145→              aria-label={`حذف ایستگاه ${station.name}`}
+  1146→  1146→            >
+  1147→  1147→              <Trash2 className="size-4" aria-hidden />
+  1148→  1148→            </Button>
+  1149→  1149→          </div>
+  1150→  1150→        </div>
+  1151→  1151→
+  1152→  1152→        <div className="mt-4 space-y-4">
+  1153→  1153→          {nameField(`station-name-${station.id}`)}
+  1154→  1154→          {descField(`station-desc-${station.id}`)}
+  1155→  1155→        </div>
+  1156→  1156→
+  1157→  1157→        <p className="num mt-3 text-[11px] text-faint">
+  1158→  1158→          ایجاد: {formatDate(station.createdAt, prefs)} · آخرین تغییر: {formatDateTime(station.updatedAt, prefs)} ·
+  1159→  1159→          تغییرات به‌صورت خودکار ذخیره می‌شوند.
+  1160→  1160→        </p>
+  1161→  1161→      </section>
+  1162→  1162→
+  1163→  1163→      {/* فعالیت‌های ایستگاه — کارت‌های کلیک‌شو به صفحه اختصاصی فعالیت */}
+  1164→  1164→      <section className="card-premium p-5" aria-label="فعالیت‌های ایستگاه">
+  1165→  1165→        <div className="flex flex-wrap items-center justify-between gap-3">
+  1166→  1166→          <div className="flex items-center gap-2">
+  1167→  1167→            <h2 className="font-extrabold">فعالیت‌های این ایستگاه</h2>
+  1168→  1168→            <Badge variant="secondary" className="num border-0 bg-surface-2">
+  1169→  1169→              {formatInt(station.activities.length, prefs)}
+  1170→  1170→            </Badge>
+  1171→  1171→          </div>
+  1172→  1172→          <Button onClick={onNewActivity} className="btn-brand gap-1.5 border-0">
+  1173→  1173→            <Plus className="size-4" aria-hidden />
+  1174→  1174→            فعالیت جدید
+  1175→  1175→          </Button>
+  1176→  1176→        </div>
+  1177→  1177→
+  1178→  1178→        {station.activities.length === 0 ? (
+  1179→  1179→          <EmptyState
+  1180→  1180→            icon={<ListTree className="size-7" aria-hidden />}
+  1181→  1181→            title="فعالیتی برای این ایستگاه ثبت نشده است"
+  1182→  1182→            description="هر فعالیت از عناصر کاری تشکیل می‌شود و صفحه اختصاصی چهارزبانه دارد: مشخصات، عناصر کاری، زمان‌سنجی و تحلیل نتایج."
+  1183→  1183→            action={
+  1184→  1184→              <Button onClick={onNewActivity} className="btn-brand gap-1.5 border-0">
+  1185→  1185→                <Plus className="size-4" aria-hidden />
+  1186→  1186→                ثبت اولین فعالیت
+  1187→  1187→              </Button>
+  1188→  1188→            }
+  1189→  1189→            className="mt-3"
+  1190→  1190→          />
+  1191→  1191→        ) : (
+  1192→  1192→          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+  1193→  1193→            {station.activities.map((activity) => (
+  1194→  1194→              <li key={activity.id}>
+  1195→  1195→                <ActivityCard activity={activity} prefs={prefs} onOpen={onOpenActivity} />
+  1196→  1196→              </li>
+  1197→  1197→            ))}
+  1198→  1198→          </ul>
+  1199→  1199→        )}
+  1200→  1200→      </section>
+  1201→  1201→
+  1202→  1202→      {/* دیالوگ ویرایش — نمای بزرگ‌تر همان فرم ذخیره خودکار */}
+  1203→  1203→      <Dialog open={dialogOpen} onOpenChange={onDialogOpenChange}>
+  1204→  1204→        <DialogContent dir="rtl" className="sm:max-w-md">
+  1205→  1205→          <DialogHeader>
+  1206→  1206→            <DialogTitle>ویرایش ایستگاه</DialogTitle>
+  1207→  1207→            <DialogDescription>
+  1208→  1208→              تغییرات به‌صورت خودکار ذخیره می‌شوند؛ همین فرم در پنل جزئیات نیز فعال است.
+  1209→  1209→            </DialogDescription>
+  1210→  1210→          </DialogHeader>
+  1211→  1211→          <div className="space-y-4">
+  1212→  1212→            {nameField(`station-dialog-name-${station.id}`)}
+  1213→  1213→            {descField(`station-dialog-desc-${station.id}`)}
+  1214→  1214→          </div>
+  1215→  1215→          <DialogFooter className="flex-row justify-between gap-2">
+  1216→  1216→            <SaveIndicator status={status} onRetry={retry} error={lastError} />
+  1217→  1217→            <Button variant="outline" onClick={() => onDialogOpenChange(false)}>
+  1218→  1218→              بستن
+  1219→  1219→            </Button>
+  1220→  1220→          </DialogFooter>
+  1221→  1221→        </DialogContent>
+  1222→  1222→      </Dialog>
+  1223→  1223→    </div>
+  1224→  1224→  )
+  1225→  1225→}
+  1226→  1226→
+  1227→  1227→// ═══════════════════════════════════════════════════════════
+  1228→  1228→// کارت فعالیت — کلیک → صفحه اختصاصی فعالیت (FR-03)
+  1229→  1229→// ═══════════════════════════════════════════════════════════
+  1230→  1230→function ActivityCard({
+  1231→  1231→  activity,
+  1232→  1232→  prefs,
+  1233→  1233→  onOpen,
+  1234→  1234→}: {
+  1235→  1235→  activity: ActivityDto
+  1236→  1236→  prefs: Prefs
+  1237→  1237→  onOpen: (activityId: string) => void
+  1238→  1238→}) {
+  1239→  1239→  const label = processLabelOf(activity.processType)
+  1240→  1240→  return (
+  1241→  1241→    <button
+  1242→  1242→      type="button"
+  1243→  1243→      onClick={() => onOpen(activity.id)}
+  1244→  1244→      className="group flex w-full items-center gap-2.5 rounded-xl border border-border/60 bg-surface-2/50 p-3 text-right transition-all hover:border-brand/40 hover:bg-brand-soft/40 focus-visible:outline-2 focus-visible:outline-ring"
+  1245→  1245→      aria-label={`باز کردن صفحه فعالیت ${activity.name}`}
+  1246→  1246→    >
+  1247→  1247→      <span
+  1248→  1248→        className="num flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-base font-bold text-brand"
+  1249→  1249→        title={label}
+  1250→  1250→        aria-hidden
+  1251→  1251→      >
+  1252→  1252→        {processSymbolOf(activity.processType)}
+  1253→  1253→      </span>
+  1254→  1254→      <span className="min-w-0 flex-1">
+  1255→  1255→        <span className="block truncate text-sm font-bold">{activity.name}</span>
+  1256→  1256→        <span className="num mt-0.5 block truncate text-[11px] text-muted-foreground">
+  1257→  1257→          {formatInt(activityElementCount(activity), prefs)} عنصر کاری
+  1258→  1258→          {activity.group ? ` · گروه ${activity.group.name}` : ' · بدون گروه'}
+  1259→  1259→        </span>
+  1260→  1260→      </span>
+  1261→  1261→      <ArrowLeft className="size-4 shrink-0 text-faint transition-colors group-hover:text-brand" aria-hidden />
+  1262→  1262→    </button>
+  1263→  1263→  )
+  1264→  1264→}
+  1265→  1265→
+  1266→  1266→// ═══════════════════════════════════════════════════════════
+  1267→  1267→// فرم ویرایش فعالیت (داخل دیالوگ) — ذخیره خودکار؛
+  1268→  1268→// با key فعالیت رندر می‌شود تا وضعیت فرم با تعویض فعالیت بازنشانی شود
+  1269→  1269→// ═══════════════════════════════════════════════════════════
+  1270→  1270→function ActivityEditForm({
+  1271→  1271→  activity,
+  1272→  1272→  groups,
+  1273→  1273→  groupsLoading,
+  1274→  1274→  groupsError,
+  1275→  1275→  onClose,
+  1276→  1276→  onSaved,
+  1277→  1277→}: {
+  1278→  1278→  activity: ActivityDto
+  1279→  1279→  groups: GroupDto[]
+  1280→  1280→  groupsLoading: boolean
+  1281→  1281→  groupsError: boolean
+  1282→  1282→  onClose: () => void
+  1283→  1283→  onSaved: (activityId: string) => void
+  1284→  1284→}) {
+  1285→  1285→  const [form, setForm] = useState<ActivityFormState>(() => ({
+  1286→  1286→    name: activity.name,
+  1287→  1287→    description: activity.description ?? '',
+  1288→  1288→    processType: activity.processType,
+  1289→  1289→    groupId: activity.groupId ?? '',
+  1290→  1290→  }))
+  1291→  1291→  const updatedAtRef = useRef(activity.updatedAt)
+  1292→  1292→
+  1293→  1293→  const { status, lastError, retry } = useAutosave<ActivityFormState>({
+  1294→  1294→    data: form,
+  1295→  1295→    ready: true,
+  1296→  1296→    save: async (value) => {
+  1297→  1297→      const res = await structureApi.updateActivity(activity.id, {
+  1298→  1298→        name: value.name.trim(),
+  1299→  1299→        description: value.description.trim() || null,
+  1300→  1300→        processType: value.processType,
+  1301→  1301→        groupId: value.groupId || null,
+  1302→  1302→        expectedUpdatedAt: updatedAtRef.current,
+  1303→  1303→      })
+  1304→  1304→      updatedAtRef.current = res.activity.updatedAt
+  1305→  1305→      onSaved(activity.id)
+  1306→  1306→    },
+  1307→  1307→  })
+  1308→  1308→
+  1309→  1309→  return (
+  1310→  1310→    <>
+  1311→  1311→      <DialogHeader>
+  1312→  1312→        <DialogTitle>ویرایش فعالیت</DialogTitle>
+  1313→  1313→        <DialogDescription>تغییرات به‌صورت خودکار ذخیره می‌شوند.</DialogDescription>
+  1314→  1314→      </DialogHeader>
+  1315→  1315→      <div className="space-y-4">
+  1316→  1316→        <div className="space-y-1.5">
+  1317→  1317→          <div className="flex items-center gap-1">
+  1318→  1318→            <Label htmlFor={`activity-edit-name-${activity.id}`}>نام فعالیت</Label>
+  1319→  1319→            <HelpDot label="نام فعالیت" content={ACTIVITY_NAME_HELP} />
+  1320→  1320→          </div>
+  1321→  1321→          <Input
+  1322→  1322→            id={`activity-edit-name-${activity.id}`}
+  1323→  1323→            value={form.name}
+  1324→  1324→            onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+  1325→  1325→            placeholder="مثلاً: بستن درب پنل"
+  1326→  1326→          />
+  1327→  1327→        </div>
+  1328→  1328→        <div className="space-y-1.5">
+  1329→  1329→          <Label htmlFor={`activity-edit-desc-${activity.id}`}>شرح فعالیت (اختیاری)</Label>
+  1330→  1330→          <Textarea
+  1331→  1331→            id={`activity-edit-desc-${activity.id}`}
+  1332→  1332→            value={form.description}
+  1333→  1333→            onChange={(e) => setForm((s) => ({ ...s, description: e.target.value }))}
+  1334→  1334→            placeholder="مثلاً: بستن ۴ پیچ با پیچ‌گوشتی برقی"
+  1335→  1335→            className="min-h-16"
+  1336→  1336→          />
+  1337→  1337→        </div>
+  1338→  1338→        <div className="grid gap-4 sm:grid-cols-2">
+  1339→  1339→          <div className="space-y-1.5">
+  1340→  1340→            <div className="flex items-center gap-1">
+  1341→  1341→              <Label>نوع رویداد فرایندی</Label>
+  1342→  1342→              <HelpDot label="نوع رویداد فرایندی" content={PROCESS_TYPE_HELP} />
+  1343→  1343→            </div>
+  1344→  1344→            <Select value={form.processType} onValueChange={(v) => setForm((s) => ({ ...s, processType: v }))}>
+  1345→  1345→              <SelectTrigger className="w-full" aria-label="نوع رویداد فرایندی">
+  1346→  1346→                <SelectValue />
+  1347→  1347→              </SelectTrigger>
+  1348→  1348→              <SelectContent>
+  1349→  1349→                {PROCESS_TYPES.map((pt) => (
+  1350→  1350→                  <SelectItem key={pt} value={pt}>
+  1351→  1351→                    <span className="num">{PROCESS_TYPE_SYMBOLS[pt]}</span> {PROCESS_TYPE_LABELS[pt]}
+  1352→  1352→                  </SelectItem>
+  1353→  1353→                ))}
+  1354→  1354→              </SelectContent>
+  1355→  1355→            </Select>
+  1356→  1356→          </div>
+  1357→  1357→          <div className="space-y-1.5">
+  1358→  1358→            <div className="flex items-center gap-1">
+  1359→  1359→              <Label>گروه مجازها</Label>
+  1360→  1360→              <HelpDot label="گروه مجازها" content={GROUP_ASSIGN_HELP} />
+  1361→  1361→            </div>
+  1362→  1362→            <Select
+  1363→  1363→              value={form.groupId || NO_GROUP}
+  1364→  1364→              onValueChange={(v) => setForm((s) => ({ ...s, groupId: v === NO_GROUP ? '' : v }))}
+  1365→  1365→              disabled={groupsLoading}
+  1366→  1366→            >
+  1367→  1367→              <SelectTrigger className="w-full" aria-label="گروه مجازها">
+  1368→  1368→                <SelectValue />
+  1369→  1369→              </SelectTrigger>
+  1370→  1370→              <SelectContent>
+  1371→  1371→                <SelectItem value={NO_GROUP}>بدون گروه</SelectItem>
+  1372→  1372→                {groups.map((g) => (
+  1373→  1373→                  <SelectItem key={g.id} value={g.id}>
+  1374→  1374→                    {g.name}
+  1375→  1375→                  </SelectItem>
+  1376→  1376→                ))}
+  1377→  1377→              </SelectContent>
+  1378→  1378→            </Select>
+  1379→  1379→            {groupsError && (
+  1380→  1380→              <p className="text-[11px] leading-5 text-red">
+  1381→  1381→                بارگذاری گروه‌ها ناموفق بود؛ فعلاً تنها «بدون گروه» در دسترس است.
+  1382→  1382→              </p>
+  1383→  1383→            )}
+  1384→  1384→          </div>
+  1385→  1385→        </div>
+  1386→  1386→      </div>
+  1387→  1387→      <DialogFooter className="flex-row justify-between gap-2">
+  1388→  1388→        <SaveIndicator status={status} onRetry={retry} error={lastError} />
+  1389→  1389→        <Button variant="outline" onClick={onClose}>
+  1390→  1390→          بستن
+  1391→  1391→        </Button>
+  1392→  1392→      </DialogFooter>
+  1393→  1393→    </>
+  1394→  1394→  )
+  1395→  1395→}
+  1396→  1396→

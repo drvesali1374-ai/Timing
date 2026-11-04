@@ -1,0 +1,1432 @@
+     1→'use client'
+     2→
+     3→// ═══════════════════════════════════════════════════════════
+     4→// نمای ارزیابی وستینگهاوس — FR-13
+     5→// • زبانه «ارزیابی عناصر»: ماتریس ایستگاه→فعالیت→عناصر با
+     6→//   دیالوگ ارزیابی (چهار عامل + پیش‌نمایش زنده R + کپی از
+     7→//   عنصر مشابه) — ارزیابی برای عنصر یک‌بار ثبت و به تمام
+     8→//   مشاهدات همان عنصر از همه اپراتورها اعمال می‌شود
+     9→// • زبانه «جدول‌های مرجع»: جدول‌های نسخه‌دار + ویرایش درجه‌ها
+    10→//   + «ذخیره به‌عنوان نسخه جدید» برای حفظ سابقه محاسباتی
+    11→// • جدول Seed صرفاً نقطه شروع است و باید توسط کارشناس/رویه
+    12→//   شرکت تأیید شود — استاندارد جهان‌شمول نیست
+    13→// ═══════════════════════════════════════════════════════════
+    14→import { useEffect, useMemo, useRef, useState } from 'react'
+    15→import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+    16→import { toast } from 'sonner'
+    17→import { ChevronDown, CopyPlus, Factory, Gauge, Loader2, Star, Table2, Trash2 } from 'lucide-react'
+    18→import { Button } from '@/components/ui/button'
+    19→import { Input } from '@/components/ui/input'
+    20→import { Label } from '@/components/ui/label'
+    21→import { Textarea } from '@/components/ui/textarea'
+    22→import { Badge } from '@/components/ui/badge'
+    23→import { Skeleton } from '@/components/ui/skeleton'
+    24→import { Switch } from '@/components/ui/switch'
+    25→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    26→import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+    27→import {
+    28→  Dialog,
+    29→  DialogContent,
+    30→  DialogDescription,
+    31→  DialogFooter,
+    32→  DialogHeader,
+    33→  DialogTitle,
+    34→} from '@/components/ui/dialog'
+    35→import {
+    36→  Select,
+    37→  SelectContent,
+    38→  SelectItem,
+    39→  SelectTrigger,
+    40→  SelectValue,
+    41→} from '@/components/ui/select'
+    42→import { HelpDot, type HelpContent } from '@/components/common/HelpDot'
+    43→import { ConfirmDeleteDialog, EmptyState } from '@/components/common/Feedback'
+    44→import { SaveIndicator } from '@/components/common/SaveIndicator'
+    45→import { PersianNumberInput } from '@/components/common/PersianNumberInput'
+    46→import { useAutosave } from '@/hooks/use-autosave'
+    47→import {
+    48→  ratingApi,
+    49→  type RatingGradeDto,
+    50→  type RatingMatrixDto,
+    51→  type RatingTableDto,
+    52→} from '@/lib/api/endpoints'
+    53→import { qk } from '@/lib/api/keys'
+    54→import {
+    55→  ELEMENT_TYPE_LABELS,
+    56→  RATING_FACTORS,
+    57→  RATING_FACTOR_LABELS,
+    58→  type ElementType,
+    59→  type RatingFactor,
+    60→} from '@/domain/types'
+    61→import { computeRatingFactor } from '@/calculation/westinghouse'
+    62→import { useAppStore } from '@/store/app-store'
+    63→import { useDisplayPrefs } from '@/store/display-store'
+    64→import { formatDateTime, formatInt, formatTimeValue } from '@/lib/format'
+    65→import { useIsMobile } from '@/hooks/use-mobile'
+    66→import { cn } from '@/lib/utils'
+    67→
+    68→type Prefs = ReturnType<typeof useDisplayPrefs>
+    69→
+    70→type MatrixActivity = RatingMatrixDto['stations'][number]['activities'][number]
+    71→type MatrixElementRow = MatrixActivity['elements'][number] & {
+    72→  activityName: string
+    73→  stationName: string
+    74→}
+    75→
+    76→/** مقدار ارسالی «بدون انتخاب» در Selectهای اختیاری */
+    77→const NONE = '__none__'
+    78→
+    79→const NO_TABLES: RatingMatrixDto['tables'] = []
+    80→
+    81→const ELEMENT_TYPE_BADGE_CLASS: Record<string, string> = {
+    82→  MANUAL: 'border-brand/30 bg-brand-soft text-brand',
+    83→  MACHINE: 'border-cyan/30 bg-cyan-soft text-cyan',
+    84→  WAITING: 'border-amber/30 bg-amber-soft text-amber',
+    85→  OVERLAP: 'border-green/30 bg-green-soft text-green',
+    86→}
+    87→
+    88→/** راهنمای کوتاه واقعی هر عامل — FR-13 */
+    89→const FACTOR_HELP: Record<RatingFactor, HelpContent> = {
+    90→  SKILL: {
+    91→    what: 'تسلط اپراتور بر حرکات و دقت اجرای کار؛ از حرکات ناشیانه تا اجرای روان و دقیق درجه‌بندی می‌شود.',
+    92→    example: 'در جدول مرجع اولیه: A1 (+۰٫۱۵) عالی‌تر تا F2 (−۰٫۲۲) بسیار ضعیف؛ D مرجع با سهم صفر.',
+    93→    note: 'مقادیر نمونه صرفاً نقطه شروع (Seed) هستند و باید با رویه مصوب شرکت جایگزین شوند.',
+    94→  },
+    95→  EFFORT: {
+    96→    what: 'سرعت و تمرکز اپراتور نسبت به ریتم معمول همان کار؛ تلاش بیش‌ازحد یا کمتر از تمپوی متعارف.',
+    97→    example: 'مثلاً C1 (+۰٫۰۵) تلاش خوب یا E1 (−۰٫۰۴) تلاش کم.',
+    98→  },
+    99→  CONDITIONS: {
+   100→    what: 'وضعیت محیط کار: نور، صدا، دما، تهویه، نظم و دسترسی به ابزار در ایستگاه.',
+   101→    example: 'مثلاً B (+۰٫۰۴) شرایط اندکی بهتر از متوسط یا E (−۰٫۰۳) نامطلوب.',
+   102→  },
+   103→  CONSISTENCY: {
+   104→    what: 'ثبات زمان‌های ثبت‌شده بین چرخه‌های مختلف؛ هرچه پراکندگی زمان‌ها کمتر باشد، یکنواختی بالاتر است.',
+   105→    example: 'مثلاً C (+۰٫۰۱) عملکرد پیوسته یا E (−۰٫۰۲) نوسان محسوس.',
+   106→  },
+   107→}
+   108→
+   109→/** نمایش مقدار درجه با علامت ± */
+   110→function formatSigned(v: number | null | undefined, prefs: Prefs): string {
+   111→  if (v === null || v === undefined || !Number.isFinite(v)) return '—'
+   112→  if (Math.abs(v) < 1e-9) return formatTimeValue(0, prefs, 2)
+   113→  return (v > 0 ? '+' : '−') + formatTimeValue(Math.abs(v), prefs, 2)
+   114→}
+   115→
+   116→function ElementTypeBadge({ type }: { type: string }) {
+   117→  return (
+   118→    <Badge variant="outline" className={ELEMENT_TYPE_BADGE_CLASS[type] ?? ''}>
+   119→      {ELEMENT_TYPE_LABELS[type as ElementType] ?? type}
+   120→    </Badge>
+   121→  )
+   122→}
+   123→
+   124→export default function WestinghouseView({ projectId }: { projectId: string }) {
+   125→  const prefs = useDisplayPrefs()
+   126→  const isMobile = useIsMobile()
+   127→  const qc = useQueryClient()
+   128→  const navigate = useAppStore((s) => s.navigate)
+   129→
+   130→  const [tab, setTab] = useState<'assess' | 'tables'>('assess')
+   131→
+   132→  const matrixQ = useQuery({
+   133→    queryKey: qk.ratingMatrix(projectId),
+   134→    queryFn: () => ratingApi.matrix(projectId),
+   135→  })
+   136→  const tablesQ = useQuery({
+   137→    queryKey: qk.ratingTables(projectId),
+   138→    queryFn: () => ratingApi.tables(projectId),
+   139→  })
+   140→
+   141→  const matrix = matrixQ.data
+   142→  const tables = tablesQ.data?.items ?? []
+   143→
+   144→  // همه عناصر پروژه (تخت) برای شمارش و «کپی از عنصر مشابه»
+   145→  const allElements = useMemo<MatrixElementRow[]>(() => {
+   146→    const out: MatrixElementRow[] = []
+   147→    for (const s of matrix?.stations ?? []) {
+   148→      for (const a of s.activities) {
+   149→        for (const e of a.elements) {
+   150→          out.push({ ...e, activityName: a.name, stationName: s.name })
+   151→        }
+   152→      }
+   153→    }
+   154→    return out
+   155→  }, [matrix])
+   156→  const ratedCount = allElements.filter((e) => e.rating !== null).length
+   157→  const pct = allElements.length === 0 ? 0 : Math.round((ratedCount / allElements.length) * 100)
+   158→
+   159→  // ── دیالوگ ارزیابی ──
+   160→  const [dialogEl, setDialogEl] = useState<MatrixElementRow | null>(null)
+   161→  const candidateSources = useMemo(
+   162→    () =>
+   163→      allElements
+   164→        .filter((e) => e.rating !== null && e.id !== dialogEl?.id)
+   165→        .map((e) => ({ id: e.id, label: `${e.stationName} › ${e.activityName} › ${e.name}` })),
+   166→    [allElements, dialogEl?.id]
+   167→  )
+   168→
+   169→  // ── انتخاب جدول مرجع ──
+   170→  const [selectedTableId, setSelectedTableId] = useState<string | null>(null)
+   171→  useEffect(() => {
+   172→    if (tables.length === 0) {
+   173→      if (selectedTableId !== null) setSelectedTableId(null)
+   174→      return
+   175→    }
+   176→    if (!selectedTableId || !tables.some((t) => t.id === selectedTableId)) {
+   177→      setSelectedTableId((tables.find((t) => t.isDefault) ?? tables[0]).id)
+   178→    }
+   179→  }, [tables, selectedTableId])
+   180→  const selectedTable = tables.find((t) => t.id === selectedTableId) ?? null
+   181→  const nextVersion = tables.reduce((m, t) => Math.max(m, t.version), 0) + 1
+   182→
+   183→  // ── حذف جدول — اگر در استفاده باشد سرور 409 می‌دهد و پیامش نمایش داده می‌شود ──
+   184→  const [deletingTable, setDeletingTable] = useState<RatingTableDto | null>(null)
+   185→  const deleteTableMutation = useMutation({
+   186→    mutationFn: (id: string) => ratingApi.deleteTable(id),
+   187→    onSuccess: () => {
+   188→      void qc.invalidateQueries({ queryKey: qk.ratingTables(projectId) })
+   189→      void qc.invalidateQueries({ queryKey: qk.ratingMatrix(projectId) })
+   190→      void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+   191→      setDeletingTable(null)
+   192→      toast.success('جدول ارزیابی حذف شد')
+   193→    },
+   194→    // خطای RATING_TABLE_IN_USE (409): پیام خود سرور عیناً نمایش داده می‌شود
+   195→    onError: (err) => toast.error(err instanceof Error ? err.message : 'حذف جدول ناموفق بود'),
+   196→  })
+   197→
+   198→  return (
+   199→    <div className="animate-view-in mx-auto max-w-6xl space-y-5">
+   200→      {/* سربرگ بخش */}
+   201→      <div className="flex flex-wrap items-center justify-between gap-3">
+   202→        <div className="flex items-center gap-3">
+   203→          <div className="chip-icon bg-brand-soft text-brand">
+   204→            <Gauge className="size-6" aria-hidden />
+   205→          </div>
+   206→          <div>
+   207→            <h1 className="text-xl font-extrabold">ارزیابی وستینگهاوس</h1>
+   208→            <p className="num text-xs text-muted-foreground">
+   209→              R = 1 + مهارت + تلاش + شرایط + یکنواختی — {formatInt(ratedCount, prefs)} از{' '}
+   210→              {formatInt(allElements.length, prefs)} عنصر ارزیابی شده
+   211→            </p>
+   212→          </div>
+   213→        </div>
+   214→        <HelpDot
+   215→          label="ارزیابی وستینگهاوس"
+   216→          content={{
+   217→            what: 'ضریب عملکرد R برای هر عنصر کاری از چهار عامل مهارت، تلاش، شرایط و یکنواختی محاسبه می‌شود و زمان نرمال از رابطه NT = OT × R به دست می‌آید.',
+   218→            input: 'برای هر عنصر، جدول مرجع و درجه هر عامل را انتخاب کنید؛ امکان کپی از عنصر مشابه نیز وجود دارد.',
+   219→            example: 'مهارت +۰٫۰۶، تلاش +۰٫۰۲، شرایط ۰ و یکنواختی +۰٫۰۱ → R = ۱٫۰۹',
+   220→            note: 'ارزیابی برای عنصر یک‌بار ثبت و به تمام مشاهدات همان عنصر از همه اپراتورها اعمال می‌شود — تصمیم مالک محصول. جدول Seed صرفاً نقطه شروع است و باید توسط کارشناس/رویه شرکت تأیید شود.',
+   221→          }}
+   222→        />
+   223→      </div>
+   224→
+   225→      <Tabs value={tab} onValueChange={(v) => setTab(v as 'assess' | 'tables')}>
+   226→        <TabsList>
+   227→          <TabsTrigger value="assess">ارزیابی عناصر</TabsTrigger>
+   228→          <TabsTrigger value="tables">جدول‌های مرجع</TabsTrigger>
+   229→        </TabsList>
+   230→
+   231→        {/* ═══════════ زبانه ارزیابی عناصر ═══════════ */}
+   232→        <TabsContent value="assess" className="space-y-4">
+   233→          {matrixQ.isLoading ? (
+   234→            <div className="space-y-3">
+   235→              {Array.from({ length: 3 }).map((_, i) => (
+   236→                <Skeleton key={i} className="h-28 w-full rounded-xl" />
+   237→              ))}
+   238→            </div>
+   239→          ) : matrixQ.error ? (
+   240→            <EmptyState
+   241→              title="بارگذاری ماتریس ارزیابی ناموفق بود"
+   242→              description={matrixQ.error instanceof Error ? matrixQ.error.message : 'خطای نامشخص'}
+   243→              action={
+   244→                <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: qk.ratingMatrix(projectId) })}>
+   245→                  تلاش مجدد
+   246→                </Button>
+   247→              }
+   248→            />
+   249→          ) : allElements.length === 0 ? (
+   250→            <EmptyState
+   251→              icon={<Factory className="size-7" aria-hidden />}
+   252→              title="هنوز عنصر کاری برای ارزیابی وجود ندارد"
+   253→              description="ابتدا در ساختار تولید، فعالیت و عنصر کاری تعریف کنید؛ سپس هر عنصر را با چهار عامل مهارت، تلاش، شرایط و یکنواختی ارزیابی کنید."
+   254→              action={
+   255→                <Button
+   256→                  className="btn-brand gap-1.5 border-0"
+   257→                  onClick={() => navigate({ name: 'project', projectId, stage: 'structure' })}
+   258→                >
+   259→                  رفتن به ساختار تولید
+   260→                </Button>
+   261→              }
+   262→            />
+   263→          ) : (
+   264→            <>
+   265→              {/* خلاصه پیشرفت */}
+   266→              <div className="card-premium p-4">
+   267→                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+   268→                  <p className="num font-bold">
+   269→                    {formatInt(ratedCount, prefs)} از {formatInt(allElements.length, prefs)} عنصر ارزیابی شده
+   270→                  </p>
+   271→                  <p className="num text-xs text-muted-foreground">{formatInt(pct, prefs)}٪ تکمیل</p>
+   272→                </div>
+   273→                <div
+   274→                  className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+   275→                  role="progressbar"
+   276→                  aria-valuemin={0}
+   277→                  aria-valuemax={100}
+   278→                  aria-valuenow={pct}
+   279→                  aria-label="درصد عناصر ارزیابی‌شده"
+   280→                >
+   281→                  <div className="h-full rounded-full bg-brand transition-all duration-500" style={{ width: `${pct}%` }} />
+   282→                </div>
+   283→                {tables.length === 0 && (
+   284→                  <p className="mt-3 rounded-lg bg-amber-soft p-2 text-xs leading-6 text-amber">
+   285→                    هیچ جدول ارزیابی‌ای برای این پروژه وجود ندارد؛ وضعیت زبانه «جدول‌های مرجع» را بررسی کنید.
+   286→                  </p>
+   287→                )}
+   288→              </div>
+   289→
+   290→              {/* ماتریس ایستگاه → فعالیت → عناصر */}
+   291→              <div className="space-y-5">
+   292→                {(matrix?.stations ?? []).map((station) => (
+   293→                  <section key={station.id} className="space-y-2.5">
+   294→                    <h3 className="flex items-center gap-2 text-sm font-extrabold">
+   295→                      <Factory className="size-4 text-brand" aria-hidden />
+   296→                      {station.name}
+   297→                    </h3>
+   298→                    {station.activities.length === 0 ? (
+   299→                      <p className="text-xs text-muted-foreground">فعالیتی در این ایستگاه تعریف نشده است.</p>
+   300→                    ) : (
+   301→                      station.activities.map((activity) => (
+   302→                        <ActivityBlock
+   303→                          key={activity.id}
+   304→                          activity={activity}
+   305→                          stationName={station.name}
+   306→                          prefs={prefs}
+   307→                          isMobile={isMobile}
+   308→                          onRate={(el) => setDialogEl(el)}
+   309→                        />
+   310→                      ))
+   311→                    )}
+   312→                  </section>
+   313→                ))}
+   314→              </div>
+   315→            </>
+   316→          )}
+   317→        </TabsContent>
+   318→
+   319→        {/* ═══════════ زبانه جدول‌های مرجع ═══════════ */}
+   320→        <TabsContent value="tables" className="space-y-4">
+   321→          <div className="flex flex-wrap items-center justify-between gap-3">
+   322→            <h2 className="flex items-center gap-1 text-sm font-bold">
+   323→              جدول‌های مرجع
+   324→              <HelpDot
+   325→                label="جدول‌های مرجع"
+   326→                content={{
+   327→                  what: 'جدول درجه‌های چهار عامل وستینگهاوس؛ هر جدول نام، نسخه، منبع و توضیح دارد و ارزیابی‌ها به نسخه مورد استفاده ارجاع می‌دهند.',
+   328→                  input: 'جدولی را از فهرست انتخاب کنید؛ فراداده و درجه‌ها قابل ویرایش‌اند و تغییر درجه‌ها با «نسخه جدید» ذخیره می‌شود.',
+   329→                  example: 'جدول Seed اولیه از نسخه رایج نظام Westinghouse (در یکی از بازنشرهای دانشگاهی به Lowry, Maynard & Stegemerten, 1940 نسبت داده شده) بارگذاری شده است.',
+   330→                  note: 'جدول Seed صرفاً نقطه شروع است و استاندارد جهان‌شمول یا رویه مصوب شرکت نیست؛ تغییر جدول نباید محاسبات تاریخی را بی‌صدا تغییر دهد.',
+   331→                }}
+   332→              />
+   333→            </h2>
+   334→            <p className="num text-xs text-muted-foreground">{formatInt(tables.length, prefs)} جدول</p>
+   335→          </div>
+   336→
+   337→          {tablesQ.isLoading ? (
+   338→            <div className="space-y-2">
+   339→              {Array.from({ length: 3 }).map((_, i) => (
+   340→                <Skeleton key={i} className="h-24 w-full rounded-xl" />
+   341→              ))}
+   342→            </div>
+   343→          ) : tablesQ.error ? (
+   344→            <EmptyState
+   345→              title="بارگذاری جدول‌ها ناموفق بود"
+   346→              description={tablesQ.error instanceof Error ? tablesQ.error.message : 'خطای نامشخص'}
+   347→              action={
+   348→                <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: qk.ratingTables(projectId) })}>
+   349→                  تلاش مجدد
+   350→                </Button>
+   351→              }
+   352→            />
+   353→          ) : tables.length === 0 ? (
+   354→            <EmptyState
+   355→              icon={<Table2 className="size-7" aria-hidden />}
+   356→              title="جدول ارزیابی‌ای وجود ندارد"
+   357→              description="جدول Seed در زمان ایجاد پروژه بارگذاری می‌شود؛ اگر حذف شده است، از نسخه پشتیبان بازیابی کنید."
+   358→            />
+   359→          ) : (
+   360→            <div className="grid items-start gap-4 lg:grid-cols-5">
+   361→              {/* فهرست جدول‌ها */}
+   362→              <div
+   363→                className="scroll-slim max-h-[28rem] space-y-2 overflow-y-auto pl-1 lg:col-span-2"
+   364→                aria-label="فهرست جدول‌های ارزیابی"
+   365→              >
+   366→                {tables.map((t) => (
+   367→                  <button
+   368→                    key={t.id}
+   369→                    type="button"
+   370→                    onClick={() => setSelectedTableId(t.id)}
+   371→                    aria-pressed={selectedTableId === t.id}
+   372→                    aria-label={`انتخاب جدول ${t.name}`}
+   373→                    className={cn(
+   374→                      'card-premium w-full p-3 text-right transition-all',
+   375→                      selectedTableId === t.id ? 'ring-2 ring-brand' : 'hover:border-brand/40'
+   376→                    )}
+   377→                  >
+   378→                    <div className="flex items-start justify-between gap-2">
+   379→                      <p className="truncate text-sm font-bold">{t.name}</p>
+   380→                      {t.isDefault && (
+   381→                        <span className="shrink-0 text-amber" title="جدول پیش‌فرض پروژه">
+   382→                          <Star className="size-4" aria-hidden />
+   383→                          <span className="sr-only">جدول پیش‌فرض پروژه</span>
+   384→                        </span>
+   385→                      )}
+   386→                    </div>
+   387→                    <p className="mt-1 truncate text-xs text-muted-foreground" title={t.source ?? undefined} dir="auto">
+   388→                      {t.source ?? 'بدون منبع'}
+   389→                    </p>
+   390→                    <div className="num mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint">
+   391→                      <Badge variant="secondary" className="num">
+   392→                        نسخه {formatInt(t.version, prefs)}
+   393→                      </Badge>
+   394→                      <span>{formatInt(t.gradesCount, prefs)} درجه</span>
+   395→                      <span>{formatInt(t.assessmentsCount, prefs)} ارزیابی</span>
+   396→                      <span>{formatDateTime(t.updatedAt, prefs)}</span>
+   397→                    </div>
+   398→                  </button>
+   399→                ))}
+   400→              </div>
+   401→
+   402→              {/* جزئیات جدول انتخاب‌شده */}
+   403→              <div className="lg:col-span-3">
+   404→                {selectedTable && (
+   405→                  <TableDetailPanel
+   406→                    key={selectedTable.id}
+   407→                    table={selectedTable}
+   408→                    projectId={projectId}
+   409→                    nextVersion={nextVersion}
+   410→                    prefs={prefs}
+   411→                    isMobile={isMobile}
+   412→                    onDelete={() => setDeletingTable(selectedTable)}
+   413→                    onCreated={(id) => setSelectedTableId(id)}
+   414→                  />
+   415→                )}
+   416→              </div>
+   417→            </div>
+   418→          )}
+   419→        </TabsContent>
+   420→      </Tabs>
+   421→
+   422→      {/* دیالوگ ارزیابی عنصر — مهم‌ترین دیالوگ این مرحله */}
+   423→      <ElementRatingDialog
+   424→        element={dialogEl}
+   425→        tables={matrix?.tables ?? NO_TABLES}
+   426→        defaultTableId={matrix?.defaultTableId ?? null}
+   427→        candidateSources={candidateSources}
+   428→        projectId={projectId}
+   429→        prefs={prefs}
+   430→        onClose={() => setDialogEl(null)}
+   431→      />
+   432→
+   433→      {/* تأیید حذف جدول — FR-26 */}
+   434→      <ConfirmDeleteDialog
+   435→        open={deletingTable !== null}
+   436→        onOpenChange={(open) => !open && setDeletingTable(null)}
+   437→        title="حذف جدول ارزیابی"
+   438→        entityName={deletingTable?.name ?? ''}
+   439→        dependencies={{
+   440→          'ارزیابی ارجاع‌دار به این جدول — در صورت وجود، حذف توسط سرور ممنوع می‌شود تا سابقه محاسباتی حفظ شود':
+   441→            deletingTable?.assessmentsCount ?? 0,
+   442→        }}
+   443→        onConfirm={() => deletingTable && deleteTableMutation.mutate(deletingTable.id)}
+   444→        loading={deleteTableMutation.isPending}
+   445→      />
+   446→    </div>
+   447→  )
+   448→}
+   449→
+   450→// ═══════════════════════════════════════════════════════════
+   451→// بلوک فعالیت در ماتریس — Collapsible باز + جدول/کارت عناصر
+   452→// ═══════════════════════════════════════════════════════════
+   453→function ActivityBlock({
+   454→  activity,
+   455→  stationName,
+   456→  prefs,
+   457→  isMobile,
+   458→  onRate,
+   459→}: {
+   460→  activity: MatrixActivity
+   461→  stationName: string
+   462→  prefs: Prefs
+   463→  isMobile: boolean
+   464→  onRate: (el: MatrixElementRow) => void
+   465→}) {
+   466→  const [open, setOpen] = useState(true)
+   467→  const rated = activity.elements.filter((e) => e.rating !== null).length
+   468→
+   469→  return (
+   470→    <Collapsible open={open} onOpenChange={setOpen} className="card-premium overflow-hidden">
+   471→      <CollapsibleTrigger
+   472→        className="flex w-full items-center justify-between gap-2 border-b bg-surface-2/60 px-4 py-3 text-right transition-colors hover:bg-muted/50"
+   473→        aria-label={`فعالیت ${activity.name}`}
+   474→      >
+   475→        <span className="flex min-w-0 flex-wrap items-center gap-2">
+   476→          <span className="truncate font-bold">{activity.name}</span>
+   477→          <span className="num rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+   478→            {formatInt(rated, prefs)}/{formatInt(activity.elements.length, prefs)} ارزیابی‌شده
+   479→          </span>
+   480→        </span>
+   481→        <ChevronDown
+   482→          className={cn('size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')}
+   483→          aria-hidden
+   484→        />
+   485→      </CollapsibleTrigger>
+   486→      <CollapsibleContent>
+   487→        {activity.elements.length === 0 ? (
+   488→          <p className="px-4 py-3 text-xs text-muted-foreground">عنصر کاری در این فعالیت تعریف نشده است.</p>
+   489→        ) : isMobile ? (
+   490→          <div className="space-y-3 p-3">
+   491→            {activity.elements.map((el) => (
+   492→              <ElementCard
+   493→                key={el.id}
+   494→                el={{ ...el, activityName: activity.name, stationName }}
+   495→                prefs={prefs}
+   496→                onRate={() => onRate({ ...el, activityName: activity.name, stationName })}
+   497→              />
+   498→            ))}
+   499→          </div>
+   500→        ) : (
+   501→          <table className="w-full text-sm">
+   502→            <thead>
+   503→              <tr className="border-b bg-surface-2/70 text-right text-xs text-muted-foreground">
+   504→                <th className="px-4 py-2.5 font-bold">عنصر کاری</th>
+   505→                <th className="px-4 py-2.5 font-bold">نوع</th>
+   506→                <th className="px-4 py-2.5 font-bold">وضعیت ارزیابی</th>
+   507→                <th className="px-4 py-2.5" aria-label="عملیات" />
+   508→              </tr>
+   509→            </thead>
+   510→            <tbody>
+   511→              {activity.elements.map((el) => (
+   512→                <tr key={el.id} className="border-b transition-colors last:border-0 hover:bg-muted/50">
+   513→                  <td className="px-4 py-2.5 font-medium">{el.name}</td>
+   514→                  <td className="px-4 py-2.5">
+   515→                    <ElementTypeBadge type={el.elementType} />
+   516→                  </td>
+   517→                  <td className="px-4 py-2.5">
+   518→                    {el.rating ? (
+   519→                      <Badge
+   520→                        className="num bg-green-soft text-green"
+   521→                        title={`جدول: ${el.rating.ratingTableName} (نسخه ${el.rating.ratingTableVersion})`}
+   522→                      >
+   523→                        R = {formatTimeValue(el.rating.totalFactor, prefs)}
+   524→                      </Badge>
+   525→                    ) : (
+   526→                      <Badge variant="outline" className="text-faint">
+   527→                        ارزیابی نشده
+   528→                      </Badge>
+   529→                    )}
+   530→                  </td>
+   531→                  <td className="px-4 py-2.5">
+   532→                    <div className="flex justify-end">
+   533→                      {el.rating ? (
+   534→                        <Button
+   535→                          variant="outline"
+   536→                          size="sm"
+   537→                          onClick={() => onRate({ ...el, activityName: activity.name, stationName })}
+   538→                          aria-label={`ویرایش ارزیابی عنصر ${el.name}`}
+   539→                        >
+   540→                          ویرایش
+   541→                        </Button>
+   542→                      ) : (
+   543→                        <Button
+   544→                          size="sm"
+   545→                          className="btn-brand gap-1 border-0"
+   546→                          onClick={() => onRate({ ...el, activityName: activity.name, stationName })}
+   547→                          aria-label={`ارزیابی عنصر ${el.name}`}
+   548→                        >
+   549→                          <Gauge className="size-3.5" aria-hidden />
+   550→                          ارزیابی
+   551→                        </Button>
+   552→                      )}
+   553→                    </div>
+   554→                  </td>
+   555→                </tr>
+   556→              ))}
+   557→            </tbody>
+   558→          </table>
+   559→        )}
+   560→      </CollapsibleContent>
+   561→    </Collapsible>
+   562→  )
+   563→}
+   564→
+   565→// ═══════════════════════════════════════════════════════════
+   566→// کارت موبایل عنصر در ماتریس — FR-30
+   567→// ═══════════════════════════════════════════════════════════
+   568→function ElementCard({
+   569→  el,
+   570→  prefs,
+   571→  onRate,
+   572→}: {
+   573→  el: MatrixElementRow
+   574→  prefs: Prefs
+   575→  onRate: () => void
+   576→}) {
+   577→  return (
+   578→    <div className="rounded-xl border p-3">
+   579→      <p className="text-sm font-bold">{el.name}</p>
+   580→      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+   581→        <ElementTypeBadge type={el.elementType} />
+   582→        {el.rating ? (
+   583→          <Badge
+   584→            className="num bg-green-soft text-green"
+   585→            title={`جدول: ${el.rating.ratingTableName} (نسخه ${el.rating.ratingTableVersion})`}
+   586→          >
+   587→            R = {formatTimeValue(el.rating.totalFactor, prefs)}
+   588→          </Badge>
+   589→        ) : (
+   590→          <Badge variant="outline" className="text-faint">
+   591→            ارزیابی نشده
+   592→          </Badge>
+   593→        )}
+   594→      </div>
+   595→      <div className="mt-3">
+   596→        {el.rating ? (
+   597→          <Button variant="outline" size="sm" onClick={onRate} aria-label={`ویرایش ارزیابی عنصر ${el.name}`}>
+   598→            ویرایش
+   599→          </Button>
+   600→        ) : (
+   601→          <Button size="sm" className="btn-brand gap-1 border-0" onClick={onRate} aria-label={`ارزیابی عنصر ${el.name}`}>
+   602→            <Gauge className="size-3.5" aria-hidden />
+   603→            ارزیابی
+   604→          </Button>
+   605→        )}
+   606→      </div>
+   607→    </div>
+   608→  )
+   609→}
+   610→
+   611→// ═══════════════════════════════════════════════════════════
+   612→// دیالوگ ارزیابی عنصر — FR-13
+   613→// جدول + چهار عامل + پیش‌نمایش زنده R + کپی از عنصر مشابه
+   614→// ═══════════════════════════════════════════════════════════
+   615→interface RatingFormState {
+   616→  tableId: string
+   617→  grades: Record<RatingFactor, string | null>
+   618→  notes: string
+   619→  copyFrom: string | null
+   620→}
+   621→
+   622→const EMPTY_GRADES: Record<RatingFactor, string | null> = {
+   623→  SKILL: null,
+   624→  EFFORT: null,
+   625→  CONDITIONS: null,
+   626→  CONSISTENCY: null,
+   627→}
+   628→
+   629→function ElementRatingDialog({
+   630→  element,
+   631→  tables,
+   632→  defaultTableId,
+   633→  candidateSources,
+   634→  projectId,
+   635→  prefs,
+   636→  onClose,
+   637→}: {
+   638→  element: MatrixElementRow | null
+   639→  tables: RatingMatrixDto['tables']
+   640→  defaultTableId: string | null
+   641→  candidateSources: { id: string; label: string }[]
+   642→  projectId: string
+   643→  prefs: Prefs
+   644→  onClose: () => void
+   645→}) {
+   646→  const qc = useQueryClient()
+   647→  const open = element !== null
+   648→
+   649→  // ارزیابی فعلی عنصر
+   650→  const ratingQ = useQuery({
+   651→    queryKey: qk.elementRating(open ? element.id : 'none'),
+   652→    queryFn: () => ratingApi.elementRating(element!.id),
+   653→    enabled: open,
+   654→  })
+   655→
+   656→  const [form, setForm] = useState<RatingFormState | null>(null)
+   657→  const dirtyRef = useRef(false)
+   658→
+   659→  const close = () => {
+   660→    dirtyRef.current = false
+   661→    setForm(null)
+   662→    onClose()
+   663→  }
+   664→
+   665→  // مقداردهی اولیه فرم از ارزیابی فعلی (تا زمانی که کاربر ویرایش نکرده است)
+   666→  useEffect(() => {
+   667→    if (!element || !ratingQ.data || dirtyRef.current) return
+   668→    const a = ratingQ.data.assessment
+   669→    setForm({
+   670→      tableId: a?.ratingTableId ?? defaultTableId ?? tables[0]?.id ?? '',
+   671→      grades: {
+   672→        SKILL: a?.skillGrade ?? null,
+   673→        EFFORT: a?.effortGrade ?? null,
+   674→        CONDITIONS: a?.conditionsGrade ?? null,
+   675→        CONSISTENCY: a?.consistencyGrade ?? null,
+   676→      },
+   677→      notes: a?.notes ?? '',
+   678→      copyFrom: null,
+   679→    })
+   680→  }, [element, ratingQ.data, defaultTableId, tables])
+   681→
+   682→  // درجه‌های جدول انتخابی
+   683→  const tableQ = useQuery({
+   684→    queryKey: qk.ratingTable(form?.tableId ?? 'none'),
+   685→    queryFn: () => ratingApi.table(form!.tableId),
+   686→    enabled: open && form !== null && form.tableId !== '',
+   687→  })
+   688→
+   689→  // ارزیابی عنصر مبدأ برای کپی
+   690→  const sourceQ = useQuery({
+   691→    queryKey: qk.elementRating(form?.copyFrom ?? 'none'),
+   692→    queryFn: () => ratingApi.elementRating(form!.copyFrom!),
+   693→    enabled: open && form !== null && form.copyFrom !== null,
+   694→  })
+   695→
+   696→  const gradesByFactor = useMemo(() => {
+   697→    const m: Record<RatingFactor, RatingGradeDto[]> = { SKILL: [], EFFORT: [], CONDITIONS: [], CONSISTENCY: [] }
+   698→    for (const g of tableQ.data?.grades ?? []) {
+   699→      if ((RATING_FACTORS as readonly string[]).includes(g.factor)) m[g.factor as RatingFactor].push(g)
+   700→    }
+   701→    return m
+   702→  }, [tableQ.data])
+   703→
+   704→  // کدهای مؤثر: دستی یا کپی‌شده از عنصر مبدأ
+   705→  const effectiveGrades = useMemo((): Record<RatingFactor, string | null> => {
+   706→    if (!form?.copyFrom) return form?.grades ?? EMPTY_GRADES
+   707→    const a = sourceQ.data?.assessment
+   708→    if (!a) return EMPTY_GRADES
+   709→    return {
+   710→      SKILL: a.skillGrade,
+   711→      EFFORT: a.effortGrade,
+   712→      CONDITIONS: a.conditionsGrade,
+   713→      CONSISTENCY: a.consistencyGrade,
+   714→    }
+   715→  }, [form, sourceQ.data])
+   716→
+   717→  // مقدار هر عامل از جدول انتخابی (مطابق منطق سرور)؛ null = نامعلوم/نامعتبر
+   718→  const factorValue = (factor: RatingFactor): number | null => {
+   719→    if (form?.copyFrom && !sourceQ.data?.assessment) return null // در انتظار بارگذاری عنصر مبدأ
+   720→    const code = effectiveGrades[factor]
+   721→    if (!code) return 0
+   722→    const g = gradesByFactor[factor].find((x) => x.gradeCode === code)
+   723→    return g ? g.value : null
+   724→  }
+   725→
+   726→  const values = {
+   727→    skill: factorValue('SKILL'),
+   728→    effort: factorValue('EFFORT'),
+   729→    conditions: factorValue('CONDITIONS'),
+   730→    consistency: factorValue('CONSISTENCY'),
+   731→  }
+   732→  const previewR =
+   733→    values.skill === null || values.effort === null || values.conditions === null || values.consistency === null
+   734→      ? null
+   735→      : computeRatingFactor({
+   736→          skill: values.skill,
+   737→          effort: values.effort,
+   738→          conditions: values.conditions,
+   739→          consistency: values.consistency,
+   740→        })
+   741→
+   742→  const saveMutation = useMutation({
+   743→    // شناسه عنصر در نتیجه بازگردانده می‌شود تا هنگام فراخوانی callback معتبر بماند
+   744→    mutationFn: async () => {
+   745→      const elId = element!.id
+   746→      const f = form!
+   747→      const res = await ratingApi.putElementRating(elId, {
+   748→        ratingTableId: f.tableId,
+   749→        skillGrade: f.grades.SKILL,
+   750→        effortGrade: f.grades.EFFORT,
+   751→        conditionsGrade: f.grades.CONDITIONS,
+   752→        consistencyGrade: f.grades.CONSISTENCY,
+   753→        notes: f.notes.trim() || null,
+   754→        copyFromElementId: f.copyFrom,
+   755→      })
+   756→      return { res, elId }
+   757→    },
+   758→    onSuccess: ({ res, elId }) => {
+   759→      void qc.invalidateQueries({ queryKey: qk.ratingMatrix(projectId) })
+   760→      void qc.invalidateQueries({ queryKey: qk.elementRating(elId) })
+   761→      void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+   762→      toast.success(`ارزیابی ثبت شد — R = ${formatTimeValue(res.assessment?.totalFactor ?? null, prefs)}`)
+   763→      close()
+   764→    },
+   765→    onError: (err) => toast.error(err instanceof Error ? err.message : 'ثبت ارزیابی ناموفق بود'),
+   766→  })
+   767→
+   768→  return (
+   769→    <Dialog open={open} onOpenChange={(o) => !o && close()}>
+   770→      <DialogContent dir="rtl" className="scroll-slim max-h-[88vh] overflow-y-auto sm:max-w-2xl">
+   771→        <DialogHeader>
+   772→          <DialogTitle className="flex flex-wrap items-center gap-1.5">
+   773→            ارزیابی عنصر «{element?.name ?? ''}»
+   774→            <HelpDot
+   775→              label="سیاست ارزیابی"
+   776→              content={{
+   777→                what: 'برای هر عنصر کاری یک ارزیابی با چهار عامل مهارت، تلاش، شرایط و یکنواختی ثبت می‌شود.',
+   778→                note: 'ارزیابی برای عنصر یک‌بار ثبت و به تمام مشاهدات همان عنصر از همه اپراتورها اعمال می‌شود — تصمیم مالک محصول؛ سیستم ارزیابی جداگانه اپراتوری جعل نمی‌کند.',
+   779→              }}
+   780→            />
+   781→          </DialogTitle>
+   782→          <DialogDescription>
+   783→            {element ? `${element.stationName} › ${element.activityName} — ` : ''}
+   784→            درجه هر عامل را از جدول مرجع انتخاب کنید؛ ضریب R به‌صورت زنده پیش‌نمایش می‌شود.
+   785→          </DialogDescription>
+   786→        </DialogHeader>
+   787→
+   788→        {ratingQ.error ? (
+   789→          <EmptyState
+   790→            className="py-6"
+   791→            title="بارگذاری ارزیابی فعلی ناموفق بود"
+   792→            description={ratingQ.error instanceof Error ? ratingQ.error.message : 'خطای نامشخص'}
+   793→            action={
+   794→              <Button
+   795→                variant="outline"
+   796→                onClick={() =>
+   797→                  element && qc.invalidateQueries({ queryKey: qk.elementRating(element.id) })
+   798→                }
+   799→              >
+   800→                تلاش مجدد
+   801→              </Button>
+   802→            }
+   803→          />
+   804→        ) : form === null || ratingQ.isLoading ? (
+   805→          <div className="space-y-3">
+   806→            <Skeleton className="h-10 w-full" />
+   807→            <Skeleton className="h-10 w-full" />
+   808→            <Skeleton className="h-10 w-full" />
+   809→            <Skeleton className="h-24 w-full" />
+   810→          </div>
+   811→        ) : (
+   812→          <div className="space-y-4">
+   813→            {/* جدول ارزیابی */}
+   814→            <div className="space-y-1.5">
+   815→              <div className="flex items-center gap-1">
+   816→                <Label>جدول ارزیابی</Label>
+   817→                <HelpDot
+   818→                  label="جدول ارزیابی"
+   819→                  content={{
+   820→                    what: 'جدول مرجعی که کد و مقدار درجه‌های چهار عامل از آن خوانده می‌شود؛ هر ارزیابی به نسخه جدول مورد استفاده ارجاع دارد.',
+   821→                    note: 'نسخه جدول در سابقه ارزیابی ثبت می‌شود؛ جدول Seed صرفاً نقطه شروع است و باید توسط کارشناس/رویه شرکت تأیید شود.',
+   822→                  }}
+   823→                />
+   824→              </div>
+   825→              <Select
+   826→                value={form.tableId}
+   827→                onValueChange={(v) => {
+   828→                  dirtyRef.current = true
+   829→                  setForm((s) => s && { ...s, tableId: v })
+   830→                }}
+   831→              >
+   832→                <SelectTrigger className="w-full" aria-label="جدول ارزیابی">
+   833→                  <SelectValue placeholder="جدول را انتخاب کنید" />
+   834→                </SelectTrigger>
+   835→                <SelectContent>
+   836→                  {tables.map((t) => (
+   837→                    <SelectItem key={t.id} value={t.id}>
+   838→                      <span className="num">
+   839→                        {t.name} (نسخه {formatInt(t.version, prefs)})
+   840→                        {t.isDefault ? ' — پیش‌فرض' : ''}
+   841→                      </span>
+   842→                    </SelectItem>
+   843→                  ))}
+   844→                </SelectContent>
+   845→              </Select>
+   846→              {tables.length === 0 && (
+   847→                <p className="text-xs text-amber">جدول ارزیابی‌ای وجود ندارد؛ ابتدا از زبانه «جدول‌های مرجع» جدول بسازید.</p>
+   848→              )}
+   849→            </div>
+   850→
+   851→            {/* کپی از عنصر مشابه — FR-13 */}
+   852→            <div className="space-y-1.5">
+   853→              <div className="flex items-center gap-1">
+   854→                <Label>کپی از عنصر مشابه</Label>
+   855→                <HelpDot
+   856→                  label="کپی از عنصر مشابه"
+   857→                  content={{
+   858→                    what: 'درجه‌های چهار عامل یک عنصر دیگر را عیناً به این عنصر کپی می‌کند؛ برای عناصر تکراری در ایستگاه‌های مشابه.',
+   859→                    input: 'یک عنصر دارای ارزیابی از همین پروژه انتخاب کنید، یا حالت «انتخاب دستی درجه‌ها» را نگه دارید.',
+   860→                    note: 'کد درجه‌ها از عنصر مبدأ خوانده و مقدار آن‌ها از جدول انتخابی بالا محاسبه می‌شود؛ اگر جدول کدی را نداشته باشد، ثبت با خطا مواجه می‌شود.',
+   861→                  }}
+   862→                />
+   863→              </div>
+   864→              <Select
+   865→                value={form.copyFrom ?? NONE}
+   866→                onValueChange={(v) => {
+   867→                  dirtyRef.current = true
+   868→                  setForm((s) => s && { ...s, copyFrom: v === NONE ? null : v })
+   869→                }}
+   870→              >
+   871→                <SelectTrigger className="w-full" aria-label="کپی ارزیابی از عنصر مشابه">
+   872→                  <SelectValue placeholder="انتخاب دستی درجه‌ها" />
+   873→                </SelectTrigger>
+   874→                <SelectContent>
+   875→                  <SelectItem value={NONE}>— انتخاب دستی درجه‌ها —</SelectItem>
+   876→                  {candidateSources.map((src) => (
+   877→                    <SelectItem key={src.id} value={src.id}>
+   878→                      <span className="text-xs">{src.label}</span>
+   879→                    </SelectItem>
+   880→                  ))}
+   881→                </SelectContent>
+   882→              </Select>
+   883→              {form.copyFrom && (
+   884→                <p className="rounded-lg bg-cyan-soft p-2 text-xs leading-5 text-cyan">
+   885→                  درجه‌ها از عنصر مبدأ کپی می‌شوند و انتخاب دستی غیرفعال است؛ برای ویرایش دستی، گزینه «انتخاب دستی درجه‌ها»
+   886→                  را برگزینید.
+   887→                </p>
+   888→              )}
+   889→            </div>
+   890→
+   891→            {/* چهار عامل */}
+   892→            <div className="grid gap-3 sm:grid-cols-2">
+   893→              {RATING_FACTORS.map((factor) => (
+   894→                <div key={factor} className="space-y-1.5">
+   895→                  <div className="flex items-center gap-1">
+   896→                    <Label>{RATING_FACTOR_LABELS[factor]}</Label>
+   897→                    <HelpDot label={RATING_FACTOR_LABELS[factor]} content={FACTOR_HELP[factor]} />
+   898→                  </div>
+   899→                  <Select
+   900→                    value={effectiveGrades[factor] ?? NONE}
+   901→                    onValueChange={(v) => {
+   902→                      dirtyRef.current = true
+   903→                      setForm((s) => s && { ...s, grades: { ...s.grades, [factor]: v === NONE ? null : v } })
+   904→                    }}
+   905→                    disabled={form.copyFrom !== null || tableQ.isLoading}
+   906→                  >
+   907→                    <SelectTrigger className="w-full" aria-label={`درجه ${RATING_FACTOR_LABELS[factor]}`}>
+   908→                      <SelectValue placeholder={`درجه ${RATING_FACTOR_LABELS[factor]}`} />
+   909→                    </SelectTrigger>
+   910→                    <SelectContent>
+   911→                      <SelectItem value={NONE}>— بدون درجه (سهم صفر) —</SelectItem>
+   912→                      {gradesByFactor[factor].map((g) => (
+   913→                        <SelectItem key={g.id} value={g.gradeCode}>
+   914→                          <span className="num">
+   915→                            {g.gradeCode} — {g.label} ({formatSigned(g.value, prefs)})
+   916→                          </span>
+   917→                        </SelectItem>
+   918→                      ))}
+   919→                    </SelectContent>
+   920→                  </Select>
+   921→                </div>
+   922→              ))}
+   923→            </div>
+   924→
+   925→            {/* پیش‌نمایش زنده R — محاسبه کلاینت؛ مقدار نهایی ملاک، پاسخ سرور است */}
+   926→            <div className="rounded-xl border border-brand/30 bg-brand-soft/50 p-3" aria-live="polite">
+   927→              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-7">
+   928→                <span className="font-bold text-brand">پیش‌نمایش زنده:</span>
+   929→                <span className="num" dir="ltr">
+   930→                  R = 1
+   931→                </span>
+   932→                {RATING_FACTORS.map((f) => (
+   933→                  <span key={f} className="num">
+   934→                    + ({RATING_FACTOR_LABELS[f]} {formatSigned(factorValue(f), prefs)})
+   935→                  </span>
+   936→                ))}
+   937→                <span>=</span>
+   938→                <span className="num text-base font-extrabold text-brand">
+   939→                  {previewR === null ? '—' : formatTimeValue(previewR, prefs)}
+   940→                </span>
+   941→              </div>
+   942→              <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+   943→                R = 1 + (مهارت) + (تلاش) + (شرایط) + (یکنواختی) — این پیش‌نمایش صرفاً راهنماست؛ مقدار نهایی پس از ذخیره
+   944→                توسط سرور محاسبه و ملاک است.
+   945→              </p>
+   946→            </div>
+   947→
+   948→            {/* یادداشت */}
+   949→            <div className="space-y-1.5">
+   950→              <Label htmlFor="rating-notes">یادداشت (اختیاری)</Label>
+   951→              <Textarea
+   952→                id="rating-notes"
+   953→                value={form.notes}
+   954→                onChange={(e) => {
+   955→                  dirtyRef.current = true
+   956→                  setForm((s) => s && { ...s, notes: e.target.value })
+   957→                }}
+   958→                placeholder="مثلاً: مبنا مشاهده سه چرخه در شیفت صبح"
+   959→                className="min-h-16"
+   960→              />
+   961→            </div>
+   962→          </div>
+   963→        )}
+   964→
+   965→        <DialogFooter className="flex-row justify-between gap-2 sm:justify-end">
+   966→          <Button variant="outline" onClick={close}>
+   967→            انصراف
+   968→          </Button>
+   969→          <Button
+   970→            onClick={() => saveMutation.mutate()}
+   971→            disabled={saveMutation.isPending || form === null || form.tableId === ''}
+   972→            className="btn-brand border-0"
+   973→          >
+   974→            {saveMutation.isPending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Gauge className="size-4" aria-hidden />}
+   975→            ثبت ارزیابی
+   976→          </Button>
+   977→        </DialogFooter>
+   978→      </DialogContent>
+   979→    </Dialog>
+   980→  )
+   981→}
+   982→
+   983→// ═══════════════════════════════════════════════════════════
+   984→// پنل جزئیات جدول مرجع — فراداده autosave + ویرایش درجه‌ها
+   985→// + «ذخیره به‌عنوان نسخه جدید» (حفظ سابقه محاسباتی) — FR-13
+   986→// ═══════════════════════════════════════════════════════════
+   987→function TableDetailPanel({
+   988→  table,
+   989→  projectId,
+   990→  nextVersion,
+   991→  prefs,
+   992→  isMobile,
+   993→  onDelete,
+   994→  onCreated,
+   995→}: {
+   996→  table: RatingTableDto
+   997→  projectId: string
+   998→  nextVersion: number
+   999→  prefs: Prefs
+  1000→  isMobile: boolean
+  1001→  onDelete: () => void
+  1002→  onCreated: (tableId: string) => void
+  1003→}) {
+  1004→  const qc = useQueryClient()
+  1005→
+  1006→  const detailQ = useQuery({
+  1007→    queryKey: qk.ratingTable(table.id),
+  1008→    queryFn: () => ratingApi.table(table.id),
+  1009→  })
+  1010→
+  1011→  const invalidate = () => {
+  1012→    void qc.invalidateQueries({ queryKey: qk.ratingTables(projectId) })
+  1013→    void qc.invalidateQueries({ queryKey: qk.ratingMatrix(projectId) })
+  1014→    void qc.invalidateQueries({ queryKey: qk.ratingTable(table.id) })
+  1015→  }
+  1016→
+  1017→  // ── فراداده با ذخیره خودکار (کنترل هم‌زمانی expectedUpdatedAt) ──
+  1018→  const updatedAtRef = useRef(table.updatedAt)
+  1019→  const [meta, setMeta] = useState({ name: table.name, source: table.source ?? '', notes: table.notes ?? '' })
+  1020→  const { status: metaStatus, retry: metaRetry } = useAutosave({
+  1021→    data: meta,
+  1022→    ready: true,
+  1023→    save: async (v) => {
+  1024→      const res = await ratingApi.updateTable(table.id, {
+  1025→        name: v.name.trim(),
+  1026→        source: v.source.trim() || null,
+  1027→        notes: v.notes.trim() || null,
+  1028→        expectedUpdatedAt: updatedAtRef.current,
+  1029→      })
+  1030→      updatedAtRef.current = res.table.updatedAt
+  1031→      invalidate()
+  1032→    },
+  1033→  })
+  1034→
+  1035→  // ── پیش‌فرض پروژه ──
+  1036→  const [switchingDefault, setSwitchingDefault] = useState(false)
+  1037→  const setDefault = async (next: boolean) => {
+  1038→    setSwitchingDefault(true)
+  1039→    try {
+  1040→      const res = await ratingApi.updateTable(table.id, { isDefault: next, expectedUpdatedAt: updatedAtRef.current })
+  1041→      updatedAtRef.current = res.table.updatedAt
+  1042→      invalidate()
+  1043→      toast.success(
+  1044→        next ? `«${table.name}» جدول پیش‌فرض پروژه شد` : `پیش‌فرض بودن «${table.name}» برداشته شد`
+  1045→      )
+  1046→    } catch (err) {
+  1047→      invalidate()
+  1048→      toast.error(err instanceof Error ? err.message : 'تغییر جدول پیش‌فرض ناموفق بود')
+  1049→    } finally {
+  1050→      setSwitchingDefault(false)
+  1051→    }
+  1052→  }
+  1053→
+  1054→  // ── ویرایش محلی درجه‌ها (ذخیره فقط از طریق نسخه جدید) ──
+  1055→  const [draft, setDraft] = useState<RatingGradeDto[] | null>(null)
+  1056→  useEffect(() => {
+  1057→    const d = detailQ.data
+  1058→    if (!d) return
+  1059→    setDraft((prev) => {
+  1060→      if (prev === null) return [...d.grades]
+  1061→      const byId = new Map(prev.map((g) => [g.id, g]))
+  1062→      return d.grades.map((g) => byId.get(g.id) ?? g)
+  1063→    })
+  1064→  }, [detailQ.data])
+  1065→
+  1066→  const serverGrades = detailQ.data?.grades ?? []
+  1067→  const dirtyCount =
+  1068→    draft?.reduce((n, g) => {
+  1069→      const sv = serverGrades.find((x) => x.id === g.id)
+  1070→      const same =
+  1071→        sv &&
+  1072→        sv.gradeCode === g.gradeCode &&
+  1073→        sv.label === g.label &&
+  1074→        sv.value === g.value &&
+  1075→        (sv.hint ?? '') === (g.hint ?? '')
+  1076→      return n + (same ? 0 : 1)
+  1077→    }, 0) ?? 0
+  1078→
+  1079→  const updateGrade = (id: string, patch: Partial<Pick<RatingGradeDto, 'gradeCode' | 'label' | 'value' | 'hint'>>) => {
+  1080→    setDraft((prev) => prev?.map((g) => (g.id === id ? { ...g, ...patch } : g)) ?? prev)
+  1081→  }
+  1082→
+  1083→  // ── ذخیره به‌عنوان نسخه جدید ──
+  1084→  const [versioning, setVersioning] = useState(false)
+  1085→  const saveNewVersion = async () => {
+  1086→    if (!draft || draft.length === 0) return
+  1087→    setVersioning(true)
+  1088→    try {
+  1089→      const res = await ratingApi.createTable(projectId, {
+  1090→        name: `${meta.name.trim() || table.name} — نسخه ${nextVersion}`,
+  1091→        source: meta.source.trim() || null,
+  1092→        notes: meta.notes.trim() || null,
+  1093→        baseOnTableId: table.id,
+  1094→        grades: draft.map((g) => ({
+  1095→          factor: g.factor,
+  1096→          gradeCode: g.gradeCode.trim(),
+  1097→          label: g.label.trim(),
+  1098→          value: g.value,
+  1099→          hint: g.hint?.trim() || null,
+  1100→          sortOrder: g.sortOrder,
+  1101→        })),
+  1102→        makeDefault: true,
+  1103→      })
+  1104→      void qc.invalidateQueries({ queryKey: qk.ratingTables(projectId) })
+  1105→      void qc.invalidateQueries({ queryKey: qk.ratingMatrix(projectId) })
+  1106→      void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+  1107→      toast.success(`نسخه جدید «${res.table.name}» ساخته و پیش‌فرض پروژه شد`)
+  1108→      onCreated(res.table.id)
+  1109→    } catch (err) {
+  1110→      toast.error(err instanceof Error ? err.message : 'ساخت نسخه جدید ناموفق بود')
+  1111→    } finally {
+  1112→      setVersioning(false)
+  1113→    }
+  1114→  }
+  1115→
+  1116→  return (
+  1117→    <div className="space-y-4">
+  1118→      {/* فراداده */}
+  1119→      <div className="card-premium p-4">
+  1120→        <div className="flex flex-wrap items-start justify-between gap-2">
+  1121→          <h3 className="text-sm font-extrabold">مشخصات جدول</h3>
+  1122→          <div className="flex items-center gap-2">
+  1123→            <SaveIndicator status={metaStatus} onRetry={metaRetry} />
+  1124→            <Button
+  1125→              variant="ghost"
+  1126→              size="icon"
+  1127→              className="size-8 text-red hover:text-red"
+  1128→              onClick={onDelete}
+  1129→              aria-label={`حذف جدول ${table.name}`}
+  1130→            >
+  1131→              <Trash2 className="size-4" aria-hidden />
+  1132→            </Button>
+  1133→          </div>
+  1134→        </div>
+  1135→        <div className="mt-3 space-y-3">
+  1136→          <div className="space-y-1.5">
+  1137→            <Label htmlFor={`rt-name-${table.id}`}>نام جدول</Label>
+  1138→            <Input
+  1139→              id={`rt-name-${table.id}`}
+  1140→              value={meta.name}
+  1141→              onChange={(e) => setMeta((s) => ({ ...s, name: e.target.value }))}
+  1142→              aria-label="نام جدول"
+  1143→            />
+  1144→          </div>
+  1145→          <div className="space-y-1.5">
+  1146→            <div className="flex items-center gap-1">
+  1147→              <Label htmlFor={`rt-source-${table.id}`}>منبع</Label>
+  1148→              <HelpDot
+  1149→                label="منبع جدول"
+  1150→                content={{
+  1151→                  what: 'مرجع یا رویه‌ای که مقادیر درجه‌ها از آن گرفته شده است.',
+  1152→                  example: '«نسخه رایج نظام Westinghouse؛ در یکی از منابع به Lowry, Maynard & Stegemerten, 1940 نسبت داده شده».',
+  1153→                  note: 'ذکر دقیق منبع برای پاسخ‌گویی در بررسی‌های کیفی ضروری است؛ جدول Seed صرفاً نقطه شروع است.',
+  1154→                }}
+  1155→              />
+  1156→            </div>
+  1157→            <Textarea
+  1158→              id={`rt-source-${table.id}`}
+  1159→              value={meta.source}
+  1160→              onChange={(e) => setMeta((s) => ({ ...s, source: e.target.value }))}
+  1161→              className="min-h-14"
+  1162→              dir="auto"
+  1163→              aria-label="منبع جدول"
+  1164→            />
+  1165→          </div>
+  1166→          <div className="space-y-1.5">
+  1167→            <Label htmlFor={`rt-notes-${table.id}`}>یادداشت</Label>
+  1168→            <Textarea
+  1169→              id={`rt-notes-${table.id}`}
+  1170→              value={meta.notes}
+  1171→              onChange={(e) => setMeta((s) => ({ ...s, notes: e.target.value }))}
+  1172→              className="min-h-14"
+  1173→              aria-label="یادداشت جدول"
+  1174→            />
+  1175→          </div>
+  1176→          <div className="flex items-center justify-between rounded-xl bg-surface-2/70 p-3">
+  1177→            <div>
+  1178→              <Label htmlFor={`rt-default-${table.id}`} className="text-sm">
+  1179→                جدول پیش‌فرض پروژه
+  1180→              </Label>
+  1181→              <p className="mt-0.5 text-xs text-muted-foreground">جدول پیش‌فرض هنگام ارزیابی جدید پیشنهاد می‌شود.</p>
+  1182→            </div>
+  1183→            <Switch
+  1184→              id={`rt-default-${table.id}`}
+  1185→              checked={table.isDefault}
+  1186→              onCheckedChange={setDefault}
+  1187→              disabled={switchingDefault}
+  1188→              aria-label="جدول پیش‌فرض پروژه"
+  1189→            />
+  1190→          </div>
+  1191→        </div>
+  1192→      </div>
+  1193→
+  1194→      {/* تأکید منبع و Seed — FR-13 */}
+  1195→      <div className="rounded-xl border border-amber/30 bg-amber-soft/60 p-3 text-xs leading-6">
+  1196→        <p className="text-muted-foreground">
+  1197→          <b className="text-foreground">منبع: </b>
+  1198→          <span title={table.source ?? undefined}>{table.source ?? '—'}</span>
+  1199→          <span className="text-faint"> · </span>
+  1200→          <b className="text-foreground">نسخه: </b>
+  1201→          <span className="num">{formatInt(table.version, prefs)}</span>
+  1202→          <span className="text-faint"> · </span>
+  1203→          <b className="text-foreground">وضعیت: </b>
+  1204→          {table.isDefault ? 'پیش‌فرض پروژه' : 'غیرپیش‌فرض'}
+  1205→          <span className="text-faint"> · </span>
+  1206→          <b className="text-foreground">درجه‌ها: </b>
+  1207→          <span className="num">{formatInt(table.gradesCount, prefs)}</span>
+  1208→          <span className="text-faint"> · </span>
+  1209→          <b className="text-foreground">ارزیابی‌ها: </b>
+  1210→          <span className="num">{formatInt(table.assessmentsCount, prefs)}</span>
+  1211→        </p>
+  1212→        <p className="mt-1 text-amber">
+  1213→          این جدول Seed صرفاً نقطه شروع نرم‌افزار است و باید توسط کارشناس/رویه شرکت تأیید شود؛ استاندارد جهان‌شمول یا نرخ
+  1214→          مصوب شرکت نیست.
+  1215→        </p>
+  1216→      </div>
+  1217→
+  1218→      {/* درجه‌ها بر اساس عامل */}
+  1219→      {detailQ.isLoading ? (
+  1220→        <div className="space-y-3">
+  1221→          {Array.from({ length: 3 }).map((_, i) => (
+  1222→            <Skeleton key={i} className="h-32 w-full rounded-xl" />
+  1223→          ))}
+  1224→        </div>
+  1225→      ) : detailQ.error ? (
+  1226→        <EmptyState
+  1227→          className="py-6"
+  1228→          title="بارگذاری درجه‌ها ناموفق بود"
+  1229→          description={detailQ.error instanceof Error ? detailQ.error.message : 'خطای نامشخص'}
+  1230→          action={
+  1231→            <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: qk.ratingTable(table.id) })}>
+  1232→              تلاش مجدد
+  1233→            </Button>
+  1234→          }
+  1235→        />
+  1236→      ) : draft === null ? null : (
+  1237→        <>
+  1238→          {dirtyCount > 0 && (
+  1239→            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber/40 bg-amber-soft/70 p-3 text-xs">
+  1240→              <p className="text-amber">
+  1241→                <b className="num">{formatInt(dirtyCount, prefs)}</b> درجه ویرایش شده و هنوز ذخیره نشده است؛ تغییرات فقط با
+  1242→                ساخت «نسخه جدید» اعمال می‌شوند.
+  1243→              </p>
+  1244→              <Button
+  1245→                variant="ghost"
+  1246→                size="sm"
+  1247→                className="h-7 text-amber hover:text-amber"
+  1248→                onClick={() => setDraft([...serverGrades])}
+  1249→              >
+  1250→                بازگردانی تغییرات
+  1251→              </Button>
+  1252→            </div>
+  1253→          )}
+  1254→
+  1255→          {RATING_FACTORS.map((factor) => {
+  1256→            const rows = draft.filter((g) => g.factor === factor)
+  1257→            if (rows.length === 0) return null
+  1258→            return (
+  1259→              <section key={factor} className="card-premium overflow-hidden">
+  1260→                <div className="border-b bg-surface-2/70 px-4 py-2.5">
+  1261→                  <h4 className="text-sm font-bold">{RATING_FACTOR_LABELS[factor]}</h4>
+  1262→                </div>
+  1263→                {isMobile ? (
+  1264→                  <div className="space-y-3 p-3">
+  1265→                    {rows.map((g) => (
+  1266→                      <GradeCard
+  1267→                        key={g.id}
+  1268→                        grade={g}
+  1269→                        onChange={(patch) => updateGrade(g.id, patch)}
+  1270→                      />
+  1271→                    ))}
+  1272→                  </div>
+  1273→                ) : (
+  1274→                  <table className="w-full text-sm">
+  1275→                    <thead>
+  1276→                      <tr className="border-b bg-surface-2/70 text-right text-xs text-muted-foreground">
+  1277→                        <th className="w-24 px-3 py-2 font-bold">کد</th>
+  1278→                        <th className="w-44 px-3 py-2 font-bold">برچسب</th>
+  1279→                        <th className="w-32 px-3 py-2 font-bold">مقدار (±)</th>
+  1280→                        <th className="px-3 py-2 font-bold">راهنما</th>
+  1281→                      </tr>
+  1282→                    </thead>
+  1283→                    <tbody>
+  1284→                      {rows.map((g) => (
+  1285→                        <tr key={g.id} className="border-b last:border-0">
+  1286→                          <td className="px-3 py-2">
+  1287→                            <Input
+  1288→                              value={g.gradeCode}
+  1289→                              onChange={(e) => updateGrade(g.id, { gradeCode: e.target.value })}
+  1290→                              className="h-8 font-mono"
+  1291→                              dir="ltr"
+  1292→                              aria-label={`کد درجه ${g.gradeCode}`}
+  1293→                            />
+  1294→                          </td>
+  1295→                          <td className="px-3 py-2">
+  1296→                            <Input
+  1297→                              value={g.label}
+  1298→                              onChange={(e) => updateGrade(g.id, { label: e.target.value })}
+  1299→                              className="h-8"
+  1300→                              aria-label={`برچسب درجه ${g.gradeCode}`}
+  1301→                            />
+  1302→                          </td>
+  1303→                          <td className="px-3 py-2">
+  1304→                            <PersianNumberInput
+  1305→                              value={g.value}
+  1306→                              onChange={(v) => updateGrade(g.id, { value: v ?? 0 })}
+  1307→                              min={-0.5}
+  1308→                              max={0.5}
+  1309→                              className="h-8"
+  1310→                              title={`مقدار امتیاز: ${formatSigned(g.value, prefs)}`}
+  1311→                              aria-label={`مقدار درجه ${g.gradeCode}`}
+  1312→                            />
+  1313→                          </td>
+  1314→                          <td className="px-3 py-2">
+  1315→                            <Input
+  1316→                              value={g.hint ?? ''}
+  1317→                              onChange={(e) => updateGrade(g.id, { hint: e.target.value })}
+  1318→                              className="h-8"
+  1319→                              aria-label={`راهنمای درجه ${g.gradeCode}`}
+  1320→                            />
+  1321→                          </td>
+  1322→                        </tr>
+  1323→                      ))}
+  1324→                    </tbody>
+  1325→                  </table>
+  1326→                )}
+  1327→              </section>
+  1328→            )
+  1329→          })}
+  1330→
+  1331→          {/* ذخیره به‌عنوان نسخه جدید — FR-13 */}
+  1332→          <div className="card-premium space-y-3 p-4">
+  1333→            <div className="flex flex-wrap items-center justify-between gap-3">
+  1334→              <div className="min-w-0">
+  1335→                <h4 className="flex items-center gap-1.5 text-sm font-extrabold">
+  1336→                  <CopyPlus className="size-4 text-brand" aria-hidden />
+  1337→                  ذخیره به‌عنوان نسخه جدید
+  1338→                </h4>
+  1339→                <p className="mt-1 text-xs leading-6 text-muted-foreground">
+  1340→                  نسخه جدید ساخته می‌شود تا ارزیابی‌های ثبت‌شده با نسخه قبلی، سابقه محاسباتی خود را حفظ کنند؛ جدول فعلی
+  1341→                  دست‌نخورده می‌ماند. نام نسخه جدید:{' '}
+  1342→                  <span className="num font-medium">
+  1343→                    «{meta.name.trim() || table.name} — نسخه {formatInt(nextVersion, prefs)}»
+  1344→                  </span>
+  1345→                </p>
+  1346→              </div>
+  1347→              <Button
+  1348→                onClick={saveNewVersion}
+  1349→                disabled={versioning || draft.length === 0}
+  1350→                className="btn-brand shrink-0 border-0"
+  1351→              >
+  1352→                {versioning ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <CopyPlus className="size-4" aria-hidden />}
+  1353→                ساخت نسخه {formatInt(nextVersion, prefs)}
+  1354→              </Button>
+  1355→            </div>
+  1356→            <p className="rounded-lg bg-muted p-2.5 text-[11px] leading-6 text-muted-foreground">
+  1357→              تغییرات درجه‌ها (کد، برچسب، مقدار و راهنما) فقط با ساخت نسخه جدید ذخیره می‌شوند؛ نسخه جدید به‌صورت خودکار
+  1358→              جدول پیش‌فرض پروژه می‌شود. مقدار هر درجه عددی اعشاری بین ‎−۰٫۵‎ و ‎+۰٫۵‎ است.
+  1359→            </p>
+  1360→          </div>
+  1361→        </>
+  1362→      )}
+  1363→    </div>
+  1364→  )
+  1365→}
+  1366→
+  1367→// ═══════════════════════════════════════════════════════════
+  1368→// کارت موبایل درجه — FR-30
+  1369→// ═══════════════════════════════════════════════════════════
+  1370→function GradeCard({
+  1371→  grade,
+  1372→  onChange,
+  1373→}: {
+  1374→  grade: RatingGradeDto
+  1375→  onChange: (patch: Partial<Pick<RatingGradeDto, 'gradeCode' | 'label' | 'value' | 'hint'>>) => void
+  1376→}) {
+  1377→  return (
+  1378→    <div className="rounded-xl border p-3">
+  1379→      <div className="grid grid-cols-2 gap-2.5">
+  1380→        <div className="space-y-1">
+  1381→          <Label className="text-[11px]" htmlFor={`gc-code-${grade.id}`}>
+  1382→            کد
+  1383→          </Label>
+  1384→          <Input
+  1385→            id={`gc-code-${grade.id}`}
+  1386→            value={grade.gradeCode}
+  1387→            onChange={(e) => onChange({ gradeCode: e.target.value })}
+  1388→            className="h-9 font-mono"
+  1389→            dir="ltr"
+  1390→            aria-label="کد درجه"
+  1391→          />
+  1392→        </div>
+  1393→        <div className="space-y-1">
+  1394→          <Label className="text-[11px]" htmlFor={`gc-val-${grade.id}`}>
+  1395→            مقدار (±)
+  1396→          </Label>
+  1397→          <PersianNumberInput
+  1398→            id={`gc-val-${grade.id}`}
+  1399→            value={grade.value}
+  1400→            onChange={(v) => onChange({ value: v ?? 0 })}
+  1401→            min={-0.5}
+  1402→            max={0.5}
+  1403→            aria-label="مقدار درجه"
+  1404→          />
+  1405→        </div>
+  1406→        <div className="col-span-2 space-y-1">
+  1407→          <Label className="text-[11px]" htmlFor={`gc-label-${grade.id}`}>
+  1408→            برچسب
+  1409→          </Label>
+  1410→          <Input
+  1411→            id={`gc-label-${grade.id}`}
+  1412→            value={grade.label}
+  1413→            onChange={(e) => onChange({ label: e.target.value })}
+  1414→            aria-label="برچسب درجه"
+  1415→          />
+  1416→        </div>
+  1417→        <div className="col-span-2 space-y-1">
+  1418→          <Label className="text-[11px]" htmlFor={`gc-hint-${grade.id}`}>
+  1419→            راهنما
+  1420→          </Label>
+  1421→          <Input
+  1422→            id={`gc-hint-${grade.id}`}
+  1423→            value={grade.hint ?? ''}
+  1424→            onChange={(e) => onChange({ hint: e.target.value })}
+  1425→            aria-label="راهنمای درجه"
+  1426→          />
+  1427→        </div>
+  1428→      </div>
+  1429→    </div>
+  1430→  )
+  1431→}
+  1432→

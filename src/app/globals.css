@@ -1,0 +1,291 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ═══════════════════════════════════════════════════
+   سیستم طراحی — بر مبنای Theme.html مالک محصول
+   فونت: وزیرمتن (محلی) | تم روشن/تیره | RTL-first
+   ═══════════════════════════════════════════════════ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-vazir), "Vazirmatn", system-ui, sans-serif;
+  --font-mono: var(--font-vazir), "Vazirmatn", monospace;
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* رنگ‌های برند و وضعیت از Theme.html */
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-brand-soft: var(--brand-soft);
+  --color-cyan: var(--cyan);
+  --color-cyan-soft: var(--cyan-soft);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-red: var(--red);
+  --color-red-soft: var(--red-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-faint: var(--faint);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-glass: var(--glass);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 5px);
+  --radius-2xl: calc(var(--radius) + 9px);
+}
+
+/* ── تم روشن ── */
+:root {
+  --radius: 0.8125rem;
+  --background: #f5f7fb;
+  --foreground: #0c1424;
+  --card: #ffffff;
+  --card-foreground: #0c1424;
+  --popover: #ffffff;
+  --popover-foreground: #0c1424;
+  --primary: #7257ff;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2f7;
+  --secondary-foreground: #0c1424;
+  --muted: #f8fafc;
+  --muted-foreground: #69778e;
+  --accent: #efeaff;
+  --accent-foreground: #5b45e0;
+  --destructive: #ef5b6b;
+  --destructive-foreground: #ffffff;
+  --border: #e4e9f1;
+  --input: #e4e9f1;
+  --ring: #7257ff;
+  --chart-1: #7257ff;
+  --chart-2: #21c7d9;
+  --chart-3: #18b77b;
+  --chart-4: #eaa928;
+  --chart-5: #ef5b6b;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0c1424;
+  --sidebar-primary: #7257ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #efeaff;
+  --sidebar-accent-foreground: #5b45e0;
+  --sidebar-border: #e4e9f1;
+  --sidebar-ring: #7257ff;
+
+  /* توکن‌های اضافی Theme.html */
+  --brand: #7257ff;
+  --brand-2: #9a7cff;
+  --brand-soft: #efeaff;
+  --cyan: #21c7d9;
+  --cyan-soft: #e5fbfd;
+  --green: #18b77b;
+  --green-soft: #dcf8ec;
+  --red: #ef5b6b;
+  --red-soft: #fde5e8;
+  --amber: #eaa928;
+  --amber-soft: #fff4d7;
+  --faint: #98a4b7;
+  --surface-2: #f8fafc;
+  --surface-3: #eef2f7;
+  --glass: rgba(255, 255, 255, 0.76);
+  --line-strong: #d7dee9;
+  --shadow-1: 0 1px 2px rgba(20, 35, 60, 0.03), 0 7px 24px rgba(20, 35, 60, 0.05);
+  --shadow-2: 0 18px 50px rgba(25, 35, 60, 0.11);
+  --shadow-3: 0 25px 70px rgba(20, 25, 55, 0.18);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.22, 1.18, 0.38, 1);
+}
+
+/* ── تم تیره ── */
+.dark {
+  --background: #070b14;
+  --foreground: #edf2fb;
+  --card: #0d1422;
+  --card-foreground: #edf2fb;
+  --popover: #0d1422;
+  --popover-foreground: #edf2fb;
+  --primary: #8874ff;
+  --primary-foreground: #ffffff;
+  --secondary: #141f31;
+  --secondary-foreground: #edf2fb;
+  --muted: #101a2a;
+  --muted-foreground: #93a0b5;
+  --accent: #201b42;
+  --accent-foreground: #b39fff;
+  --destructive: #ff6c7a;
+  --destructive-foreground: #ffffff;
+  --border: #1e2a3d;
+  --input: #1e2a3d;
+  --ring: #8874ff;
+  --chart-1: #8874ff;
+  --chart-2: #37d1df;
+  --chart-3: #27c992;
+  --chart-4: #f1b743;
+  --chart-5: #ff6c7a;
+  --sidebar: #0d1422;
+  --sidebar-foreground: #edf2fb;
+  --sidebar-primary: #8874ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #201b42;
+  --sidebar-accent-foreground: #b39fff;
+  --sidebar-border: #1e2a3d;
+  --sidebar-ring: #8874ff;
+
+  --brand: #8874ff;
+  --brand-2: #b39fff;
+  --brand-soft: #201b42;
+  --cyan: #37d1df;
+  --cyan-soft: #102f35;
+  --green: #27c992;
+  --green-soft: #0c3025;
+  --red: #ff6c7a;
+  --red-soft: #3a1b22;
+  --amber: #f1b743;
+  --amber-soft: #3b2b10;
+  --faint: #627189;
+  --surface-2: #101a2a;
+  --surface-3: #141f31;
+  --glass: rgba(12, 18, 30, 0.74);
+  --line-strong: #2a3950;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.25), 0 12px 30px rgba(0, 0, 0, 0.14);
+  --shadow-2: 0 20px 55px rgba(0, 0, 0, 0.34);
+  --shadow-3: 0 30px 80px rgba(0, 0, 0, 0.48);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01";
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 22%, transparent);
+  }
+  /* اعداد همیشه با ارقام فارسی/لاتین مطابق تنظیمات — فونت باید هر دو را پشتیبانی کند */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* کارت ممتاز — الگوی Theme.html */
+  .card-premium {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) + 5px);
+    box-shadow: var(--shadow-1);
+    transition: box-shadow 0.35s var(--ease), transform 0.35s var(--ease), border-color 0.35s var(--ease);
+  }
+  .card-premium:hover {
+    box-shadow: var(--shadow-2);
+    transform: translateY(-2px);
+  }
+  .chip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: calc(var(--radius) - 2px);
+    flex-shrink: 0;
+  }
+  .glass-bar {
+    background: var(--glass);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  }
+  .text-gradient-brand {
+    background: linear-gradient(120deg, var(--brand), var(--brand-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .btn-brand {
+    background: linear-gradient(120deg, var(--brand), var(--brand-2));
+    color: #fff;
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--brand) 35%, transparent);
+    transition: all 0.3s var(--ease);
+  }
+  .btn-brand:hover {
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--brand) 45%, transparent);
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+  }
+  /* اسکرول‌بار ظریف */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .animate-view-in {
+    animation: viewIn 0.32s var(--ease) both;
+  }
+  @keyframes viewIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

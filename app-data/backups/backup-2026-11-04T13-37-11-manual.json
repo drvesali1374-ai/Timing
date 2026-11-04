@@ -1,0 +1,536 @@
+{
+  "format": "timing-backup",
+  "schemaVersion": 1,
+  "createdAt": "2026-11-04T13:37:11.377Z",
+  "checksum": "f703d135d89867c32866ab17ac8f750a7b41e58852675044b9f94a0a1cec2547",
+  "data": {
+    "project": [
+      {
+        "id": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "name": "پروژه آزمون خط مونتاژ",
+        "lineName": "خط مونتاژ ۱",
+        "productName": "پمپ آب",
+        "studyDate": "2026-11-04",
+        "status": "IN_PROGRESS",
+        "description": "آزمون فاز ۱",
+        "createdAt": "2026-11-04T13:35:53.474Z",
+        "updatedAt": "2026-11-04T13:35:53.474Z"
+      }
+    ],
+    "projectSetting": [
+      {
+        "id": "1eda9511-29f3-4e9f-a839-41c2fa046189",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "key": "calc.allowanceMethod",
+        "value": "PERCENT_OF_NT",
+        "version": 1,
+        "updatedAt": "2026-11-04T13:35:53.477Z"
+      },
+      {
+        "id": "9b7f9682-64a6-42bb-8c1d-17039ea26dd7",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "key": "calc.aggregationMethod",
+        "value": "WEIGHTED_BY_COUNT",
+        "version": 1,
+        "updatedAt": "2026-11-04T13:35:53.477Z"
+      }
+    ],
+    "station": [
+      {
+        "id": "da2678f4-4c52-414a-818b-2040404e0222",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "name": "ایستگاه مونتاژ بدنه",
+        "description": null,
+        "sortOrder": 0,
+        "createdAt": "2026-11-04T13:36:45.237Z",
+        "updatedAt": "2026-11-04T13:36:45.237Z"
+      }
+    ],
+    "activityGroup": [
+      {
+        "id": "7568180a-f12d-41a7-8e8b-d35726a139a1",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "name": "کار دستی",
+        "description": null,
+        "createdAt": "2026-11-04T13:36:45.937Z",
+        "updatedAt": "2026-11-04T13:36:45.937Z"
+      }
+    ],
+    "allowanceCategory": [
+      {
+        "id": "eb6f85c2-f77e-48ea-a4e5-ccee7e7affcb",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "name": "استراحت شخصی",
+        "code": "PF",
+        "isActive": true,
+        "sortOrder": 0,
+        "createdAt": "2026-11-04T13:36:46.496Z",
+        "updatedAt": "2026-11-04T13:36:46.496Z"
+      },
+      {
+        "id": "a529a2c2-f03f-4a6f-ab81-05dd304ba906",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "name": "نیازهای طبیعی",
+        "code": "NF",
+        "isActive": true,
+        "sortOrder": 1,
+        "createdAt": "2026-11-04T13:36:46.561Z",
+        "updatedAt": "2026-11-04T13:36:46.561Z"
+      }
+    ],
+    "operator": [
+      {
+        "id": "f8335bbf-05b4-4700-a4d4-b79233784fb7",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "displayName": "اپراتور ۱",
+        "code": "OP-01",
+        "notes": null,
+        "createdAt": "2026-11-04T13:36:50.676Z",
+        "updatedAt": "2026-11-04T13:36:50.676Z"
+      }
+    ],
+    "ratingTable": [
+      {
+        "id": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "name": "جدول وستینگهاوس — نسخه مرجع اولیه",
+        "version": 1,
+        "source": "نسخه رایج از نظام Westinghouse (در بازنشرهای آموزشی؛ در یکی از منابع به Lowry, Maynard & Stegemerten, 1940, p.233 نسبت داده شده). این نسخه صرفاً نقطه شروع است و استاندارد جهان‌شمول یا رویه مصوب شرکت نیست؛ پیش از استفاده عملی توسط کارشناس تأیید شود.",
+        "notes": "Seed اولیه نرم‌افزار. مقادیر و برچسب‌ها قابل ویرایش است؛ هر تغییر باید با «ذخیره نسخه جدید» ثبت شود تا محاسبات تاریخی بی‌صدا تغییر نکند.",
+        "isDefault": true,
+        "createdAt": "2026-11-04T13:35:53.478Z",
+        "updatedAt": "2026-11-04T13:35:53.478Z"
+      }
+    ],
+    "activity": [
+      {
+        "id": "4fbe2aaa-040b-44f7-a9d4-6de34d4681b5",
+        "stationId": "da2678f4-4c52-414a-818b-2040404e0222",
+        "groupId": "7568180a-f12d-41a7-8e8b-d35726a139a1",
+        "name": "مونتاژ درپوش",
+        "description": null,
+        "processType": "OPERATION",
+        "sortOrder": 0,
+        "targetSampleCount": 15,
+        "createdAt": "2026-11-04T13:36:48.151Z",
+        "updatedAt": "2026-11-04T13:36:48.151Z"
+      }
+    ],
+    "ratingTableGrade": [
+      {
+        "id": "15a8ec3b-ff4a-4de1-8e05-5f72c36d632e",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "A1",
+        "label": "عالی‌تر",
+        "value": 0.15,
+        "hint": "تسلط کامل و روان؛ حرکات دقیق، پیوسته و بدون مکث",
+        "sortOrder": 1
+      },
+      {
+        "id": "9826af16-7e8e-477b-a4ca-5c92eee6b8ff",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "A2",
+        "label": "عالی",
+        "value": 0.13,
+        "hint": "تسلط بالا؛ هماهنگی عالی دست و چشم با توقف ناچیز",
+        "sortOrder": 2
+      },
+      {
+        "id": "aa87cc5c-b324-452c-9c08-7d4096d12b0a",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "B1",
+        "label": "خوب‌تر",
+        "value": 0.11,
+        "hint": "مهارت خوب؛ حرکات روان با مکث‌های گاه‌به‌گاه",
+        "sortOrder": 3
+      },
+      {
+        "id": "412fd05b-cb12-4d5a-9edd-c7be57a54ae8",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "B2",
+        "label": "خوب",
+        "value": 0.08,
+        "hint": "مهارت قابل اتکا؛ روش کار منظم و پیوسته",
+        "sortOrder": 4
+      },
+      {
+        "id": "d663e761-1317-460f-8174-a4edd421cf48",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "C1",
+        "label": "متوسط رو به بالا",
+        "value": 0.06,
+        "hint": "بالاتر از متوسط؛ با کمی تردید در حرکات",
+        "sortOrder": 5
+      },
+      {
+        "id": "cf014907-c2ea-4547-820e-4d7afd49d302",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "C2",
+        "label": "متوسط",
+        "value": 0.03,
+        "hint": "مهارت متوسط؛ گاهی دقت و هماهنگی کم می‌شود",
+        "sortOrder": 6
+      },
+      {
+        "id": "bd1115cb-ce69-46ea-b042-92cb576e7f7c",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی؛ عملکرد معمول انتظارشده",
+        "sortOrder": 7
+      },
+      {
+        "id": "7f52e8c5-5228-4465-ba35-d73a4c8be32c",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "E1",
+        "label": "ضعیف‌تر",
+        "value": -0.05,
+        "hint": "کمی ضعیف‌تر از قابل قبول؛ مکث و تردید محسوس",
+        "sortOrder": 8
+      },
+      {
+        "id": "683d00fe-4d56-40bf-b6ca-f90f01f6cb6b",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "E2",
+        "label": "ضعیف",
+        "value": -0.1,
+        "hint": "مهارت ضعیف؛ حرکات ناهماهنگ و مکرر",
+        "sortOrder": 9
+      },
+      {
+        "id": "898159bf-0ad8-47fa-aaab-178d703b5ecc",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "F1",
+        "label": "بسیار ضعیف‌تر",
+        "value": -0.16,
+        "hint": "آشنا با کار اما ناتوان در اجرای روان",
+        "sortOrder": 10
+      },
+      {
+        "id": "1f2ba31f-598c-47c8-a3c9-ea870de76305",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "SKILL",
+        "gradeCode": "F2",
+        "label": "بسیار ضعیف",
+        "value": -0.22,
+        "hint": "ناآشنا با کار؛ حرکات بسیار ناکارآمد",
+        "sortOrder": 11
+      },
+      {
+        "id": "04129ec9-f919-4cbc-b1c2-4a256dd8929b",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "A1",
+        "label": "کوشش فوق‌العاده",
+        "value": 0.13,
+        "hint": "تمرکز و سرعت بی‌وقفه در کل چرخه",
+        "sortOrder": 1
+      },
+      {
+        "id": "dfb0d9c3-03f4-4ebb-9888-69db195c9434",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "A2",
+        "label": "کوشش بسیار زیاد",
+        "value": 0.12,
+        "hint": "مصمم و پرانگیزه با حداقل وقفه",
+        "sortOrder": 2
+      },
+      {
+        "id": "85508e60-c0e9-4cec-9a5d-6d3dd96e8773",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "B1",
+        "label": "کوشش زیاد",
+        "value": 0.1,
+        "hint": "از متوسط بیشتر؛ ریتم پایدار و هدفمند",
+        "sortOrder": 3
+      },
+      {
+        "id": "e6b88e55-bc9d-4577-b15d-b42011657b3f",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "B2",
+        "label": "کوشش خوب",
+        "value": 0.08,
+        "hint": "علاقه و توجه مشخص به کار",
+        "sortOrder": 4
+      },
+      {
+        "id": "0af18f54-03ca-4a75-87d9-df47caa1a2bd",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "C1",
+        "label": "کوشش متوسط رو به بالا",
+        "value": 0.05,
+        "hint": "کمی بیش از متوسط",
+        "sortOrder": 5
+      },
+      {
+        "id": "42c2a15d-13c4-43c3-8008-a698d526c1a5",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "C2",
+        "label": "کوشش متوسط",
+        "value": 0.02,
+        "hint": "حالت معمول و روان کار",
+        "sortOrder": 6
+      },
+      {
+        "id": "80f41dac-33b6-4762-b757-f26a9d825efe",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی تلاش",
+        "sortOrder": 7
+      },
+      {
+        "id": "d9dc78d3-744a-4396-81ab-5758b3288687",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "E1",
+        "label": "کوشش کم",
+        "value": -0.04,
+        "hint": "بی‌میلی محسوس و کندی گاه‌به‌گاه",
+        "sortOrder": 8
+      },
+      {
+        "id": "1d33c9c0-5df8-479d-b84d-3359492b6d88",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "E2",
+        "label": "کوشش بسیار کم",
+        "value": -0.08,
+        "hint": "کند و بی‌انگیزه؛ وقفه‌های مکرر",
+        "sortOrder": 9
+      },
+      {
+        "id": "b06dd127-daee-4c5c-b0fc-50ed7fd6f657",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "F1",
+        "label": "کوشش ناچیز",
+        "value": -0.12,
+        "hint": "بی‌توجه به پیشرفت کار",
+        "sortOrder": 10
+      },
+      {
+        "id": "7b51cd38-4f98-400b-9b43-33de6fe47424",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "EFFORT",
+        "gradeCode": "F2",
+        "label": "بی‌انگیزه",
+        "value": -0.17,
+        "hint": "مقاومت آشکار در برابر کار",
+        "sortOrder": 11
+      },
+      {
+        "id": "0c7786b6-0e69-4d57-a229-9aeafe09a2fd",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONDITIONS",
+        "gradeCode": "A",
+        "label": "ایده‌آل",
+        "value": 0.06,
+        "hint": "شرایط کاری ممتاز؛ روشنایی، دما و نظم عالی",
+        "sortOrder": 1
+      },
+      {
+        "id": "7eb40efe-80e8-4a24-a296-ca1510f4d698",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONDITIONS",
+        "gradeCode": "B",
+        "label": "خوب",
+        "value": 0.04,
+        "hint": "شرایط مطلوب و راحت برای کار",
+        "sortOrder": 2
+      },
+      {
+        "id": "6f604663-8eb8-4870-8e27-c15f88b8f265",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONDITIONS",
+        "gradeCode": "C",
+        "label": "متوسط",
+        "value": 0.02,
+        "hint": "قابل تحمل؛ کمی بهتر از معمول",
+        "sortOrder": 3
+      },
+      {
+        "id": "a20ca18f-cd9e-43c2-9a00-ed86c0939fca",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONDITIONS",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی شرایط",
+        "sortOrder": 4
+      },
+      {
+        "id": "8c4632d3-7728-4044-856d-0ccfe5cf8d00",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONDITIONS",
+        "gradeCode": "E",
+        "label": "ضعیف",
+        "value": -0.03,
+        "hint": "عوامل مزاحم (سر و صدا، دما، نور ناکافی)",
+        "sortOrder": 5
+      },
+      {
+        "id": "4170ff59-5044-4ecb-af56-c4f1e2002429",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONDITIONS",
+        "gradeCode": "F",
+        "label": "بسیار ضعیف",
+        "value": -0.07,
+        "hint": "شرایط نامطلوب و خسته‌کننده؛ اثر محسوس بر عملکرد",
+        "sortOrder": 6
+      },
+      {
+        "id": "43cd71c2-3238-4886-a48e-2c37a80fb747",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONSISTENCY",
+        "gradeCode": "A",
+        "label": "کاملاً یکنواخت",
+        "value": 0.04,
+        "hint": "ریتم کار بدون تغییر محسوس در تمام چرخه‌ها",
+        "sortOrder": 1
+      },
+      {
+        "id": "b400c088-60e5-4d4e-bce3-f7851083fdcc",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONSISTENCY",
+        "gradeCode": "B",
+        "label": "یکنواخت",
+        "value": 0.03,
+        "hint": "تغییرات بسیار جزئی بین چرخه‌ها",
+        "sortOrder": 2
+      },
+      {
+        "id": "08a01b0a-8d64-4197-b50b-5d81afa743ac",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONSISTENCY",
+        "gradeCode": "C",
+        "label": "تقریباً یکنواخت",
+        "value": 0.01,
+        "hint": "پراکندگی کم در زمان‌های تکراری",
+        "sortOrder": 3
+      },
+      {
+        "id": "ee73d496-ff80-4f0e-b262-5c2fa2d3a6c8",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONSISTENCY",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی یکنواختی",
+        "sortOrder": 4
+      },
+      {
+        "id": "6c28292b-ca51-4411-bb40-17fd183b1352",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONSISTENCY",
+        "gradeCode": "E",
+        "label": "ناپایدار",
+        "value": -0.02,
+        "hint": "نوسان قابل مشاهده در زمان‌ها؛ نیازمند بازبینی",
+        "sortOrder": 5
+      },
+      {
+        "id": "bfde0541-58f7-4747-8c3a-3b69c89ae74e",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "factor": "CONSISTENCY",
+        "gradeCode": "F",
+        "label": "بسیار ناپایدار",
+        "value": -0.04,
+        "hint": "نوسان شدید؛ احتمال داده غیرعادی یا نیاز به آموزش",
+        "sortOrder": 6
+      }
+    ],
+    "groupAllowance": [
+      {
+        "id": "eba9e33e-5bc7-48ed-8761-01518c546c3a",
+        "groupId": "7568180a-f12d-41a7-8e8b-d35726a139a1",
+        "categoryId": "eb6f85c2-f77e-48ea-a4e5-ccee7e7affcb",
+        "percentValue": 0.05,
+        "updatedAt": "2026-11-04T13:36:47.382Z"
+      },
+      {
+        "id": "eabd6fc9-c024-469e-966b-c62c6d958303",
+        "groupId": "7568180a-f12d-41a7-8e8b-d35726a139a1",
+        "categoryId": "a529a2c2-f03f-4a6f-ab81-05dd304ba906",
+        "percentValue": 0.1,
+        "updatedAt": "2026-11-04T13:36:47.387Z"
+      }
+    ],
+    "activityAllowanceOverride": [
+      {
+        "id": "f940df84-af7d-45e6-bc19-09bf267e9556",
+        "activityId": "4fbe2aaa-040b-44f7-a9d4-6de34d4681b5",
+        "categoryId": "eb6f85c2-f77e-48ea-a4e5-ccee7e7affcb",
+        "percentValue": 0.08,
+        "updatedAt": "2026-11-04T13:36:49.938Z"
+      }
+    ],
+    "workElement": [
+      {
+        "id": "b3799755-6521-41cf-93f9-7a7fa10f355a",
+        "activityId": "4fbe2aaa-040b-44f7-a9d4-6de34d4681b5",
+        "name": "برداشتن درپوش",
+        "description": null,
+        "elementType": "MANUAL",
+        "sortOrder": 0,
+        "createdAt": "2026-11-04T13:36:48.887Z",
+        "updatedAt": "2026-11-04T13:36:48.887Z"
+      },
+      {
+        "id": "c60a9898-8d31-41e3-8cdb-44bbe0aa764a",
+        "activityId": "4fbe2aaa-040b-44f7-a9d4-6de34d4681b5",
+        "name": "پرس خودکار",
+        "description": null,
+        "elementType": "MACHINE",
+        "sortOrder": 1,
+        "createdAt": "2026-11-04T13:36:48.961Z",
+        "updatedAt": "2026-11-04T13:36:48.961Z"
+      }
+    ],
+    "studySession": [],
+    "ratingAssessment": [
+      {
+        "id": "e29bf174-5496-4acb-9824-41321d171454",
+        "workElementId": "b3799755-6521-41cf-93f9-7a7fa10f355a",
+        "ratingTableId": "1a3b3410-53c4-4a85-adf6-03de7c9fcb54",
+        "skillGrade": "C1",
+        "effortGrade": "C2",
+        "conditionsGrade": "D",
+        "consistencyGrade": "C",
+        "skillValue": 0.06,
+        "effortValue": 0.02,
+        "conditionsValue": 0,
+        "consistencyValue": 0.01,
+        "totalFactor": 1.09,
+        "notes": null,
+        "createdAt": "2026-11-04T13:36:52.181Z",
+        "updatedAt": "2026-11-04T13:36:52.181Z"
+      }
+    ],
+    "cycleObservation": [],
+    "timelineLane": [],
+    "elementObservation": [],
+    "chartNode": [],
+    "chartEdge": [],
+    "calculationRun": [],
+    "finalizationInfo": []
+  }
+}

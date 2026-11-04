@@ -1,0 +1,1813 @@
+{
+  "format": "timing-backup",
+  "schemaVersion": 1,
+  "createdAt": "2026-11-04T15:28:53.058Z",
+  "checksum": "c1590698d3291b03815b7b7d16396453b87174376b2f16925d00d945fd96a58f",
+  "data": {
+    "project": [
+      {
+        "id": "ecbedc38-6479-4028-8995-6b7f78b9c9c9",
+        "name": "پروژه نمایشی",
+        "lineName": "خط ۱",
+        "productName": "محصول A",
+        "studyDate": "2026-11-04",
+        "status": "IN_PROGRESS",
+        "description": null,
+        "createdAt": "2026-11-04T13:54:09.570Z",
+        "updatedAt": "2026-11-04T13:54:09.570Z"
+      },
+      {
+        "id": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "name": "پروژه آزمون خودکار — ویرایش ۱",
+        "lineName": "خط آزمون",
+        "productName": "محصول آزمون",
+        "studyDate": "2026-11-04",
+        "status": "IN_PROGRESS",
+        "description": "آزمون فاز ۱ و ۲",
+        "createdAt": "2026-11-04T15:28:45.017Z",
+        "updatedAt": "2026-11-04T15:28:51.329Z"
+      }
+    ],
+    "projectSetting": [
+      {
+        "id": "d200b4c4-6492-495c-a27d-a1b3fe2be399",
+        "projectId": "ecbedc38-6479-4028-8995-6b7f78b9c9c9",
+        "key": "calc.allowanceMethod",
+        "value": "PERCENT_OF_NT",
+        "version": 1,
+        "updatedAt": "2026-11-04T13:54:09.575Z"
+      },
+      {
+        "id": "21a70084-1fa7-4b03-83c0-7f76f548be02",
+        "projectId": "ecbedc38-6479-4028-8995-6b7f78b9c9c9",
+        "key": "calc.aggregationMethod",
+        "value": "WEIGHTED_BY_COUNT",
+        "version": 1,
+        "updatedAt": "2026-11-04T13:54:09.575Z"
+      },
+      {
+        "id": "2d49d773-3a62-46f1-a2cf-67b358c15a4d",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "key": "calc.allowanceMethod",
+        "value": "PERCENT_OF_NT",
+        "version": 3,
+        "updatedAt": "2026-11-04T15:28:49.757Z"
+      },
+      {
+        "id": "ecb0e6ef-2cbc-4d18-826d-1f6a0a0ff482",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "key": "calc.aggregationMethod",
+        "value": "WEIGHTED_BY_COUNT",
+        "version": 1,
+        "updatedAt": "2026-11-04T15:28:45.019Z"
+      }
+    ],
+    "station": [
+      {
+        "id": "9b37570f-3a78-492a-b3a8-4d578f1ed411",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "name": "ایستگاه مونتاژ",
+        "description": null,
+        "sortOrder": 0,
+        "createdAt": "2026-11-04T15:28:45.967Z",
+        "updatedAt": "2026-11-04T15:28:45.967Z"
+      }
+    ],
+    "activityGroup": [
+      {
+        "id": "74757378-006d-42a2-996c-b2098858ce98",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "name": "کار دستی",
+        "description": null,
+        "createdAt": "2026-11-04T15:28:46.270Z",
+        "updatedAt": "2026-11-04T15:28:46.270Z"
+      }
+    ],
+    "allowanceCategory": [
+      {
+        "id": "e9edd6be-f05a-4a26-a084-11f2dd695799",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "name": "استراحت شخصی",
+        "code": "PF",
+        "isActive": true,
+        "sortOrder": 0,
+        "createdAt": "2026-11-04T15:28:48.658Z",
+        "updatedAt": "2026-11-04T15:28:48.658Z"
+      },
+      {
+        "id": "7e8ea104-b783-4eec-86ee-6c925037b4e4",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "name": "نیازهای طبیعی",
+        "code": "NF",
+        "isActive": true,
+        "sortOrder": 1,
+        "createdAt": "2026-11-04T15:28:48.681Z",
+        "updatedAt": "2026-11-04T15:28:48.681Z"
+      }
+    ],
+    "operator": [
+      {
+        "id": "ef9b6d34-0284-48ef-8e53-d7e263f5239a",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "displayName": "اپراتور آزمون",
+        "code": "T-01",
+        "notes": null,
+        "createdAt": "2026-11-04T15:28:47.994Z",
+        "updatedAt": "2026-11-04T15:28:47.994Z"
+      }
+    ],
+    "ratingTable": [
+      {
+        "id": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "projectId": "ecbedc38-6479-4028-8995-6b7f78b9c9c9",
+        "name": "جدول وستینگهاوس — نسخه مرجع اولیه",
+        "version": 1,
+        "source": "نسخه رایج از نظام Westinghouse (در بازنشرهای آموزشی؛ در یکی از منابع به Lowry, Maynard & Stegemerten, 1940, p.233 نسبت داده شده). این نسخه صرفاً نقطه شروع است و استاندارد جهان‌شمول یا رویه مصوب شرکت نیست؛ پیش از استفاده عملی توسط کارشناس تأیید شود.",
+        "notes": "Seed اولیه نرم‌افزار. مقادیر و برچسب‌ها قابل ویرایش است؛ هر تغییر باید با «ذخیره نسخه جدید» ثبت شود تا محاسبات تاریخی بی‌صدا تغییر نکند.",
+        "isDefault": true,
+        "createdAt": "2026-11-04T13:54:09.576Z",
+        "updatedAt": "2026-11-04T13:54:09.576Z"
+      },
+      {
+        "id": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "name": "جدول وستینگهاوس — نسخه مرجع اولیه",
+        "version": 1,
+        "source": "نسخه رایج از نظام Westinghouse (در بازنشرهای آموزشی؛ در یکی از منابع به Lowry, Maynard & Stegemerten, 1940, p.233 نسبت داده شده). این نسخه صرفاً نقطه شروع است و استاندارد جهان‌شمول یا رویه مصوب شرکت نیست؛ پیش از استفاده عملی توسط کارشناس تأیید شود.",
+        "notes": "Seed اولیه نرم‌افزار. مقادیر و برچسب‌ها قابل ویرایش است؛ هر تغییر باید با «ذخیره نسخه جدید» ثبت شود تا محاسبات تاریخی بی‌صدا تغییر نکند.",
+        "isDefault": true,
+        "createdAt": "2026-11-04T15:28:45.020Z",
+        "updatedAt": "2026-11-04T15:28:45.020Z"
+      }
+    ],
+    "activity": [
+      {
+        "id": "8fa5ba05-565f-431a-bea5-c3d5e511ad49",
+        "stationId": "9b37570f-3a78-492a-b3a8-4d578f1ed411",
+        "groupId": "74757378-006d-42a2-996c-b2098858ce98",
+        "name": "مونتاژ درپوش",
+        "description": null,
+        "processType": "OPERATION",
+        "sortOrder": 0,
+        "targetSampleCount": 15,
+        "createdAt": "2026-11-04T15:28:46.645Z",
+        "updatedAt": "2026-11-04T15:28:46.645Z"
+      }
+    ],
+    "ratingTableGrade": [
+      {
+        "id": "a5ec9e66-503d-4744-bbef-9dbe5e9e3613",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "A1",
+        "label": "عالی‌تر",
+        "value": 0.15,
+        "hint": "تسلط کامل و روان؛ حرکات دقیق، پیوسته و بدون مکث",
+        "sortOrder": 1
+      },
+      {
+        "id": "10844571-bf43-442f-a301-530a5cccd4af",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "A2",
+        "label": "عالی",
+        "value": 0.13,
+        "hint": "تسلط بالا؛ هماهنگی عالی دست و چشم با توقف ناچیز",
+        "sortOrder": 2
+      },
+      {
+        "id": "86ce02af-fef8-47ab-95ec-ce92e282e1f5",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "B1",
+        "label": "خوب‌تر",
+        "value": 0.11,
+        "hint": "مهارت خوب؛ حرکات روان با مکث‌های گاه‌به‌گاه",
+        "sortOrder": 3
+      },
+      {
+        "id": "63e01f79-bd0b-4baf-86d4-54ca8ec39d6f",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "B2",
+        "label": "خوب",
+        "value": 0.08,
+        "hint": "مهارت قابل اتکا؛ روش کار منظم و پیوسته",
+        "sortOrder": 4
+      },
+      {
+        "id": "c567e0c0-5870-4e28-8e91-6797d0d4878c",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "C1",
+        "label": "متوسط رو به بالا",
+        "value": 0.06,
+        "hint": "بالاتر از متوسط؛ با کمی تردید در حرکات",
+        "sortOrder": 5
+      },
+      {
+        "id": "af132cbd-7be5-4b56-9f5e-bde315e74cfc",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "C2",
+        "label": "متوسط",
+        "value": 0.03,
+        "hint": "مهارت متوسط؛ گاهی دقت و هماهنگی کم می‌شود",
+        "sortOrder": 6
+      },
+      {
+        "id": "fb31eb8b-ef70-4856-8db8-72dcfb18612a",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی؛ عملکرد معمول انتظارشده",
+        "sortOrder": 7
+      },
+      {
+        "id": "00d26722-15f1-45af-add3-19ee7913f51c",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "E1",
+        "label": "ضعیف‌تر",
+        "value": -0.05,
+        "hint": "کمی ضعیف‌تر از قابل قبول؛ مکث و تردید محسوس",
+        "sortOrder": 8
+      },
+      {
+        "id": "e5da16ba-ac24-4f6a-a8cd-3789e1713db1",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "E2",
+        "label": "ضعیف",
+        "value": -0.1,
+        "hint": "مهارت ضعیف؛ حرکات ناهماهنگ و مکرر",
+        "sortOrder": 9
+      },
+      {
+        "id": "bd201ef0-b481-4c64-8225-8d42b184d99b",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "F1",
+        "label": "بسیار ضعیف‌تر",
+        "value": -0.16,
+        "hint": "آشنا با کار اما ناتوان در اجرای روان",
+        "sortOrder": 10
+      },
+      {
+        "id": "5ff45129-f171-4c8b-b5e1-922de29ffdc9",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "SKILL",
+        "gradeCode": "F2",
+        "label": "بسیار ضعیف",
+        "value": -0.22,
+        "hint": "ناآشنا با کار؛ حرکات بسیار ناکارآمد",
+        "sortOrder": 11
+      },
+      {
+        "id": "37b19658-b636-4e7c-bca7-0befee90dd0f",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "A1",
+        "label": "کوشش فوق‌العاده",
+        "value": 0.13,
+        "hint": "تمرکز و سرعت بی‌وقفه در کل چرخه",
+        "sortOrder": 1
+      },
+      {
+        "id": "953bf38e-bcc6-4c98-8312-d96de0889de7",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "A2",
+        "label": "کوشش بسیار زیاد",
+        "value": 0.12,
+        "hint": "مصمم و پرانگیزه با حداقل وقفه",
+        "sortOrder": 2
+      },
+      {
+        "id": "9189a351-ec8f-4071-bbbc-d6862a9adf3c",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "B1",
+        "label": "کوشش زیاد",
+        "value": 0.1,
+        "hint": "از متوسط بیشتر؛ ریتم پایدار و هدفمند",
+        "sortOrder": 3
+      },
+      {
+        "id": "d7b480b3-a852-4062-88d7-15e994692cab",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "B2",
+        "label": "کوشش خوب",
+        "value": 0.08,
+        "hint": "علاقه و توجه مشخص به کار",
+        "sortOrder": 4
+      },
+      {
+        "id": "b5b76a1a-feb9-49ae-92ae-79cb4cdb2a4d",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "C1",
+        "label": "کوشش متوسط رو به بالا",
+        "value": 0.05,
+        "hint": "کمی بیش از متوسط",
+        "sortOrder": 5
+      },
+      {
+        "id": "8edc0b35-00f4-4304-9a23-5a03e5127c07",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "C2",
+        "label": "کوشش متوسط",
+        "value": 0.02,
+        "hint": "حالت معمول و روان کار",
+        "sortOrder": 6
+      },
+      {
+        "id": "f45ec732-7821-45eb-bc84-7b5e2a048e87",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی تلاش",
+        "sortOrder": 7
+      },
+      {
+        "id": "f48bb714-c33d-4814-a8e2-352287fa85c8",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "E1",
+        "label": "کوشش کم",
+        "value": -0.04,
+        "hint": "بی‌میلی محسوس و کندی گاه‌به‌گاه",
+        "sortOrder": 8
+      },
+      {
+        "id": "b0a73cb5-af56-4c47-afe9-93b5dc3c1850",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "E2",
+        "label": "کوشش بسیار کم",
+        "value": -0.08,
+        "hint": "کند و بی‌انگیزه؛ وقفه‌های مکرر",
+        "sortOrder": 9
+      },
+      {
+        "id": "af2a30ab-73d1-4511-9d87-49d1bd93b075",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "F1",
+        "label": "کوشش ناچیز",
+        "value": -0.12,
+        "hint": "بی‌توجه به پیشرفت کار",
+        "sortOrder": 10
+      },
+      {
+        "id": "f65f0693-d778-4287-93f5-9a713417e6f4",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "EFFORT",
+        "gradeCode": "F2",
+        "label": "بی‌انگیزه",
+        "value": -0.17,
+        "hint": "مقاومت آشکار در برابر کار",
+        "sortOrder": 11
+      },
+      {
+        "id": "a024c969-7860-492b-829e-3caa73cd2bdf",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONDITIONS",
+        "gradeCode": "A",
+        "label": "ایده‌آل",
+        "value": 0.06,
+        "hint": "شرایط کاری ممتاز؛ روشنایی، دما و نظم عالی",
+        "sortOrder": 1
+      },
+      {
+        "id": "698eec5c-3250-4b02-bfc5-f3c92a87f303",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONDITIONS",
+        "gradeCode": "B",
+        "label": "خوب",
+        "value": 0.04,
+        "hint": "شرایط مطلوب و راحت برای کار",
+        "sortOrder": 2
+      },
+      {
+        "id": "f156fe96-55be-4d74-b9ee-54e84710fd5c",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONDITIONS",
+        "gradeCode": "C",
+        "label": "متوسط",
+        "value": 0.02,
+        "hint": "قابل تحمل؛ کمی بهتر از معمول",
+        "sortOrder": 3
+      },
+      {
+        "id": "afbd04ee-9db2-43cd-85e0-18623e926ce2",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONDITIONS",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی شرایط",
+        "sortOrder": 4
+      },
+      {
+        "id": "74819f9a-713e-4e5f-9990-2ffc191289b7",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONDITIONS",
+        "gradeCode": "E",
+        "label": "ضعیف",
+        "value": -0.03,
+        "hint": "عوامل مزاحم (سر و صدا، دما، نور ناکافی)",
+        "sortOrder": 5
+      },
+      {
+        "id": "c717b45d-4c1a-4594-9a4b-d476ce42aabc",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONDITIONS",
+        "gradeCode": "F",
+        "label": "بسیار ضعیف",
+        "value": -0.07,
+        "hint": "شرایط نامطلوب و خسته‌کننده؛ اثر محسوس بر عملکرد",
+        "sortOrder": 6
+      },
+      {
+        "id": "bd2c60af-7906-4400-843f-8b712ee752f0",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONSISTENCY",
+        "gradeCode": "A",
+        "label": "کاملاً یکنواخت",
+        "value": 0.04,
+        "hint": "ریتم کار بدون تغییر محسوس در تمام چرخه‌ها",
+        "sortOrder": 1
+      },
+      {
+        "id": "ab660ec4-efa6-4347-adb3-cf3c73e2da79",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONSISTENCY",
+        "gradeCode": "B",
+        "label": "یکنواخت",
+        "value": 0.03,
+        "hint": "تغییرات بسیار جزئی بین چرخه‌ها",
+        "sortOrder": 2
+      },
+      {
+        "id": "89452814-5ce9-4baf-941e-5143d6068002",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONSISTENCY",
+        "gradeCode": "C",
+        "label": "تقریباً یکنواخت",
+        "value": 0.01,
+        "hint": "پراکندگی کم در زمان‌های تکراری",
+        "sortOrder": 3
+      },
+      {
+        "id": "76952597-23b0-4060-a7c5-6cf7344a2e3a",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONSISTENCY",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی یکنواختی",
+        "sortOrder": 4
+      },
+      {
+        "id": "9972ae0a-5dde-42a7-9f24-b9f7bbe54046",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONSISTENCY",
+        "gradeCode": "E",
+        "label": "ناپایدار",
+        "value": -0.02,
+        "hint": "نوسان قابل مشاهده در زمان‌ها؛ نیازمند بازبینی",
+        "sortOrder": 5
+      },
+      {
+        "id": "dbc7d1a3-3e3d-4fe7-a66b-8de67d625cc6",
+        "ratingTableId": "cb72ab07-bbfd-4703-b02d-9839518e5e56",
+        "factor": "CONSISTENCY",
+        "gradeCode": "F",
+        "label": "بسیار ناپایدار",
+        "value": -0.04,
+        "hint": "نوسان شدید؛ احتمال داده غیرعادی یا نیاز به آموزش",
+        "sortOrder": 6
+      },
+      {
+        "id": "a5050269-b0e7-424c-b17a-2b153786555e",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "A1",
+        "label": "عالی‌تر",
+        "value": 0.15,
+        "hint": "تسلط کامل و روان؛ حرکات دقیق، پیوسته و بدون مکث",
+        "sortOrder": 1
+      },
+      {
+        "id": "21062115-56af-48cd-a94a-08130cb14682",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "A2",
+        "label": "عالی",
+        "value": 0.13,
+        "hint": "تسلط بالا؛ هماهنگی عالی دست و چشم با توقف ناچیز",
+        "sortOrder": 2
+      },
+      {
+        "id": "d2660471-ae4d-48bb-864f-36d97fdede19",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "B1",
+        "label": "خوب‌تر",
+        "value": 0.11,
+        "hint": "مهارت خوب؛ حرکات روان با مکث‌های گاه‌به‌گاه",
+        "sortOrder": 3
+      },
+      {
+        "id": "21f9bc23-073f-4aba-a9df-166a1ef88319",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "B2",
+        "label": "خوب",
+        "value": 0.08,
+        "hint": "مهارت قابل اتکا؛ روش کار منظم و پیوسته",
+        "sortOrder": 4
+      },
+      {
+        "id": "2b033fdd-e00b-4543-8e90-6d9b5eac68ff",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "C1",
+        "label": "متوسط رو به بالا",
+        "value": 0.06,
+        "hint": "بالاتر از متوسط؛ با کمی تردید در حرکات",
+        "sortOrder": 5
+      },
+      {
+        "id": "8b63793d-5105-4b6a-b041-189fe930e121",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "C2",
+        "label": "متوسط",
+        "value": 0.03,
+        "hint": "مهارت متوسط؛ گاهی دقت و هماهنگی کم می‌شود",
+        "sortOrder": 6
+      },
+      {
+        "id": "23e8faa1-bbc1-4953-a293-7c5737b0d75e",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی؛ عملکرد معمول انتظارشده",
+        "sortOrder": 7
+      },
+      {
+        "id": "129c6e52-a739-4e33-8042-a83825542673",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "E1",
+        "label": "ضعیف‌تر",
+        "value": -0.05,
+        "hint": "کمی ضعیف‌تر از قابل قبول؛ مکث و تردید محسوس",
+        "sortOrder": 8
+      },
+      {
+        "id": "b84cc8c2-d444-4b09-a7aa-903e68afa0d4",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "E2",
+        "label": "ضعیف",
+        "value": -0.1,
+        "hint": "مهارت ضعیف؛ حرکات ناهماهنگ و مکرر",
+        "sortOrder": 9
+      },
+      {
+        "id": "5eb30bd7-57a7-4e97-a440-0fa0a3f02c29",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "F1",
+        "label": "بسیار ضعیف‌تر",
+        "value": -0.16,
+        "hint": "آشنا با کار اما ناتوان در اجرای روان",
+        "sortOrder": 10
+      },
+      {
+        "id": "c4e2da9a-c8f2-492d-b5a7-4b3989b9e9a3",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "SKILL",
+        "gradeCode": "F2",
+        "label": "بسیار ضعیف",
+        "value": -0.22,
+        "hint": "ناآشنا با کار؛ حرکات بسیار ناکارآمد",
+        "sortOrder": 11
+      },
+      {
+        "id": "c26730d2-f97f-4a60-b495-f7da8c991d26",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "A1",
+        "label": "کوشش فوق‌العاده",
+        "value": 0.13,
+        "hint": "تمرکز و سرعت بی‌وقفه در کل چرخه",
+        "sortOrder": 1
+      },
+      {
+        "id": "30bc4387-f279-4a77-acbc-8f7ad87b8226",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "A2",
+        "label": "کوشش بسیار زیاد",
+        "value": 0.12,
+        "hint": "مصمم و پرانگیزه با حداقل وقفه",
+        "sortOrder": 2
+      },
+      {
+        "id": "2781725b-7236-4456-bce8-e9c6f4f32c47",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "B1",
+        "label": "کوشش زیاد",
+        "value": 0.1,
+        "hint": "از متوسط بیشتر؛ ریتم پایدار و هدفمند",
+        "sortOrder": 3
+      },
+      {
+        "id": "ced6a155-34f5-4ac3-a39c-e731e38b2791",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "B2",
+        "label": "کوشش خوب",
+        "value": 0.08,
+        "hint": "علاقه و توجه مشخص به کار",
+        "sortOrder": 4
+      },
+      {
+        "id": "4e558c8e-8b3b-4824-9745-b545c33807a7",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "C1",
+        "label": "کوشش متوسط رو به بالا",
+        "value": 0.05,
+        "hint": "کمی بیش از متوسط",
+        "sortOrder": 5
+      },
+      {
+        "id": "ec713c64-8c22-40ca-84cc-2156c53a81a5",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "C2",
+        "label": "کوشش متوسط",
+        "value": 0.02,
+        "hint": "حالت معمول و روان کار",
+        "sortOrder": 6
+      },
+      {
+        "id": "4de0699f-6ddd-4608-b2e5-ea354884b6a0",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی تلاش",
+        "sortOrder": 7
+      },
+      {
+        "id": "d15b9106-39d0-4dea-8115-a858d0d22f3a",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "E1",
+        "label": "کوشش کم",
+        "value": -0.04,
+        "hint": "بی‌میلی محسوس و کندی گاه‌به‌گاه",
+        "sortOrder": 8
+      },
+      {
+        "id": "a5565792-e491-4435-afc8-02462bd267ca",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "E2",
+        "label": "کوشش بسیار کم",
+        "value": -0.08,
+        "hint": "کند و بی‌انگیزه؛ وقفه‌های مکرر",
+        "sortOrder": 9
+      },
+      {
+        "id": "c648d7c4-d2d8-45d9-a5e0-bda177659f35",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "F1",
+        "label": "کوشش ناچیز",
+        "value": -0.12,
+        "hint": "بی‌توجه به پیشرفت کار",
+        "sortOrder": 10
+      },
+      {
+        "id": "cef89db1-2738-438b-a537-4dbcecf9e8b6",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "EFFORT",
+        "gradeCode": "F2",
+        "label": "بی‌انگیزه",
+        "value": -0.17,
+        "hint": "مقاومت آشکار در برابر کار",
+        "sortOrder": 11
+      },
+      {
+        "id": "b291bf91-b15e-430a-8318-7253993cac3b",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONDITIONS",
+        "gradeCode": "A",
+        "label": "ایده‌آل",
+        "value": 0.06,
+        "hint": "شرایط کاری ممتاز؛ روشنایی، دما و نظم عالی",
+        "sortOrder": 1
+      },
+      {
+        "id": "1419491f-1770-4479-b579-a766e5aa6c3e",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONDITIONS",
+        "gradeCode": "B",
+        "label": "خوب",
+        "value": 0.04,
+        "hint": "شرایط مطلوب و راحت برای کار",
+        "sortOrder": 2
+      },
+      {
+        "id": "11512170-7433-48b0-80d1-49a3b4725215",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONDITIONS",
+        "gradeCode": "C",
+        "label": "متوسط",
+        "value": 0.02,
+        "hint": "قابل تحمل؛ کمی بهتر از معمول",
+        "sortOrder": 3
+      },
+      {
+        "id": "91214ad8-f3df-4827-b82c-8705a639fce4",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONDITIONS",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی شرایط",
+        "sortOrder": 4
+      },
+      {
+        "id": "e3915e4a-20ad-403c-bb7d-31fa19d60a7a",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONDITIONS",
+        "gradeCode": "E",
+        "label": "ضعیف",
+        "value": -0.03,
+        "hint": "عوامل مزاحم (سر و صدا، دما، نور ناکافی)",
+        "sortOrder": 5
+      },
+      {
+        "id": "10cdb975-85d6-4f44-b413-ed3a379b570a",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONDITIONS",
+        "gradeCode": "F",
+        "label": "بسیار ضعیف",
+        "value": -0.07,
+        "hint": "شرایط نامطلوب و خسته‌کننده؛ اثر محسوس بر عملکرد",
+        "sortOrder": 6
+      },
+      {
+        "id": "21f69222-3a45-4ee6-9642-1be8bd0c7f40",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONSISTENCY",
+        "gradeCode": "A",
+        "label": "کاملاً یکنواخت",
+        "value": 0.04,
+        "hint": "ریتم کار بدون تغییر محسوس در تمام چرخه‌ها",
+        "sortOrder": 1
+      },
+      {
+        "id": "fd01c49e-c689-4577-939b-216ec78aff0e",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONSISTENCY",
+        "gradeCode": "B",
+        "label": "یکنواخت",
+        "value": 0.03,
+        "hint": "تغییرات بسیار جزئی بین چرخه‌ها",
+        "sortOrder": 2
+      },
+      {
+        "id": "ca5fcaa5-db23-4d22-b88f-bb6b01d15922",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONSISTENCY",
+        "gradeCode": "C",
+        "label": "تقریباً یکنواخت",
+        "value": 0.01,
+        "hint": "پراکندگی کم در زمان‌های تکراری",
+        "sortOrder": 3
+      },
+      {
+        "id": "aebf2ca6-0b40-4626-acf4-864479529e0b",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONSISTENCY",
+        "gradeCode": "D",
+        "label": "قابل قبول (مرجع)",
+        "value": 0,
+        "hint": "سطح مرجع ارزیابی یکنواختی",
+        "sortOrder": 4
+      },
+      {
+        "id": "88a497e2-955c-46f1-8497-0c31434c7a7c",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONSISTENCY",
+        "gradeCode": "E",
+        "label": "ناپایدار",
+        "value": -0.02,
+        "hint": "نوسان قابل مشاهده در زمان‌ها؛ نیازمند بازبینی",
+        "sortOrder": 5
+      },
+      {
+        "id": "10f388cf-e1f0-4ecf-95f0-43b1bd8f462d",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "factor": "CONSISTENCY",
+        "gradeCode": "F",
+        "label": "بسیار ناپایدار",
+        "value": -0.04,
+        "hint": "نوسان شدید؛ احتمال داده غیرعادی یا نیاز به آموزش",
+        "sortOrder": 6
+      }
+    ],
+    "groupAllowance": [
+      {
+        "id": "d68643a6-985b-4d1f-976b-efcc07bf87ca",
+        "groupId": "74757378-006d-42a2-996c-b2098858ce98",
+        "categoryId": "e9edd6be-f05a-4a26-a084-11f2dd695799",
+        "percentValue": 0.05,
+        "updatedAt": "2026-11-04T15:28:49.080Z"
+      },
+      {
+        "id": "b36682cb-4a8a-4140-9a05-aec6fec7ec6f",
+        "groupId": "74757378-006d-42a2-996c-b2098858ce98",
+        "categoryId": "7e8ea104-b783-4eec-86ee-6c925037b4e4",
+        "percentValue": 0.1,
+        "updatedAt": "2026-11-04T15:28:49.087Z"
+      }
+    ],
+    "activityAllowanceOverride": [
+      {
+        "id": "50119a70-2bf7-41b7-812d-e37f88556b7c",
+        "activityId": "8fa5ba05-565f-431a-bea5-c3d5e511ad49",
+        "categoryId": "e9edd6be-f05a-4a26-a084-11f2dd695799",
+        "percentValue": 0.08,
+        "updatedAt": "2026-11-04T15:28:49.536Z"
+      }
+    ],
+    "workElement": [
+      {
+        "id": "ea5f195d-8d22-49bd-a62f-c5a8840394b8",
+        "activityId": "8fa5ba05-565f-431a-bea5-c3d5e511ad49",
+        "name": "برداشتن درپوش",
+        "description": null,
+        "elementType": "MANUAL",
+        "sortOrder": 2,
+        "createdAt": "2026-11-04T15:28:46.864Z",
+        "updatedAt": "2026-11-04T15:28:47.349Z"
+      },
+      {
+        "id": "31e0aafa-e8fe-45c0-a74c-3624acfc25c5",
+        "activityId": "8fa5ba05-565f-431a-bea5-c3d5e511ad49",
+        "name": "پرس خودکار",
+        "description": null,
+        "elementType": "MACHINE",
+        "sortOrder": 1,
+        "createdAt": "2026-11-04T15:28:46.878Z",
+        "updatedAt": "2026-11-04T15:28:47.349Z"
+      },
+      {
+        "id": "8077372b-7a25-446f-879c-019a3437714c",
+        "activityId": "8fa5ba05-565f-431a-bea5-c3d5e511ad49",
+        "name": "انتظار خنک‌شدن",
+        "description": null,
+        "elementType": "WAITING",
+        "sortOrder": 0,
+        "createdAt": "2026-11-04T15:28:46.933Z",
+        "updatedAt": "2026-11-04T15:28:47.349Z"
+      }
+    ],
+    "studySession": [],
+    "ratingAssessment": [
+      {
+        "id": "7f3be2ff-e716-4173-b703-66c2ebea2f56",
+        "workElementId": "ea5f195d-8d22-49bd-a62f-c5a8840394b8",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "skillGrade": "C1",
+        "effortGrade": "C2",
+        "conditionsGrade": "D",
+        "consistencyGrade": "C",
+        "skillValue": 0.06,
+        "effortValue": 0.02,
+        "conditionsValue": 0,
+        "consistencyValue": 0.01,
+        "totalFactor": 1.09,
+        "notes": null,
+        "createdAt": "2026-11-04T15:28:50.271Z",
+        "updatedAt": "2026-11-04T15:28:50.271Z"
+      },
+      {
+        "id": "f12f0214-9771-4ec3-b6a1-05f9f73cedc0",
+        "workElementId": "31e0aafa-e8fe-45c0-a74c-3624acfc25c5",
+        "ratingTableId": "d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a",
+        "skillGrade": "C1",
+        "effortGrade": "C2",
+        "conditionsGrade": "D",
+        "consistencyGrade": "C",
+        "skillValue": 0.06,
+        "effortValue": 0.02,
+        "conditionsValue": 0,
+        "consistencyValue": 0.01,
+        "totalFactor": 1.09,
+        "notes": null,
+        "createdAt": "2026-11-04T15:28:50.583Z",
+        "updatedAt": "2026-11-04T15:28:50.583Z"
+      }
+    ],
+    "cycleObservation": [],
+    "timelineLane": [],
+    "elementObservation": [],
+    "chartNode": [],
+    "chartEdge": [],
+    "calculationRun": [],
+    "finalizationInfo": [],
+    "appSetting": [
+      {
+        "id": "ui.digits",
+        "value": "persian"
+      }
+    ],
+    "auditEvent": [
+      {
+        "id": "98308d4f-3059-41a7-93bb-1e77d7c2983c",
+        "entityType": "Project",
+        "entityId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "action": "CREATE",
+        "entityName": "پروژه آزمون خط مونتاژ",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"پروژه آزمون خط مونتاژ\",\"lineName\":\"خط مونتاژ ۱\",\"productName\":\"پمپ آب\"}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:35:53.482Z"
+      },
+      {
+        "id": "0f145b5b-cc49-46aa-a428-d12230074815",
+        "entityType": "Station",
+        "entityId": "da2678f4-4c52-414a-818b-2040404e0222",
+        "action": "CREATE",
+        "entityName": "ایستگاه مونتاژ بدنه",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"ایستگاه مونتاژ بدنه\"}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:45.242Z"
+      },
+      {
+        "id": "b88cf66e-f6e6-46aa-a92a-e69eed4c8a3b",
+        "entityType": "ActivityGroup",
+        "entityId": "7568180a-f12d-41a7-8e8b-d35726a139a1",
+        "action": "CREATE",
+        "entityName": "کار دستی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"کار دستی\"}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:45.940Z"
+      },
+      {
+        "id": "1ba5e10f-7e34-4518-b1e2-6e8401d958d5",
+        "entityType": "AllowanceCategory",
+        "entityId": "eb6f85c2-f77e-48ea-a4e5-ccee7e7affcb",
+        "action": "CREATE",
+        "entityName": "استراحت شخصی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"استراحت شخصی\",\"isActive\":true}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:46.498Z"
+      },
+      {
+        "id": "60de7409-cdf9-4d8d-ad96-a9e5eccd0c1b",
+        "entityType": "AllowanceCategory",
+        "entityId": "a529a2c2-f03f-4a6f-ab81-05dd304ba906",
+        "action": "CREATE",
+        "entityName": "نیازهای طبیعی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"نیازهای طبیعی\",\"isActive\":true}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:46.562Z"
+      },
+      {
+        "id": "9bf52dcc-d555-4fbd-ba35-d5b4b03dd78d",
+        "entityType": "ActivityGroup",
+        "entityId": "7568180a-f12d-41a7-8e8b-d35726a139a1",
+        "action": "UPDATE",
+        "entityName": "کار دستی",
+        "beforeJson": null,
+        "afterJson": "{\"allowances\":[{\"categoryId\":\"eb6f85c2-f77e-48ea-a4e5-ccee7e7affcb\",\"percentValue\":0.05},{\"categoryId\":\"a529a2c2-f03f-4a6f-ab81-05dd304ba906\",\"percentValue\":0.1}]}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:47.390Z"
+      },
+      {
+        "id": "fb01ef9f-f3ed-40f8-8a21-2ad42cdd3416",
+        "entityType": "Activity",
+        "entityId": "4fbe2aaa-040b-44f7-a9d4-6de34d4681b5",
+        "action": "CREATE",
+        "entityName": "مونتاژ درپوش",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"مونتاژ درپوش\",\"processType\":\"OPERATION\"}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:48.153Z"
+      },
+      {
+        "id": "2605bafd-cb68-48ce-b35b-4bc6fdb6201a",
+        "entityType": "WorkElement",
+        "entityId": "b3799755-6521-41cf-93f9-7a7fa10f355a",
+        "action": "CREATE",
+        "entityName": "برداشتن درپوش",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"برداشتن درپوش\",\"elementType\":\"MANUAL\"}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:48.892Z"
+      },
+      {
+        "id": "b253f106-58b3-41d1-a369-fe6290fa484c",
+        "entityType": "WorkElement",
+        "entityId": "c60a9898-8d31-41e3-8cdb-44bbe0aa764a",
+        "action": "CREATE",
+        "entityName": "پرس خودکار",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"پرس خودکار\",\"elementType\":\"MACHINE\"}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:48.963Z"
+      },
+      {
+        "id": "b2588eb0-5ae6-4a2d-9ccd-d381ca565341",
+        "entityType": "Activity",
+        "entityId": "4fbe2aaa-040b-44f7-a9d4-6de34d4681b5",
+        "action": "UPDATE",
+        "entityName": "مونتاژ درپوش",
+        "beforeJson": null,
+        "afterJson": "{\"allowanceOverrides\":[{\"categoryId\":\"eb6f85c2-f77e-48ea-a4e5-ccee7e7affcb\",\"percentValue\":0.08}]}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:49.945Z"
+      },
+      {
+        "id": "b3ee54ff-4ba2-4960-9c01-5819170bbd4c",
+        "entityType": "Operator",
+        "entityId": "f8335bbf-05b4-4700-a4d4-b79233784fb7",
+        "action": "CREATE",
+        "entityName": "اپراتور ۱",
+        "beforeJson": null,
+        "afterJson": "{\"displayName\":\"اپراتور ۱\",\"code\":\"OP-01\"}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:50.678Z"
+      },
+      {
+        "id": "e04c91f4-e58b-4467-b742-2bf578697128",
+        "entityType": "RatingAssessment",
+        "entityId": "e29bf174-5496-4acb-9824-41321d171454",
+        "action": "CREATE",
+        "entityName": "برداشتن درپوش — R=1.09",
+        "beforeJson": null,
+        "afterJson": "{\"totalFactor\":1.09,\"ratingTableId\":\"1a3b3410-53c4-4a85-adf6-03de7c9fcb54\",\"ratingTableVersion\":1,\"grades\":{\"skillGrade\":\"C1\",\"effortGrade\":\"C2\",\"conditionsGrade\":\"D\",\"consistencyGrade\":\"C\"}}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:36:52.184Z"
+      },
+      {
+        "id": "a4570250-e17a-4ce7-9ff9-1ffe8c422cfa",
+        "entityType": "Backup",
+        "entityId": "0f58ae65-1876-4004-b85c-438a2ac41570",
+        "action": "BACKUP",
+        "entityName": "backup-2026-11-04T13-37-11-manual.json",
+        "beforeJson": null,
+        "afterJson": "{\"kind\":\"MANUAL\",\"sizeBytes\":19281,\"projectCount\":1}",
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:37:11.381Z"
+      },
+      {
+        "id": "245915b7-47ff-481d-9775-34e0bf5c0869",
+        "entityType": "Project",
+        "entityId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "action": "EXPORT",
+        "entityName": "پروژه آزمون خط مونتاژ",
+        "beforeJson": null,
+        "afterJson": "{\"checksum\":\"02158d88cfdc150ee7bc7548098aa79ae3ca340b53f44a504b9bfb9240c370f2\"}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:37:13.017Z"
+      },
+      {
+        "id": "dfa9c0ce-67c8-4a5d-971b-a252763676b6",
+        "entityType": "Project",
+        "entityId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "action": "EXPORT",
+        "entityName": "پروژه آزمون خط مونتاژ",
+        "beforeJson": null,
+        "afterJson": "{\"checksum\":\"10e1094eb5bfb6d42f0932676f137782250b2d940a480a1c8d08de7c7f1f24fa\"}",
+        "projectId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:38:50.248Z"
+      },
+      {
+        "id": "81c605cb-41b2-4c5f-8066-b5841f1e43ae",
+        "entityType": "Project",
+        "entityId": "def0f44c-dc69-4d11-bc5b-9519212fc5be",
+        "action": "IMPORT",
+        "entityName": "پروژه آزمون خط مونتاژ (ورودی)",
+        "beforeJson": null,
+        "afterJson": "{\"source\":\"پروژه آزمون خط مونتاژ\",\"counts\":{\"project\":1,\"projectSetting\":2,\"station\":1,\"activityGroup\":1,\"allowanceCategory\":2,\"operator\":1,\"ratingTable\":1,\"activity\":1,\"ratingTableGrade\":34,\"groupAllowance\":2,\"activityAllowanceOverride\":1,\"workElement\":2,\"studySession\":0,\"ratingAssessment\":0,\"cycleObservation\":0,\"timelineLane\":0,\"elementObservation\":0,\"chartNode\":0,\"chartEdge\":0,\"calculationRun\":0,\"finalizationInfo\":0}}",
+        "projectId": "def0f44c-dc69-4d11-bc5b-9519212fc5be",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:38:50.356Z"
+      },
+      {
+        "id": "34c48b85-e593-460b-9320-ed54c2b1436e",
+        "entityType": "Project",
+        "entityId": "302ccf92-7c5d-4e91-894d-eeb67adc0a82",
+        "action": "DUPLICATE",
+        "entityName": "کپی آزمونی",
+        "beforeJson": null,
+        "afterJson": "{\"sourceProjectId\":\"701e55bd-9c7a-4b25-b850-35f8ea47690a\",\"sections\":{\"structure\":true,\"settings\":true,\"operators\":false,\"groupsAndAllowances\":false,\"ratingTables\":false,\"rawObservations\":false}}",
+        "projectId": "302ccf92-7c5d-4e91-894d-eeb67adc0a82",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:39:49.403Z"
+      },
+      {
+        "id": "906ae81e-b316-4068-a54d-bf36f32ef1ad",
+        "entityType": "Project",
+        "entityId": "302ccf92-7c5d-4e91-894d-eeb67adc0a82",
+        "action": "DELETE",
+        "entityName": "کپی آزمونی",
+        "beforeJson": null,
+        "afterJson": null,
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:40:34.533Z"
+      },
+      {
+        "id": "1c5c9507-8e89-4ad2-88b3-14207ab088cc",
+        "entityType": "Project",
+        "entityId": "def0f44c-dc69-4d11-bc5b-9519212fc5be",
+        "action": "DELETE",
+        "entityName": "پروژه آزمون خط مونتاژ (ورودی)",
+        "beforeJson": null,
+        "afterJson": null,
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:40:34.633Z"
+      },
+      {
+        "id": "c3270eab-ccd9-4584-abf3-7a9508039fa5",
+        "entityType": "Project",
+        "entityId": "701e55bd-9c7a-4b25-b850-35f8ea47690a",
+        "action": "DELETE",
+        "entityName": "پروژه آزمون خط مونتاژ",
+        "beforeJson": null,
+        "afterJson": null,
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:41:14.468Z"
+      },
+      {
+        "id": "cba9f34d-51cd-4146-85bc-703e5fa42c26",
+        "entityType": "Project",
+        "entityId": "ecbedc38-6479-4028-8995-6b7f78b9c9c9",
+        "action": "CREATE",
+        "entityName": "پروژه نمایشی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"پروژه نمایشی\",\"lineName\":\"خط ۱\",\"productName\":\"محصول A\"}",
+        "projectId": "ecbedc38-6479-4028-8995-6b7f78b9c9c9",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T13:54:09.579Z"
+      },
+      {
+        "id": "6925003b-6558-4df3-acda-4400484de583",
+        "entityType": "Project",
+        "entityId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "action": "CREATE",
+        "entityName": "پروژه آزمون خودکار",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"پروژه آزمون خودکار\",\"lineName\":\"خط آزمون\",\"productName\":\"محصول آزمون\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:00.947Z"
+      },
+      {
+        "id": "88950fe0-98c9-4fd7-b52f-b11f5e751707",
+        "entityType": "Station",
+        "entityId": "5a841408-55b1-4808-b62c-34751497b3bb",
+        "action": "CREATE",
+        "entityName": "ایستگاه مونتاژ",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"ایستگاه مونتاژ\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:02.274Z"
+      },
+      {
+        "id": "f29a592d-e2d8-4b04-a461-49a24ecafa2d",
+        "entityType": "ActivityGroup",
+        "entityId": "6246089f-361e-44fc-b661-956a4b0d9f17",
+        "action": "CREATE",
+        "entityName": "کار دستی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"کار دستی\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:02.452Z"
+      },
+      {
+        "id": "f97ff0a4-0424-4dd2-b598-75f395c360bf",
+        "entityType": "Activity",
+        "entityId": "4cc8a8d1-41fe-48da-bae4-f8b6d060ff7b",
+        "action": "CREATE",
+        "entityName": "مونتاژ درپوش",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"مونتاژ درپوش\",\"processType\":\"OPERATION\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:02.656Z"
+      },
+      {
+        "id": "23c4f51a-c2ef-48f0-acc4-1477ab61124e",
+        "entityType": "WorkElement",
+        "entityId": "5485f862-29dc-4869-b09d-89d32f7e00ab",
+        "action": "CREATE",
+        "entityName": "برداشتن درپوش",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"برداشتن درپوش\",\"elementType\":\"MANUAL\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:02.891Z"
+      },
+      {
+        "id": "164413c5-5f35-4604-9aa8-ec673e02fccd",
+        "entityType": "WorkElement",
+        "entityId": "c600a6b6-3e54-4923-879e-fa3382a20aa6",
+        "action": "CREATE",
+        "entityName": "پرس خودکار",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"پرس خودکار\",\"elementType\":\"MACHINE\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:02.957Z"
+      },
+      {
+        "id": "379581ee-97f8-45d0-a5ab-ce8c1452e025",
+        "entityType": "WorkElement",
+        "entityId": "6fd81101-d2d5-4a01-a74c-7a8d97c1e9cc",
+        "action": "CREATE",
+        "entityName": "انتظار خنک‌شدن",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"انتظار خنک‌شدن\",\"elementType\":\"WAITING\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:02.978Z"
+      },
+      {
+        "id": "c2295ea6-dc9f-499f-a640-7bef20771294",
+        "entityType": "Operator",
+        "entityId": "d01d8b0e-5c5a-4aa9-8eef-0387e27b4796",
+        "action": "CREATE",
+        "entityName": "اپراتور آزمون",
+        "beforeJson": null,
+        "afterJson": "{\"displayName\":\"اپراتور آزمون\",\"code\":\"T-01\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:04.267Z"
+      },
+      {
+        "id": "bae7b75e-62e9-4fd0-918c-964619d1fe93",
+        "entityType": "AllowanceCategory",
+        "entityId": "06b8edba-1a9a-4dbe-a8ec-8f42d9139731",
+        "action": "CREATE",
+        "entityName": "استراحت شخصی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"استراحت شخصی\",\"isActive\":true}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:04.688Z"
+      },
+      {
+        "id": "33bda932-c6a9-4f07-8d6f-069cb3cc344b",
+        "entityType": "AllowanceCategory",
+        "entityId": "bd911b76-369c-4538-a08f-c45170003a1f",
+        "action": "CREATE",
+        "entityName": "نیازهای طبیعی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"نیازهای طبیعی\",\"isActive\":true}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:04.701Z"
+      },
+      {
+        "id": "608c6e62-f1bb-49f0-ad41-6c256683cb47",
+        "entityType": "ActivityGroup",
+        "entityId": "6246089f-361e-44fc-b661-956a4b0d9f17",
+        "action": "UPDATE",
+        "entityName": "کار دستی",
+        "beforeJson": null,
+        "afterJson": "{\"allowances\":[{\"categoryId\":\"06b8edba-1a9a-4dbe-a8ec-8f42d9139731\",\"percentValue\":0.05},{\"categoryId\":\"bd911b76-369c-4538-a08f-c45170003a1f\",\"percentValue\":0.1}]}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:05.071Z"
+      },
+      {
+        "id": "7f293ce5-99fb-4877-8e3a-6e41457e15b3",
+        "entityType": "Activity",
+        "entityId": "4cc8a8d1-41fe-48da-bae4-f8b6d060ff7b",
+        "action": "UPDATE",
+        "entityName": "مونتاژ درپوش",
+        "beforeJson": null,
+        "afterJson": "{\"allowanceOverrides\":[{\"categoryId\":\"06b8edba-1a9a-4dbe-a8ec-8f42d9139731\",\"percentValue\":0.08}]}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:05.545Z"
+      },
+      {
+        "id": "9310094d-7756-4ad1-bbed-15d1a6ab1273",
+        "entityType": "Project",
+        "entityId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "action": "UPDATE",
+        "entityName": "تنظیمات محاسبات",
+        "beforeJson": null,
+        "afterJson": "{\"allowanceMethod\":\"SHARE_OF_ST\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:05.698Z"
+      },
+      {
+        "id": "654dee2c-316d-4592-9490-996aa87c3d03",
+        "entityType": "Project",
+        "entityId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "action": "UPDATE",
+        "entityName": "تنظیمات محاسبات",
+        "beforeJson": null,
+        "afterJson": "{\"allowanceMethod\":\"PERCENT_OF_NT\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:05.827Z"
+      },
+      {
+        "id": "9e7bc574-21f0-47a5-b38a-2b3725fc95d8",
+        "entityType": "RatingAssessment",
+        "entityId": "3ecbe46b-0010-4a57-b2c6-f018535f1f0a",
+        "action": "CREATE",
+        "entityName": "برداشتن درپوش — R=1.09",
+        "beforeJson": null,
+        "afterJson": "{\"totalFactor\":1.09,\"ratingTableId\":\"01003212-1347-4ab3-9864-338f1ba055e3\",\"ratingTableVersion\":1,\"grades\":{\"skillGrade\":\"C1\",\"effortGrade\":\"C2\",\"conditionsGrade\":\"D\",\"consistencyGrade\":\"C\"}}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:06.293Z"
+      },
+      {
+        "id": "91ef1281-e782-4e09-8bb7-3114e3844413",
+        "entityType": "RatingAssessment",
+        "entityId": "1740b8fd-d84f-43bf-bd78-95766399fe64",
+        "action": "CREATE",
+        "entityName": "پرس خودکار — R=1.09",
+        "beforeJson": null,
+        "afterJson": "{\"totalFactor\":1.09,\"ratingTableId\":\"01003212-1347-4ab3-9864-338f1ba055e3\",\"ratingTableVersion\":1,\"grades\":{\"skillGrade\":\"C1\",\"effortGrade\":\"C2\",\"conditionsGrade\":\"D\",\"consistencyGrade\":\"C\"}}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:06.460Z"
+      },
+      {
+        "id": "ae34cf8f-92e8-4fb3-a77c-a32ab3386eff",
+        "entityType": "Project",
+        "entityId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "action": "UPDATE",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱",
+        "beforeJson": "{\"name\":\"پروژه آزمون خودکار\"}",
+        "afterJson": "{\"name\":\"پروژه آزمون خودکار — ویرایش ۱\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:07.643Z"
+      },
+      {
+        "id": "1dac07c6-842c-401e-9814-bae95dbc790b",
+        "entityType": "Project",
+        "entityId": "bf8413be-b9a8-4213-8f71-35ccf0260f1a",
+        "action": "DUPLICATE",
+        "entityName": "کپی ساختاری آزمون",
+        "beforeJson": null,
+        "afterJson": "{\"sourceProjectId\":\"2717f02f-1e92-4e51-91cf-bc6fa2f63ed0\",\"sections\":{\"structure\":true,\"settings\":true,\"operators\":false,\"groupsAndAllowances\":false,\"ratingTables\":false,\"rawObservations\":false}}",
+        "projectId": "bf8413be-b9a8-4213-8f71-35ccf0260f1a",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:07.903Z"
+      },
+      {
+        "id": "323f2702-0dc8-4b58-bdd9-5aa5156adaee",
+        "entityType": "Project",
+        "entityId": "bf8413be-b9a8-4213-8f71-35ccf0260f1a",
+        "action": "DELETE",
+        "entityName": "کپی ساختاری آزمون",
+        "beforeJson": null,
+        "afterJson": null,
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:08.060Z"
+      },
+      {
+        "id": "1cc419c0-7f4d-4154-8800-f07c6c4e3c31",
+        "entityType": "Project",
+        "entityId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "action": "EXPORT",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱",
+        "beforeJson": null,
+        "afterJson": "{\"checksum\":\"a8f3915d9132b21d3eb676b6c5fd31064c33015af18f705c8268f76a0244df8c\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:08.364Z"
+      },
+      {
+        "id": "a6285709-0a5d-49f2-84ad-de979e3415d9",
+        "entityType": "Project",
+        "entityId": "c711df83-8d04-4646-b9da-ddfe8262e5a1",
+        "action": "IMPORT",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱ (ورودی)",
+        "beforeJson": null,
+        "afterJson": "{\"source\":\"پروژه آزمون خودکار — ویرایش ۱\",\"counts\":{\"project\":1,\"projectSetting\":2,\"station\":1,\"activityGroup\":1,\"allowanceCategory\":2,\"operator\":1,\"ratingTable\":1,\"activity\":1,\"ratingTableGrade\":34,\"groupAllowance\":2,\"activityAllowanceOverride\":1,\"workElement\":3,\"studySession\":0,\"ratingAssessment\":0,\"cycleObservation\":0,\"timelineLane\":0,\"elementObservation\":0,\"chartNode\":0,\"chartEdge\":0,\"calculationRun\":0,\"finalizationInfo\":0}}",
+        "projectId": "c711df83-8d04-4646-b9da-ddfe8262e5a1",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:08.692Z"
+      },
+      {
+        "id": "585bd12a-a75e-4940-b3fa-934fce563a94",
+        "entityType": "Project",
+        "entityId": "c711df83-8d04-4646-b9da-ddfe8262e5a1",
+        "action": "DELETE",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱ (ورودی)",
+        "beforeJson": null,
+        "afterJson": null,
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:08.943Z"
+      },
+      {
+        "id": "2f4c53d4-f1a2-426b-99dc-a24886d8677f",
+        "entityType": "Backup",
+        "entityId": "1caa318f-6d53-4ef1-9ac5-3df51450a1f1",
+        "action": "BACKUP",
+        "entityName": "backup-2026-11-04T15-23-09-manual.json",
+        "beforeJson": null,
+        "afterJson": "{\"kind\":\"MANUAL\",\"sizeBytes\":58369,\"projectCount\":2}",
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:09.250Z"
+      },
+      {
+        "id": "1f66707a-8d07-4d3f-91a5-01f28ecdb801",
+        "entityType": "WorkElement",
+        "entityId": "c600a6b6-3e54-4923-879e-fa3382a20aa6",
+        "action": "DELETE",
+        "entityName": "پرس خودکار",
+        "beforeJson": null,
+        "afterJson": null,
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:10.167Z"
+      },
+      {
+        "id": "eb502b76-8f91-4d66-8ba6-a742080a847c",
+        "entityType": "Backup",
+        "entityId": "cd19693f-fad1-45e7-bc75-9fae44933f45",
+        "action": "BACKUP",
+        "entityName": "backup-2026-11-04T15-23-11-pre_restore.json",
+        "beforeJson": null,
+        "afterJson": "{\"kind\":\"PRE_RESTORE\",\"sizeBytes\":58316,\"projectCount\":2}",
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:11.074Z"
+      },
+      {
+        "id": "d3e3f430-c567-4853-a1a4-ee0d10c3a6f7",
+        "entityType": "Project",
+        "entityId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "action": "FINALIZE",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱",
+        "beforeJson": null,
+        "afterJson": "{\"reason\":\"آزمون خودکار\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:12.571Z"
+      },
+      {
+        "id": "cfab42ce-3e63-4091-87fe-c1a58510e89a",
+        "entityType": "Project",
+        "entityId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "action": "UPDATE",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱",
+        "beforeJson": "{\"description\":\"آزمون فاز ۱ و ۲\"}",
+        "afterJson": "{\"description\":\"ویرایش پس از نهایی‌سازی مجاز است\"}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:12.653Z"
+      },
+      {
+        "id": "82c0481a-ebbd-4d95-bb19-bf05ccfe6fd7",
+        "entityType": "Project",
+        "entityId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "action": "UPDATE",
+        "entityName": "بازگشت از نهایی‌سازی",
+        "beforeJson": null,
+        "afterJson": "{\"unfinalized\":true}",
+        "projectId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:12.767Z"
+      },
+      {
+        "id": "560eb246-e649-4232-8d64-b62f063236e6",
+        "entityType": "Project",
+        "entityId": "2717f02f-1e92-4e51-91cf-bc6fa2f63ed0",
+        "action": "DELETE",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱",
+        "beforeJson": null,
+        "afterJson": null,
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:23:12.852Z"
+      },
+      {
+        "id": "abfc329c-9c46-4ddb-a016-75bd11f63811",
+        "entityType": "Project",
+        "entityId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "action": "CREATE",
+        "entityName": "پروژه آزمون خودکار",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"پروژه آزمون خودکار\",\"lineName\":\"خط آزمون\",\"productName\":\"محصول آزمون\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:45.023Z"
+      },
+      {
+        "id": "83b9e0c7-f6a7-4294-a909-07434506713d",
+        "entityType": "Station",
+        "entityId": "9b37570f-3a78-492a-b3a8-4d578f1ed411",
+        "action": "CREATE",
+        "entityName": "ایستگاه مونتاژ",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"ایستگاه مونتاژ\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:45.969Z"
+      },
+      {
+        "id": "cf0cdc44-e773-473d-815f-620703f96b77",
+        "entityType": "ActivityGroup",
+        "entityId": "74757378-006d-42a2-996c-b2098858ce98",
+        "action": "CREATE",
+        "entityName": "کار دستی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"کار دستی\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:46.274Z"
+      },
+      {
+        "id": "554c2def-d10d-4efd-8db3-566998b5bd15",
+        "entityType": "Activity",
+        "entityId": "8fa5ba05-565f-431a-bea5-c3d5e511ad49",
+        "action": "CREATE",
+        "entityName": "مونتاژ درپوش",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"مونتاژ درپوش\",\"processType\":\"OPERATION\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:46.648Z"
+      },
+      {
+        "id": "0bed4b8e-665b-4695-a180-98d0a7ed1938",
+        "entityType": "WorkElement",
+        "entityId": "ea5f195d-8d22-49bd-a62f-c5a8840394b8",
+        "action": "CREATE",
+        "entityName": "برداشتن درپوش",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"برداشتن درپوش\",\"elementType\":\"MANUAL\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:46.866Z"
+      },
+      {
+        "id": "d86d3947-a535-4ae2-9056-b8980b514a03",
+        "entityType": "WorkElement",
+        "entityId": "31e0aafa-e8fe-45c0-a74c-3624acfc25c5",
+        "action": "CREATE",
+        "entityName": "پرس خودکار",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"پرس خودکار\",\"elementType\":\"MACHINE\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:46.880Z"
+      },
+      {
+        "id": "be67a8ff-c66d-49a6-b8e9-5e786c0c6735",
+        "entityType": "WorkElement",
+        "entityId": "8077372b-7a25-446f-879c-019a3437714c",
+        "action": "CREATE",
+        "entityName": "انتظار خنک‌شدن",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"انتظار خنک‌شدن\",\"elementType\":\"WAITING\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:46.935Z"
+      },
+      {
+        "id": "20a7459f-cbb7-4e5e-831b-05dd801eb151",
+        "entityType": "Operator",
+        "entityId": "ef9b6d34-0284-48ef-8e53-d7e263f5239a",
+        "action": "CREATE",
+        "entityName": "اپراتور آزمون",
+        "beforeJson": null,
+        "afterJson": "{\"displayName\":\"اپراتور آزمون\",\"code\":\"T-01\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:48.028Z"
+      },
+      {
+        "id": "fe5c819b-b4c6-4ace-9095-6c5a8e4ad613",
+        "entityType": "AllowanceCategory",
+        "entityId": "e9edd6be-f05a-4a26-a084-11f2dd695799",
+        "action": "CREATE",
+        "entityName": "استراحت شخصی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"استراحت شخصی\",\"isActive\":true}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:48.660Z"
+      },
+      {
+        "id": "7bd010e2-5288-4e4a-b6b9-6535a5425052",
+        "entityType": "AllowanceCategory",
+        "entityId": "7e8ea104-b783-4eec-86ee-6c925037b4e4",
+        "action": "CREATE",
+        "entityName": "نیازهای طبیعی",
+        "beforeJson": null,
+        "afterJson": "{\"name\":\"نیازهای طبیعی\",\"isActive\":true}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:48.682Z"
+      },
+      {
+        "id": "463eb028-ca0e-4458-9789-cd4b5ecee418",
+        "entityType": "ActivityGroup",
+        "entityId": "74757378-006d-42a2-996c-b2098858ce98",
+        "action": "UPDATE",
+        "entityName": "کار دستی",
+        "beforeJson": null,
+        "afterJson": "{\"allowances\":[{\"categoryId\":\"e9edd6be-f05a-4a26-a084-11f2dd695799\",\"percentValue\":0.05},{\"categoryId\":\"7e8ea104-b783-4eec-86ee-6c925037b4e4\",\"percentValue\":0.1}]}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:49.092Z"
+      },
+      {
+        "id": "ac61f4f6-1f7b-49b4-b2cc-cde456166949",
+        "entityType": "Activity",
+        "entityId": "8fa5ba05-565f-431a-bea5-c3d5e511ad49",
+        "action": "UPDATE",
+        "entityName": "مونتاژ درپوش",
+        "beforeJson": null,
+        "afterJson": "{\"allowanceOverrides\":[{\"categoryId\":\"e9edd6be-f05a-4a26-a084-11f2dd695799\",\"percentValue\":0.08}]}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:49.552Z"
+      },
+      {
+        "id": "383e76a3-e3f8-4634-896b-875417bcb5fe",
+        "entityType": "Project",
+        "entityId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "action": "UPDATE",
+        "entityName": "تنظیمات محاسبات",
+        "beforeJson": null,
+        "afterJson": "{\"allowanceMethod\":\"SHARE_OF_ST\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:49.728Z"
+      },
+      {
+        "id": "7a5d646b-724a-4759-a9e3-257c2acc1546",
+        "entityType": "Project",
+        "entityId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "action": "UPDATE",
+        "entityName": "تنظیمات محاسبات",
+        "beforeJson": null,
+        "afterJson": "{\"allowanceMethod\":\"PERCENT_OF_NT\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:49.759Z"
+      },
+      {
+        "id": "1ba0fa98-d628-4416-a539-bea4b13b70a1",
+        "entityType": "RatingAssessment",
+        "entityId": "7f3be2ff-e716-4173-b703-66c2ebea2f56",
+        "action": "CREATE",
+        "entityName": "برداشتن درپوش — R=1.09",
+        "beforeJson": null,
+        "afterJson": "{\"totalFactor\":1.09,\"ratingTableId\":\"d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a\",\"ratingTableVersion\":1,\"grades\":{\"skillGrade\":\"C1\",\"effortGrade\":\"C2\",\"conditionsGrade\":\"D\",\"consistencyGrade\":\"C\"}}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:50.290Z"
+      },
+      {
+        "id": "6a89ad61-5940-495b-a158-3e4864a28e2b",
+        "entityType": "RatingAssessment",
+        "entityId": "f12f0214-9771-4ec3-b6a1-05f9f73cedc0",
+        "action": "CREATE",
+        "entityName": "پرس خودکار — R=1.09",
+        "beforeJson": null,
+        "afterJson": "{\"totalFactor\":1.09,\"ratingTableId\":\"d6ab4fa4-416e-48f4-9d5d-6bcc4ae6510a\",\"ratingTableVersion\":1,\"grades\":{\"skillGrade\":\"C1\",\"effortGrade\":\"C2\",\"conditionsGrade\":\"D\",\"consistencyGrade\":\"C\"}}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:50.637Z"
+      },
+      {
+        "id": "686d5b65-9a64-437b-bfa5-114985573f8c",
+        "entityType": "Project",
+        "entityId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "action": "UPDATE",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱",
+        "beforeJson": "{\"name\":\"پروژه آزمون خودکار\"}",
+        "afterJson": "{\"name\":\"پروژه آزمون خودکار — ویرایش ۱\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:51.334Z"
+      },
+      {
+        "id": "ff402fd6-1a58-499a-b0a5-5a6d1b6e7f2d",
+        "entityType": "Project",
+        "entityId": "60d90086-93e8-4728-b022-eb4229c8d1cb",
+        "action": "DUPLICATE",
+        "entityName": "کپی ساختاری آزمون",
+        "beforeJson": null,
+        "afterJson": "{\"sourceProjectId\":\"d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4\",\"sections\":{\"structure\":true,\"settings\":true,\"operators\":false,\"groupsAndAllowances\":false,\"ratingTables\":false,\"rawObservations\":false}}",
+        "projectId": "60d90086-93e8-4728-b022-eb4229c8d1cb",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:51.878Z"
+      },
+      {
+        "id": "3ab57300-7004-4d47-84d5-b9314b0bf3fe",
+        "entityType": "Project",
+        "entityId": "60d90086-93e8-4728-b022-eb4229c8d1cb",
+        "action": "DELETE",
+        "entityName": "کپی ساختاری آزمون",
+        "beforeJson": null,
+        "afterJson": null,
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:52.135Z"
+      },
+      {
+        "id": "68e908d1-ac7c-4788-b84d-d12eb8fdaa2f",
+        "entityType": "Project",
+        "entityId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "action": "EXPORT",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱",
+        "beforeJson": null,
+        "afterJson": "{\"checksum\":\"378d4423414f1454e935726af0f75ee08d55ff662e8784a86ba5f93a4a990e4f\"}",
+        "projectId": "d2aaf65b-ffcf-43ed-9cf4-3fc6b01ac3a4",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:52.459Z"
+      },
+      {
+        "id": "38bf5522-51ba-4c74-8cc3-96065c577a94",
+        "entityType": "Project",
+        "entityId": "ef7ae52f-aa20-4b75-a7b3-2a9db1c72ab0",
+        "action": "IMPORT",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱ (ورودی)",
+        "beforeJson": null,
+        "afterJson": "{\"source\":\"پروژه آزمون خودکار — ویرایش ۱\",\"counts\":{\"project\":1,\"projectSetting\":2,\"station\":1,\"activityGroup\":1,\"allowanceCategory\":2,\"operator\":1,\"ratingTable\":1,\"activity\":1,\"ratingTableGrade\":34,\"groupAllowance\":2,\"activityAllowanceOverride\":1,\"workElement\":3,\"studySession\":0,\"ratingAssessment\":0,\"cycleObservation\":0,\"timelineLane\":0,\"elementObservation\":0,\"chartNode\":0,\"chartEdge\":0,\"calculationRun\":0,\"finalizationInfo\":0}}",
+        "projectId": "ef7ae52f-aa20-4b75-a7b3-2a9db1c72ab0",
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:52.686Z"
+      },
+      {
+        "id": "6350a6d1-9a36-420d-8bf0-f526d84b3adf",
+        "entityType": "Project",
+        "entityId": "ef7ae52f-aa20-4b75-a7b3-2a9db1c72ab0",
+        "action": "DELETE",
+        "entityName": "پروژه آزمون خودکار — ویرایش ۱ (ورودی)",
+        "beforeJson": null,
+        "afterJson": null,
+        "projectId": null,
+        "actor": "کاربر محلی",
+        "occurredAt": "2026-11-04T15:28:52.876Z"
+      }
+    ]
+  }
+}

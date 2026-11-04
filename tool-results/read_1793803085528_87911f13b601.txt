@@ -1,0 +1,1096 @@
+     1→'use client'
+     2→
+     3→// ═══════════════════════════════════════════════════════════
+     4→// نمای گروه‌های فعالیت و دسته‌های مجاز — FR-04 / FR-15
+     5→// • زبانه گروه‌ها: کارت‌های افقی قابل انتخاب + پنل جزئیات با
+     6→//   ذخیره خودکار نام/توضیح و مقادیر مجاز (debounce)
+     7→// • زبانه دسته‌ها: جدول دسکتاپ / کارت موبایل + فعال‌سازی
+     8→// • درصدها: کاربر عدد درصد می‌بیند؛ API مقدار اعشاری می‌گیرد
+     9→//   (۱۵٪ ↔ 0.15) — PercentInput + formatPercent — FR-15
+    10→// ═══════════════════════════════════════════════════════════
+    11→import { useEffect, useRef, useState } from 'react'
+    12→import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+    13→import { toast } from 'sonner'
+    14→import { Eye, Layers, Loader2, Pencil, Plus, Tags, Trash2 } from 'lucide-react'
+    15→import { Button } from '@/components/ui/button'
+    16→import { Input } from '@/components/ui/input'
+    17→import { Label } from '@/components/ui/label'
+    18→import { Textarea } from '@/components/ui/textarea'
+    19→import { Badge } from '@/components/ui/badge'
+    20→import { Switch } from '@/components/ui/switch'
+    21→import { Skeleton } from '@/components/ui/skeleton'
+    22→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    23→import {
+    24→  Dialog,
+    25→  DialogContent,
+    26→  DialogDescription,
+    27→  DialogFooter,
+    28→  DialogHeader,
+    29→  DialogTitle,
+    30→} from '@/components/ui/dialog'
+    31→import { HelpDot } from '@/components/common/HelpDot'
+    32→import { ConfirmDeleteDialog, EmptyState } from '@/components/common/Feedback'
+    33→import { SaveIndicator } from '@/components/common/SaveIndicator'
+    34→import { PercentInput, PersianNumberInput } from '@/components/common/PersianNumberInput'
+    35→import { useAutosave } from '@/hooks/use-autosave'
+    36→import {
+    37→  allowancesApi,
+    38→  projectsApi,
+    39→  type CategoryDto,
+    40→  type GroupAllowancesDto,
+    41→  type GroupDto,
+    42→} from '@/lib/api/endpoints'
+    43→import { qk } from '@/lib/api/keys'
+    44→import { ALLOWANCE_METHOD_FORMULAS, ALLOWANCE_METHOD_LABELS } from '@/domain/types'
+    45→import { useAppStore } from '@/store/app-store'
+    46→import { useDisplayPrefs } from '@/store/display-store'
+    47→import { formatDateTime, formatInt, formatPercent } from '@/lib/format'
+    48→import { useIsMobile } from '@/hooks/use-mobile'
+    49→import { cn } from '@/lib/utils'
+    50→
+    51→type Prefs = ReturnType<typeof useDisplayPrefs>
+    52→
+    53→/** سقف مقدار اعشاری درصد طبق اعتبارسنجی API (۰٫۹۹۹۹ = ۹۹٫۹۹٪) — FR-15 */
+    54→const MAX_PERCENT_DECIMAL = 0.9999
+    55→
+    56→interface GroupEditorState {
+    57→  name: string
+    58→  description: string
+    59→}
+    60→
+    61→interface CategoryEditorState {
+    62→  name: string
+    63→  code: string
+    64→  sortOrder: number | null
+    65→}
+    66→
+    67→const EMPTY_GROUP_EDITOR: GroupEditorState = { name: '', description: '' }
+    68→const EMPTY_CATEGORY_EDITOR: CategoryEditorState = { name: '', code: '', sortOrder: 0 }
+    69→
+    70→export default function GroupsView({ projectId }: { projectId: string }) {
+    71→  const prefs = useDisplayPrefs()
+    72→  const isMobile = useIsMobile()
+    73→  const qc = useQueryClient()
+    74→
+    75→  const [tab, setTab] = useState<'groups' | 'categories'>('groups')
+    76→  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+    77→
+    78→  const groupsQ = useQuery({
+    79→    queryKey: qk.groups(projectId),
+    80→    queryFn: () => allowancesApi.groups(projectId),
+    81→  })
+    82→  const calcQ = useQuery({
+    83→    queryKey: qk.projectCalcSettings(projectId),
+    84→    queryFn: () => projectsApi.calcSettings(projectId),
+    85→  })
+    86→
+    87→  const groups = groupsQ.data?.items ?? []
+    88→
+    89→  // انتخاب پیش‌فرض: اگر گروه انتخابی حذف/نامعتبر شد، نخستین گروه انتخاب می‌شود
+    90→  useEffect(() => {
+    91→    if (groups.length === 0) {
+    92→      if (selectedGroupId !== null) setSelectedGroupId(null)
+    93→      return
+    94→    }
+    95→    if (!groups.some((g) => g.id === selectedGroupId)) setSelectedGroupId(groups[0].id)
+    96→  }, [groups, selectedGroupId])
+    97→
+    98→  const invalidate = () => {
+    99→    void qc.invalidateQueries({ queryKey: qk.groups(projectId) })
+   100→    void qc.invalidateQueries({ queryKey: qk.categories(projectId) })
+   101→    void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+   102→  }
+   103→
+   104→  // ── ایجاد گروه ──
+   105→  const [groupCreateOpen, setGroupCreateOpen] = useState(false)
+   106→  const [groupDraft, setGroupDraft] = useState<GroupEditorState>(EMPTY_GROUP_EDITOR)
+   107→  const [creatingGroup, setCreatingGroup] = useState(false)
+   108→
+   109→  const submitCreateGroup = async () => {
+   110→    if (!groupDraft.name.trim()) {
+   111→      toast.error('نام گروه الزامی است')
+   112→      return
+   113→    }
+   114→    setCreatingGroup(true)
+   115→    try {
+   116→      const res = await allowancesApi.createGroup(projectId, {
+   117→        name: groupDraft.name.trim(),
+   118→        description: groupDraft.description.trim() || null,
+   119→      })
+   120→      invalidate()
+   121→      setSelectedGroupId(res.group.id)
+   122→      setGroupCreateOpen(false)
+   123→      setGroupDraft(EMPTY_GROUP_EDITOR)
+   124→      toast.success('گروه فعالیت ایجاد شد')
+   125→    } catch (err) {
+   126→      toast.error(err instanceof Error ? err.message : 'ایجاد گروه ناموفق بود')
+   127→    } finally {
+   128→      setCreatingGroup(false)
+   129→    }
+   130→  }
+   131→
+   132→  // ── حذف گروه — FR-26 ──
+   133→  const [deletingGroup, setDeletingGroup] = useState<GroupDto | null>(null)
+   134→  const deleteGroupMutation = useMutation({
+   135→    mutationFn: (id: string) => allowancesApi.deleteGroup(id),
+   136→    onSuccess: (res) => {
+   137→      invalidate()
+   138→      setDeletingGroup(null)
+   139→      toast.success(
+   140→        `گروه حذف شد — ${formatInt(res.removedCounts.values, prefs)} مقدار مجاز پاک شد و ${formatInt(
+   141→          res.removedCounts.activities,
+   142→          prefs
+   143→        )} فعالیتِ این گروه بدون گروه شد`
+   144→      )
+   145→    },
+   146→    onError: (err) => toast.error(err instanceof Error ? err.message : 'حذف گروه ناموفق بود'),
+   147→  })
+   148→
+   149→  // ── دسته‌های مجاز ──
+   150→  const categoriesQ = useQuery({
+   151→    queryKey: qk.categories(projectId),
+   152→    queryFn: () => allowancesApi.categories(projectId),
+   153→  })
+   154→  const categories = categoriesQ.data?.items ?? []
+   155→
+   156→  // ── ایجاد دسته ──
+   157→  const [catCreateOpen, setCatCreateOpen] = useState(false)
+   158→  const [catDraft, setCatDraft] = useState<{ name: string; code: string; isActive: boolean }>({
+   159→    name: '',
+   160→    code: '',
+   161→    isActive: true,
+   162→  })
+   163→  const [creatingCat, setCreatingCat] = useState(false)
+   164→
+   165→  const submitCreateCategory = async () => {
+   166→    if (!catDraft.name.trim()) {
+   167→      toast.error('نام دسته الزامی است')
+   168→      return
+   169→    }
+   170→    setCreatingCat(true)
+   171→    try {
+   172→      await allowancesApi.createCategory(projectId, {
+   173→        name: catDraft.name.trim(),
+   174→        code: catDraft.code.trim() || null,
+   175→        isActive: catDraft.isActive,
+   176→      })
+   177→      invalidate()
+   178→      setCatCreateOpen(false)
+   179→      setCatDraft({ name: '', code: '', isActive: true })
+   180→      toast.success('دسته مجاز ایجاد شد')
+   181→    } catch (err) {
+   182→      toast.error(err instanceof Error ? err.message : 'ایجاد دسته ناموفق بود')
+   183→    } finally {
+   184→      setCreatingCat(false)
+   185→    }
+   186→  }
+   187→
+   188→  // ── ویرایش دسته با ذخیره خودکار — FR-23 ──
+   189→  const [catEditOpen, setCatEditOpen] = useState(false)
+   190→  const [editingCat, setEditingCat] = useState<CategoryDto | null>(null)
+   191→  const [catEditor, setCatEditor] = useState<CategoryEditorState>(EMPTY_CATEGORY_EDITOR)
+   192→
+   193→  const { status: catAutoStatus, retry: catAutoRetry } = useAutosave<CategoryEditorState>({
+   194→    data: catEditor,
+   195→    ready: catEditOpen && editingCat !== null,
+   196→    save: async (value) => {
+   197→      await allowancesApi.updateCategory(editingCat!.id, {
+   198→        name: value.name.trim(),
+   199→        code: value.code.trim() || null,
+   200→        sortOrder: value.sortOrder ?? 0,
+   201→      })
+   202→      invalidate()
+   203→    },
+   204→  })
+   205→
+   206→  const openCatEdit = (cat: CategoryDto) => {
+   207→    setEditingCat(cat)
+   208→    setCatEditor({ name: cat.name, code: cat.code ?? '', sortOrder: cat.sortOrder })
+   209→    setCatEditOpen(true)
+   210→  }
+   211→
+   212→  // ── فعال/غیرفعال‌سازی دسته (ذخیره خودکار در لحظه با به‌روزرسانی خوش‌بینانه) ──
+   213→  const [togglingCatId, setTogglingCatId] = useState<string | null>(null)
+   214→  const toggleCategory = async (cat: CategoryDto, next: boolean) => {
+   215→    setTogglingCatId(cat.id)
+   216→    qc.setQueryData<{ items: CategoryDto[] }>(qk.categories(projectId), (old) =>
+   217→      old ? { ...old, items: old.items.map((c) => (c.id === cat.id ? { ...c, isActive: next } : c)) } : old
+   218→    )
+   219→    try {
+   220→      await allowancesApi.updateCategory(cat.id, { isActive: next })
+   221→      invalidate()
+   222→      toast.success(
+   223→        next
+   224→          ? `دسته «${cat.name}» فعال شد`
+   225→          : `دسته «${cat.name}» غیرفعال شد — از مجموع A کنار گذاشته می‌شود`
+   226→      )
+   227→    } catch (err) {
+   228→      void qc.invalidateQueries({ queryKey: qk.categories(projectId) })
+   229→      toast.error(err instanceof Error ? err.message : 'تغییر وضعیت دسته ناموفق بود')
+   230→    } finally {
+   231→      setTogglingCatId(null)
+   232→    }
+   233→  }
+   234→
+   235→  // ── حذف دسته — FR-26 ──
+   236→  const [deletingCat, setDeletingCat] = useState<CategoryDto | null>(null)
+   237→  const deleteCatMutation = useMutation({
+   238→    mutationFn: (id: string) => allowancesApi.deleteCategory(id),
+   239→    onSuccess: (res) => {
+   240→      invalidate()
+   241→      setDeletingCat(null)
+   242→      toast.success(
+   243→        `دسته حذف شد — ${formatInt(res.removedCounts.groupValues, prefs)} مقدار گروه و ${formatInt(
+   244→          res.removedCounts.overrides,
+   245→          prefs
+   246→        )} بازنویسی فعالیت پاک شد`
+   247→      )
+   248→    },
+   249→    onError: (err) => toast.error(err instanceof Error ? err.message : 'حذف دسته ناموفق بود'),
+   250→  })
+   251→
+   252→  const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null
+   253→  const method = calcQ.data?.allowanceMethod
+   254→  const methodLabel = method ? ALLOWANCE_METHOD_LABELS[method as keyof typeof ALLOWANCE_METHOD_LABELS] : undefined
+   255→  const methodFormula = method ? ALLOWANCE_METHOD_FORMULAS[method as keyof typeof ALLOWANCE_METHOD_FORMULAS] : undefined
+   256→
+   257→  return (
+   258→    <div className="animate-view-in mx-auto max-w-5xl space-y-5">
+   259→      {/* سربرگ بخش */}
+   260→      <div className="flex flex-wrap items-center justify-between gap-3">
+   261→        <div className="flex items-center gap-3">
+   262→          <div className="chip-icon bg-brand-soft text-brand">
+   263→            <Layers className="size-6" aria-hidden />
+   264→          </div>
+   265→          <div>
+   266→            <h1 className="text-xl font-extrabold">گروه‌ها و مجازها</h1>
+   267→            <p className="num text-xs text-muted-foreground">
+   268→              {formatInt(groups.length, prefs)} گروه · {formatInt(categories.length, prefs)} دسته مجاز
+   269→            </p>
+   270→          </div>
+   271→        </div>
+   272→      </div>
+   273→
+   274→      <Tabs value={tab} onValueChange={(v) => setTab(v as 'groups' | 'categories')}>
+   275→        <TabsList>
+   276→          <TabsTrigger value="groups">گروه‌های فعالیت</TabsTrigger>
+   277→          <TabsTrigger value="categories">دسته‌های مجاز</TabsTrigger>
+   278→        </TabsList>
+   279→
+   280→        {/* ═══════════ زبانه گروه‌ها — FR-04 ═══════════ */}
+   281→        <TabsContent value="groups" className="space-y-4">
+   282→          <div className="flex flex-wrap items-center justify-between gap-3">
+   283→            <h2 className="flex items-center gap-1 text-sm font-bold">
+   284→              گروه‌های فعالیت
+   285→              <HelpDot
+   286→                label="گروه فعالیت"
+   287→                content={{
+   288→                  what: 'گروه فعالیت، بسته‌ای از مقادیر مجاز است که هر فعالیت می‌تواند به آن تخصیص یابد و مقادیر را از آن به ارث ببرد؛ در سطح فعالیت هر دسته قابل بازنویسی است.',
+   289→                  input: 'گروه بسازید، دسته‌های مجاز را درصدگذاری کنید و فعالیت‌ها را از مرحله «ساختار تولید» به گروه تخصیص دهید.',
+   290→                  example: 'گروه «کار دستی» یا «کار ماشینی» — مانند کار دستی با استراحت شخصی ۵٪ و نیازهای طبیعی ۳٪ (درصدها صرفاً مثال‌اند و نرخ مصوب شرکت نیست).',
+   291→                  note: 'مجموع A فقط از دسته‌های فعال ساخته می‌شود؛ منبع هر مقدار (ارث‌رسیده از گروه یا اختصاصی فعالیت) در صفحه فعالیت مشخص می‌شود.',
+   292→                }}
+   293→              />
+   294→            </h2>
+   295→            <Button onClick={() => setGroupCreateOpen(true)} className="btn-brand gap-1.5 border-0">
+   296→              <Plus className="size-4" aria-hidden />
+   297→              گروه جدید
+   298→            </Button>
+   299→          </div>
+   300→
+   301→          {groupsQ.isLoading ? (
+   302→            <div className="space-y-2">
+   303→              {Array.from({ length: 3 }).map((_, i) => (
+   304→                <Skeleton key={i} className="h-24 w-full rounded-xl" />
+   305→              ))}
+   306→            </div>
+   307→          ) : groupsQ.error ? (
+   308→            <EmptyState
+   309→              title="بارگذاری گروه‌ها ناموفق بود"
+   310→              description={groupsQ.error instanceof Error ? groupsQ.error.message : 'خطای نامشخص'}
+   311→              action={
+   312→                <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: qk.groups(projectId) })}>
+   313→                  تلاش مجدد
+   314→                </Button>
+   315→              }
+   316→            />
+   317→          ) : groups.length === 0 ? (
+   318→            <EmptyState
+   319→              icon={<Layers className="size-7" aria-hidden />}
+   320→              title="هنوز گروهی تعریف نشده است"
+   321→              description="گروه‌های دلخواه مانند کار دستی یا کار ماشینی بسازید و دسته‌های مجاز را به آن‌ها تخصیص دهید؛ فعالیت‌ها مقادیر را از گروه به ارث می‌برند."
+   322→              action={
+   323→                <Button onClick={() => setGroupCreateOpen(true)} className="btn-brand gap-1.5 border-0">
+   324→                  <Plus className="size-4" aria-hidden />
+   325→                  ثبت اولین گروه
+   326→                </Button>
+   327→              }
+   328→            />
+   329→          ) : (
+   330→            <>
+   331→              {/* کارت‌های افقی قابل انتخاب */}
+   332→              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+   333→                {groups.map((g) => (
+   334→                  <button
+   335→                    key={g.id}
+   336→                    type="button"
+   337→                    onClick={() => setSelectedGroupId(g.id)}
+   338→                    aria-pressed={selectedGroupId === g.id}
+   339→                    aria-label={`انتخاب گروه ${g.name}`}
+   340→                    className={cn(
+   341→                      'card-premium p-4 text-right transition-all',
+   342→                      selectedGroupId === g.id ? 'ring-2 ring-brand' : 'hover:border-brand/40'
+   343→                    )}
+   344→                  >
+   345→                    <div className="flex items-start justify-between gap-2">
+   346→                      <div className="min-w-0">
+   347→                        <p className="truncate font-bold">{g.name}</p>
+   348→                        <p className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">
+   349→                          {g.description ?? 'بدون توضیح'}
+   350→                        </p>
+   351→                      </div>
+   352→                      <Badge className="num shrink-0 bg-brand-soft text-brand" aria-label={`جمع مجازهای گروه ${g.name}`}>
+   353→                        A = {formatPercent(g.totalA, prefs)}
+   354→                      </Badge>
+   355→                    </div>
+   356→                    <p className="num mt-3 text-xs text-faint">
+   357→                      {formatInt(g.activities.length, prefs)} فعالیت استفاده‌کننده
+   358→                    </p>
+   359→                  </button>
+   360→                ))}
+   361→              </div>
+   362→
+   363→              {selectedGroup && (
+   364→                <GroupDetailPanel
+   365→                  key={selectedGroup.id}
+   366→                  group={selectedGroup}
+   367→                  projectId={projectId}
+   368→                  prefs={prefs}
+   369→                  isMobile={isMobile}
+   370→                  onDelete={() => setDeletingGroup(selectedGroup)}
+   371→                  onGoToCategories={() => setTab('categories')}
+   372→                />
+   373→              )}
+   374→            </>
+   375→          )}
+   376→        </TabsContent>
+   377→
+   378→        {/* ═══════════ زبانه دسته‌ها — FR-04 ═══════════ */}
+   379→        <TabsContent value="categories" className="space-y-4">
+   380→          <div className="flex flex-wrap items-center justify-between gap-3">
+   381→            <h2 className="flex items-center gap-1 text-sm font-bold">
+   382→              دسته‌های مجاز
+   383→              <HelpDot
+   384→                label="دسته مجاز"
+   385→                content={{
+   386→                  what: 'دسته مجاز، جزء تشکیل‌دهنده مجموع A است که در سطح گروه درصدگذاری می‌شود و فعالیت می‌تواند آن را بازنویسی کند.',
+   387→                  input: 'نام و کد اختیاری وارد کنید؛ ترتیب نمایش با «ترتیب» تنظیم می‌شود.',
+   388→                  example: 'دسته‌هایی مانند استراحت شخصی ۵٪ یا نیازهای طبیعی ۳٪ — درصد صرفاً مثال است و نرخ مصوب شرکت نیست.',
+   389→                  note: 'حذف دسته، مقدار آن در گروه‌ها و بازنویسی‌های فعالیت را نیز حذف می‌کند؛ دسته غیرفعال در مجموع A لحاظ نمی‌شود.',
+   390→                }}
+   391→              />
+   392→            </h2>
+   393→            <Button onClick={() => setCatCreateOpen(true)} className="btn-brand gap-1.5 border-0">
+   394→              <Plus className="size-4" aria-hidden />
+   395→              دسته جدید
+   396→            </Button>
+   397→          </div>
+   398→
+   399→          {categoriesQ.isLoading ? (
+   400→            <div className="space-y-2">
+   401→              {Array.from({ length: 3 }).map((_, i) => (
+   402→                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+   403→              ))}
+   404→            </div>
+   405→          ) : categoriesQ.error ? (
+   406→            <EmptyState
+   407→              title="بارگذاری دسته‌ها ناموفق بود"
+   408→              description={categoriesQ.error instanceof Error ? categoriesQ.error.message : 'خطای نامشخص'}
+   409→              action={
+   410→                <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: qk.categories(projectId) })}>
+   411→                  تلاش مجدد
+   412→                </Button>
+   413→              }
+   414→            />
+   415→          ) : categories.length === 0 ? (
+   416→            <EmptyState
+   417→              icon={<Tags className="size-7" aria-hidden />}
+   418→              title="هنوز دسته مجازی تعریف نشده است"
+   419→              description="دسته‌های مجاز اجزای مجموع A هستند؛ مانند استراحت شخصی یا نیازهای طبیعی. برای درصدگذاری گروه‌ها ابتدا باید دسته بسازید."
+   420→              action={
+   421→                <Button onClick={() => setCatCreateOpen(true)} className="btn-brand gap-1.5 border-0">
+   422→                  <Plus className="size-4" aria-hidden />
+   423→                  ثبت اولین دسته
+   424→                </Button>
+   425→              }
+   426→            />
+   427→          ) : isMobile ? (
+   428→            /* کارت موبایل — FR-30 */
+   429→            <div className="space-y-3">
+   430→              {categories.map((c) => (
+   431→                <div key={c.id} className="card-premium p-4">
+   432→                  <div className="flex items-start justify-between gap-2">
+   433→                    <div className="min-w-0">
+   434→                      <p className="truncate font-bold">{c.name}</p>
+   435→                      <p className="num text-xs text-faint" dir="ltr">
+   436→                        {c.code ?? 'بدون کد'}
+   437→                      </p>
+   438→                    </div>
+   439→                    <div className="flex gap-1">
+   440→                      <Button variant="ghost" size="icon" className="size-8" onClick={() => openCatEdit(c)} aria-label={`ویرایش دسته ${c.name}`}>
+   441→                        <Pencil className="size-4" aria-hidden />
+   442→                      </Button>
+   443→                      <Button variant="ghost" size="icon" className="size-8 text-red hover:text-red" onClick={() => setDeletingCat(c)} aria-label={`حذف دسته ${c.name}`}>
+   444→                        <Trash2 className="size-4" aria-hidden />
+   445→                      </Button>
+   446→                    </div>
+   447→                  </div>
+   448→                  <div className="mt-3 flex items-center justify-between gap-2">
+   449→                    <div className="flex items-center gap-2">
+   450→                      <Switch
+   451→                        checked={c.isActive}
+   452→                        onCheckedChange={(v) => toggleCategory(c, v)}
+   453→                        disabled={togglingCatId === c.id}
+   454→                        aria-label={`${c.isActive ? 'غیرفعال‌سازی' : 'فعال‌سازی'} دسته ${c.name}`}
+   455→                      />
+   456→                      <span className={cn('text-xs font-medium', c.isActive ? 'text-green' : 'text-faint')}>
+   457→                        {c.isActive ? 'فعال' : 'غیرفعال'}
+   458→                      </span>
+   459→                    </div>
+   460→                    <p className="num text-xs text-muted-foreground">
+   461→                      {formatInt(c.groupValuesCount, prefs)} مقدار گروه · {formatInt(c.overrideCount, prefs)} بازنویسی
+   462→                    </p>
+   463→                  </div>
+   464→                  <p className="mt-2 text-xs text-faint">{formatDateTime(c.updatedAt, prefs)}</p>
+   465→                </div>
+   466→              ))}
+   467→            </div>
+   468→          ) : (
+   469→            /* جدول دسکتاپ */
+   470→            <div className="card-premium overflow-hidden">
+   471→              <table className="w-full text-sm">
+   472→                <thead>
+   473→                  <tr className="border-b bg-surface-2/70 text-right text-xs text-muted-foreground">
+   474→                    <th className="px-4 py-3 font-bold">دسته مجاز</th>
+   475→                    <th className="px-4 py-3 font-bold">وضعیت</th>
+   476→                    <th className="num px-4 py-3 font-bold">مقادیر گروه</th>
+   477→                    <th className="num px-4 py-3 font-bold">بازنویسی فعالیت</th>
+   478→                    <th className="px-4 py-3 font-bold">آخرین تغییر</th>
+   479→                    <th className="px-4 py-3" aria-label="عملیات" />
+   480→                  </tr>
+   481→                </thead>
+   482→                <tbody>
+   483→                  {categories.map((c) => (
+   484→                    <tr key={c.id} className="border-b transition-colors last:border-0 hover:bg-muted/50">
+   485→                      <td className="px-4 py-3">
+   486→                        <span className="font-bold">{c.name}</span>
+   487→                        {c.code && (
+   488→                          <span className="num ms-2 text-xs text-faint" dir="ltr">
+   489→                            {c.code}
+   490→                          </span>
+   491→                        )}
+   492→                      </td>
+   493→                      <td className="px-4 py-3">
+   494→                        <div className="flex items-center gap-2">
+   495→                          <Switch
+   496→                            checked={c.isActive}
+   497→                            onCheckedChange={(v) => toggleCategory(c, v)}
+   498→                            disabled={togglingCatId === c.id}
+   499→                            aria-label={`${c.isActive ? 'غیرفعال‌سازی' : 'فعال‌سازی'} دسته ${c.name}`}
+   500→                          />
+   501→                          <span className={cn('text-xs font-medium', c.isActive ? 'text-green' : 'text-faint')}>
+   502→                            {c.isActive ? 'فعال' : 'غیرفعال'}
+   503→                          </span>
+   504→                        </div>
+   505→                      </td>
+   506→                      <td className="num px-4 py-3 text-muted-foreground">{formatInt(c.groupValuesCount, prefs)}</td>
+   507→                      <td className="num px-4 py-3 text-muted-foreground">{formatInt(c.overrideCount, prefs)}</td>
+   508→                      <td className="px-4 py-3 text-xs text-muted-foreground">{formatDateTime(c.updatedAt, prefs)}</td>
+   509→                      <td className="px-4 py-3">
+   510→                        <div className="flex justify-end gap-1">
+   511→                          <Button variant="ghost" size="icon" className="size-8" onClick={() => openCatEdit(c)} aria-label={`ویرایش دسته ${c.name}`}>
+   512→                            <Pencil className="size-4" aria-hidden />
+   513→                          </Button>
+   514→                          <Button variant="ghost" size="icon" className="size-8 text-red hover:text-red" onClick={() => setDeletingCat(c)} aria-label={`حذف دسته ${c.name}`}>
+   515→                            <Trash2 className="size-4" aria-hidden />
+   516→                          </Button>
+   517→                        </div>
+   518→                      </td>
+   519→                    </tr>
+   520→                  ))}
+   521→                </tbody>
+   522→              </table>
+   523→            </div>
+   524→          )}
+   525→        </TabsContent>
+   526→      </Tabs>
+   527→
+   528→      {/* نکته پایین صفحه — FR-15 */}
+   529→      <p className="rounded-xl bg-muted p-3 text-xs leading-6 text-muted-foreground">
+   530→        <b className="text-foreground">روش اعمال مجاز: </b>
+   531→        روش اعمال مجاز (درصدی از زمان نرمال یا سهم از زمان استاندارد) در «مشخصات پروژه» انتخاب می‌شود.
+   532→        {calcQ.isLoading ? (
+   533→          <span className="text-faint"> (در حال بارگذاری تنظیم فعلی…)</span>
+   534→        ) : calcQ.error ? (
+   535→          <span className="text-amber"> (بارگذاری تنظیم فعلی ناموفق بود — صفحه را تازه‌سازی کنید)</span>
+   536→        ) : methodLabel && methodFormula ? (
+   537→          <>
+   538→            {' '}
+   539→            روش فعلی این پروژه: «{methodLabel}» با فرمول{' '}
+   540→            <span className="num font-medium" dir="ltr">
+   541→              {methodFormula}
+   542→            </span>
+   543→            {method === 'SHARE_OF_ST' ? ' — در این روش مجموع A باید کمتر از ۱۰۰٪ باشد، وگرنه محاسبه ممنوع است.' : ''}
+   544→          </>
+   545→        ) : null}
+   546→      </p>
+   547→
+   548→      {/* دیالوگ ایجاد گروه */}
+   549→      <Dialog open={groupCreateOpen} onOpenChange={setGroupCreateOpen}>
+   550→        <DialogContent dir="rtl" className="sm:max-w-md">
+   551→          <DialogHeader>
+   552→            <DialogTitle>گروه جدید</DialogTitle>
+   553→            <DialogDescription>
+   554→              گروه‌ها بسته‌های قابل استفاده مجدد مقادیر مجاز هستند؛ فعالیت‌ها مقادیر را از گروه به ارث می‌برند.
+   555→            </DialogDescription>
+   556→          </DialogHeader>
+   557→          <div className="space-y-4">
+   558→            <div className="space-y-1.5">
+   559→              <div className="flex items-center gap-1">
+   560→                <Label htmlFor="grp-name">نام گروه</Label>
+   561→                <HelpDot
+   562→                  label="نام گروه"
+   563→                  content={{
+   564→                    what: 'نامی گویا برای بسته مجازهای فعالیت؛ فعالیت‌ها در ساختار تولید به این گروه تخصیص می‌یابند.',
+   565→                    input: 'نام کوتاه و معنادار.',
+   566→                    example: '«کار دستی»، «کار ماشینی» یا گروه اختصاصی شرکت.',
+   567→                  }}
+   568→                />
+   569→              </div>
+   570→              <Input
+   571→                id="grp-name"
+   572→                value={groupDraft.name}
+   573→                onChange={(e) => setGroupDraft((s) => ({ ...s, name: e.target.value }))}
+   574→                placeholder="مثلاً: کار دستی"
+   575→              />
+   576→            </div>
+   577→            <div className="space-y-1.5">
+   578→              <Label htmlFor="grp-desc">توضیحات (اختیاری)</Label>
+   579→              <Textarea
+   580→                id="grp-desc"
+   581→                value={groupDraft.description}
+   582→                onChange={(e) => setGroupDraft((s) => ({ ...s, description: e.target.value }))}
+   583→                placeholder="مثلاً: مجازهای رایج کار‌های بدون ماشین"
+   584→                className="min-h-16"
+   585→              />
+   586→            </div>
+   587→          </div>
+   588→          <DialogFooter className="flex-row justify-between gap-2">
+   589→            <Button variant="outline" onClick={() => setGroupCreateOpen(false)}>
+   590→              انصراف
+   591→            </Button>
+   592→            <Button onClick={submitCreateGroup} disabled={creatingGroup} className="btn-brand border-0">
+   593→              {creatingGroup ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Plus className="size-4" aria-hidden />}
+   594→              ثبت گروه
+   595→            </Button>
+   596→          </DialogFooter>
+   597→        </DialogContent>
+   598→      </Dialog>
+   599→
+   600→      {/* دیالوگ ایجاد دسته */}
+   601→      <Dialog open={catCreateOpen} onOpenChange={setCatCreateOpen}>
+   602→        <DialogContent dir="rtl" className="sm:max-w-md">
+   603→          <DialogHeader>
+   604→            <DialogTitle>دسته مجاز جدید</DialogTitle>
+   605→            <DialogDescription>
+   606→              دسته‌ها اجزای مجموع A هستند و در سطح گروه درصدگذاری می‌شوند؛ فعالیت می‌تواند مقدار هر دسته را بازنویسی کند.
+   607→            </DialogDescription>
+   608→          </DialogHeader>
+   609→          <div className="space-y-4">
+   610→            <div className="space-y-1.5">
+   611→              <div className="flex items-center gap-1">
+   612→                <Label htmlFor="cat-name">نام دسته (الزامی)</Label>
+   613→                <HelpDot
+   614→                  label="نام دسته مجاز"
+   615→                  content={{
+   616→                    what: 'نام جزء مجاز که در گروه‌ها و گزارش‌ها نمایش داده می‌شود.',
+   617→                    example: 'استراحت شخصی، نیازهای طبیعی، مزاحمت کاری — درصد نمونه صرفاً مثال است و نرخ مصوب شرکت نیست.',
+   618→                  }}
+   619→                />
+   620→              </div>
+   621→              <Input
+   622→                id="cat-name"
+   623→                value={catDraft.name}
+   624→                onChange={(e) => setCatDraft((s) => ({ ...s, name: e.target.value }))}
+   625→                placeholder="مثلاً: استراحت شخصی"
+   626→              />
+   627→            </div>
+   628→            <div className="space-y-1.5">
+   629→              <Label htmlFor="cat-code">کد (اختیاری)</Label>
+   630→              <Input
+   631→                id="cat-code"
+   632→                value={catDraft.code}
+   633→                onChange={(e) => setCatDraft((s) => ({ ...s, code: e.target.value }))}
+   634→                placeholder="مثلاً: PF"
+   635→                dir="ltr"
+   636→              />
+   637→            </div>
+   638→            <div className="flex items-center justify-between rounded-xl bg-surface-2/70 p-3">
+   639→              <div>
+   640→                <Label htmlFor="cat-active" className="text-sm">
+   641→                  دسته فعال باشد
+   642→                </Label>
+   643→                <p className="mt-0.5 text-xs text-muted-foreground">دسته غیرفعال در مجموع A لحاظ نمی‌شود.</p>
+   644→              </div>
+   645→              <Switch
+   646→                id="cat-active"
+   647→                checked={catDraft.isActive}
+   648→                onCheckedChange={(v) => setCatDraft((s) => ({ ...s, isActive: v }))}
+   649→                aria-label="دسته فعال باشد"
+   650→              />
+   651→            </div>
+   652→          </div>
+   653→          <DialogFooter className="flex-row justify-between gap-2">
+   654→            <Button variant="outline" onClick={() => setCatCreateOpen(false)}>
+   655→              انصراف
+   656→            </Button>
+   657→            <Button onClick={submitCreateCategory} disabled={creatingCat} className="btn-brand border-0">
+   658→              {creatingCat ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Plus className="size-4" aria-hidden />}
+   659→              ثبت دسته
+   660→            </Button>
+   661→          </DialogFooter>
+   662→        </DialogContent>
+   663→      </Dialog>
+   664→
+   665→      {/* دیالوگ ویرایش دسته — ذخیره خودکار */}
+   666→      <Dialog
+   667→        open={catEditOpen}
+   668→        onOpenChange={(open) => {
+   669→          setCatEditOpen(open)
+   670→          if (!open) setEditingCat(null)
+   671→        }}
+   672→      >
+   673→        <DialogContent dir="rtl" className="sm:max-w-md">
+   674→          <DialogHeader>
+   675→            <DialogTitle>ویرایش دسته مجاز</DialogTitle>
+   676→            <DialogDescription>تغییرات به‌صورت خودکار ذخیره می‌شوند.</DialogDescription>
+   677→          </DialogHeader>
+   678→          <div className="space-y-4">
+   679→            <div className="space-y-1.5">
+   680→              <Label htmlFor="cate-name">نام دسته</Label>
+   681→              <Input
+   682→                id="cate-name"
+   683→                value={catEditor.name}
+   684→                onChange={(e) => setCatEditor((s) => ({ ...s, name: e.target.value }))}
+   685→              />
+   686→            </div>
+   687→            <div className="space-y-1.5">
+   688→              <Label htmlFor="cate-code">کد (اختیاری)</Label>
+   689→              <Input
+   690→                id="cate-code"
+   691→                value={catEditor.code}
+   692→                onChange={(e) => setCatEditor((s) => ({ ...s, code: e.target.value }))}
+   693→                dir="ltr"
+   694→              />
+   695→            </div>
+   696→            <div className="space-y-1.5">
+   697→              <div className="flex items-center gap-1">
+   698→                <Label htmlFor="cate-sort">ترتیب نمایش</Label>
+   699→                <HelpDot
+   700→                  label="ترتیب نمایش"
+   701→                  content={{
+   702→                    what: 'ترتیب نمایش دسته در جدول‌های گروه و گزارش‌ها؛ عدد کوچکتر بالاتر.',
+   703→                    input: 'عدد صحیح بین ۰ تا ۹۹۹۹.',
+   704→                  }}
+   705→                />
+   706→              </div>
+   707→              <PersianNumberInput
+   708→                id="cate-sort"
+   709→                value={catEditor.sortOrder}
+   710→                onChange={(v) => setCatEditor((s) => ({ ...s, sortOrder: v }))}
+   711→                decimals={false}
+   712→                min={0}
+   713→                max={9999}
+   714→                aria-label="ترتیب نمایش دسته"
+   715→              />
+   716→            </div>
+   717→          </div>
+   718→          <DialogFooter className="flex-row justify-between gap-2">
+   719→            <SaveIndicator status={editingCat ? catAutoStatus : 'idle'} onRetry={catAutoRetry} />
+   720→            <Button variant="outline" onClick={() => setCatEditOpen(false)}>
+   721→              بستن
+   722→            </Button>
+   723→          </DialogFooter>
+   724→        </DialogContent>
+   725→      </Dialog>
+   726→
+   727→      {/* تأیید حذف گروه — FR-26 */}
+   728→      <ConfirmDeleteDialog
+   729→        open={deletingGroup !== null}
+   730→        onOpenChange={(open) => !open && setDeletingGroup(null)}
+   731→        title="حذف گروه فعالیت"
+   732→        entityName={deletingGroup?.name ?? ''}
+   733→        dependencies={{
+   734→          'مقدار مجاز ثبت‌شده در این گروه (حذف می‌شود)': deletingGroup?.groupAllowances.length ?? 0,
+   735→          'فعالیت‌های این گروه — فقط بدون گروه می‌شوند؛ داده آن‌ها حذف نمی‌شود': deletingGroup?.activities.length ?? 0,
+   736→        }}
+   737→        onConfirm={() => deletingGroup && deleteGroupMutation.mutate(deletingGroup.id)}
+   738→        loading={deleteGroupMutation.isPending}
+   739→      />
+   740→
+   741→      {/* تأیید حذف دسته — FR-26 */}
+   742→      <ConfirmDeleteDialog
+   743→        open={deletingCat !== null}
+   744→        onOpenChange={(open) => !open && setDeletingCat(null)}
+   745→        title="حذف دسته مجاز"
+   746→        entityName={deletingCat?.name ?? ''}
+   747→        dependencies={{
+   748→          'مقدار ثبت‌شده در گروه‌ها': deletingCat?.groupValuesCount ?? 0,
+   749→          'بازنویسی اختصاصی فعالیت‌ها': deletingCat?.overrideCount ?? 0,
+   750→        }}
+   751→        onConfirm={() => deletingCat && deleteCatMutation.mutate(deletingCat.id)}
+   752→        loading={deleteCatMutation.isPending}
+   753→      />
+   754→    </div>
+   755→  )
+   756→}
+   757→
+   758→// ═══════════════════════════════════════════════════════════
+   759→// پنل جزئیات گروه انتخاب‌شده — ویرایش autosave + مجازها + فعالیت‌ها
+   760→// کامپوننت با key گروه رندر می‌شود تا وضعیت فرم با تعویض گروه بازنشانی شود
+   761→// ═══════════════════════════════════════════════════════════
+   762→function GroupDetailPanel({
+   763→  group,
+   764→  projectId,
+   765→  prefs,
+   766→  isMobile,
+   767→  onDelete,
+   768→  onGoToCategories,
+   769→}: {
+   770→  group: GroupDto
+   771→  projectId: string
+   772→  prefs: Prefs
+   773→  isMobile: boolean
+   774→  onDelete: () => void
+   775→  onGoToCategories: () => void
+   776→}) {
+   777→  const qc = useQueryClient()
+   778→  const navigate = useAppStore((s) => s.navigate)
+   779→
+   780→  // ── ویرایش نام/توضیح با ذخیره خودکار (با کنترل هم‌زمانی expectedUpdatedAt) ──
+   781→  const updatedAtRef = useRef(group.updatedAt)
+   782→  const [editor, setEditor] = useState<GroupEditorState>({ name: group.name, description: group.description ?? '' })
+   783→  const { status: metaStatus, retry: metaRetry } = useAutosave<GroupEditorState>({
+   784→    data: editor,
+   785→    ready: true,
+   786→    save: async (value) => {
+   787→      const res = await allowancesApi.updateGroup(group.id, {
+   788→        name: value.name.trim(),
+   789→        description: value.description.trim() || null,
+   790→        expectedUpdatedAt: updatedAtRef.current,
+   791→      })
+   792→      updatedAtRef.current = res.group.updatedAt
+   793→      void qc.invalidateQueries({ queryKey: qk.groups(projectId) })
+   794→      void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+   795→    },
+   796→  })
+   797→
+   798→  // ── مقادیر مجاز گروه ──
+   799→  const gaQ = useQuery({
+   800→    queryKey: qk.groupAllowances(group.id),
+   801→    queryFn: () => allowancesApi.groupAllowances(group.id),
+   802→  })
+   803→
+   804→  return (
+   805→    <div className="space-y-4">
+   806→      {/* فرم نام/توضیح */}
+   807→      <div className="card-premium p-4 sm:p-5">
+   808→        <div className="flex flex-wrap items-start justify-between gap-2">
+   809→          <div className="flex items-center gap-2.5">
+   810→            <span className="flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand">
+   811→              <Layers className="size-5" aria-hidden />
+   812→            </span>
+   813→            <div>
+   814→              <h3 className="font-extrabold">جزئیات گروه «{group.name}»</h3>
+   815→              <p className="text-xs text-muted-foreground">تغییرات نام و توضیح به‌صورت خودکار ذخیره می‌شود</p>
+   816→            </div>
+   817→          </div>
+   818→          <div className="flex items-center gap-2">
+   819→            <SaveIndicator status={metaStatus} onRetry={metaRetry} />
+   820→            <Button
+   821→              variant="ghost"
+   822→              size="icon"
+   823→              className="size-9 text-red hover:text-red"
+   824→              onClick={onDelete}
+   825→              aria-label={`حذف گروه ${group.name}`}
+   826→            >
+   827→              <Trash2 className="size-4" aria-hidden />
+   828→            </Button>
+   829→          </div>
+   830→        </div>
+   831→        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+   832→          <div className="space-y-1.5">
+   833→            <Label htmlFor={`grp-edit-name-${group.id}`}>نام گروه</Label>
+   834→            <Input
+   835→              id={`grp-edit-name-${group.id}`}
+   836→              value={editor.name}
+   837→              onChange={(e) => setEditor((s) => ({ ...s, name: e.target.value }))}
+   838→              aria-label="نام گروه"
+   839→            />
+   840→          </div>
+   841→          <div className="space-y-1.5 sm:col-span-2">
+   842→            <Label htmlFor={`grp-edit-desc-${group.id}`}>توضیحات</Label>
+   843→            <Textarea
+   844→              id={`grp-edit-desc-${group.id}`}
+   845→              value={editor.description}
+   846→              onChange={(e) => setEditor((s) => ({ ...s, description: e.target.value }))}
+   847→              className="min-h-16"
+   848→              aria-label="توضیحات گروه"
+   849→            />
+   850→          </div>
+   851→        </div>
+   852→      </div>
+   853→
+   854→      {/* مجازهای گروه */}
+   855→      {gaQ.isLoading ? (
+   856→        <div className="space-y-2">
+   857→          <Skeleton className="h-8 w-48 rounded-lg" />
+   858→          <Skeleton className="h-40 w-full rounded-xl" />
+   859→        </div>
+   860→      ) : gaQ.error ? (
+   861→        <EmptyState
+   862→          className="py-6"
+   863→          title="بارگذاری مجازهای گروه ناموفق بود"
+   864→          description={gaQ.error instanceof Error ? gaQ.error.message : 'خطای نامشخص'}
+   865→          action={
+   866→            <Button variant="outline" onClick={() => qc.invalidateQueries({ queryKey: qk.groupAllowances(group.id) })}>
+   867→              تلاش مجدد
+   868→            </Button>
+   869→          }
+   870→        />
+   871→      ) : (gaQ.data?.values.length ?? 0) === 0 ? (
+   872→        <div className="card-premium p-4">
+   873→          <p className="text-sm leading-6 text-muted-foreground">
+   874→            هنوز دسته مجازی برای این پروژه تعریف نشده است؛ ابتدا از زبانه «دسته‌های مجاز» دسته بسازید تا بتوانید برای این
+   875→            گروه مقدار تعیین کنید.
+   876→          </p>
+   877→          <Button variant="outline" size="sm" className="mt-3" onClick={onGoToCategories}>
+   878→            <Tags className="size-3.5" aria-hidden />
+   879→            رفتن به دسته‌های مجاز
+   880→          </Button>
+   881→        </div>
+   882→      ) : gaQ.data ? (
+   883→        <AllowancesEditor
+   884→          key={group.id}
+   885→          groupId={group.id}
+   886→          groupName={group.name}
+   887→          allowances={gaQ.data}
+   888→          projectId={projectId}
+   889→          prefs={prefs}
+   890→          isMobile={isMobile}
+   891→        />
+   892→      ) : null}
+   893→
+   894→      {/* فعالیت‌های این گروه */}
+   895→      <div className="card-premium overflow-hidden">
+   896→        <div className="border-b bg-surface-2/70 px-4 py-3">
+   897→          <h3 className="text-sm font-bold">فعالیت‌های این گروه</h3>
+   898→        </div>
+   899→        {group.activities.length === 0 ? (
+   900→          <p className="p-4 text-sm leading-6 text-muted-foreground">
+   901→            فعالیتی به این گروه تخصیص داده نشده است؛ تخصیص گروه از مرحله «ساختار تولید» و در جزئیات فعالیت انجام می‌شود.
+   902→          </p>
+   903→        ) : (
+   904→          <ul className="divide-y">
+   905→            {group.activities.map((a) => (
+   906→              <li key={a.id} className="flex items-center justify-between gap-2 px-4 py-2.5">
+   907→                <div className="min-w-0">
+   908→                  <p className="truncate text-sm font-medium">{a.name}</p>
+   909→                  <p className="truncate text-xs text-faint">{a.station.name}</p>
+   910→                </div>
+   911→                <Button
+   912→                  variant="outline"
+   913→                  size="sm"
+   914→                  className="shrink-0 gap-1.5"
+   915→                  onClick={() => navigate({ name: 'activity', projectId, activityId: a.id })}
+   916→                  aria-label={`مشاهده فعالیت ${a.name}`}
+   917→                >
+   918→                  <Eye className="size-3.5" aria-hidden />
+   919→                  مشاهده
+   920→                </Button>
+   921→              </li>
+   922→            ))}
+   923→          </ul>
+   924→        )}
+   925→      </div>
+   926→    </div>
+   927→  )
+   928→}
+   929→
+   930→// ═══════════════════════════════════════════════════════════
+   931→// ویرایشگر مقادیر مجاز گروه — debounce با useAutosave
+   932→// کل values (همه دسته‌ها) در هر ذخیره ارسال می‌شود — FR-04
+   933→// ═══════════════════════════════════════════════════════════
+   934→function AllowancesEditor({
+   935→  groupId,
+   936→  groupName,
+   937→  allowances,
+   938→  projectId,
+   939→  prefs,
+   940→  isMobile,
+   941→}: {
+   942→  groupId: string
+   943→  groupName: string
+   944→  allowances: GroupAllowancesDto
+   945→  projectId: string
+   946→  prefs: Prefs
+   947→  isMobile: boolean
+   948→}) {
+   949→  const qc = useQueryClient()
+   950→
+   951→  // درصد کاربر ↔ مقدار اعشاری API — FR-15
+   952→  const [values, setValues] = useState<Record<string, number | null>>(() =>
+   953→    Object.fromEntries(allowances.values.map((v) => [v.categoryId, v.percentValue]))
+   954→  )
+   955→
+   956→  // همگام‌سازی محافظه‌کارانه با داده سرور (ویرایش‌های کاربر حفظ می‌شود)
+   957→  useEffect(() => {
+   958→    setValues((prev) => {
+   959→      const next: Record<string, number | null> = {}
+   960→      for (const v of allowances.values) {
+   961→        next[v.categoryId] = v.categoryId in prev ? prev[v.categoryId] : v.percentValue
+   962→      }
+   963→      return next
+   964→    })
+   965→  }, [allowances])
+   966→
+   967→  const { status, retry } = useAutosave<Record<string, number | null>>({
+   968→    data: values,
+   969→    ready: true,
+   970→    delayMs: 900,
+   971→    save: async (v) => {
+   972→      const entries = Object.entries(v).map(([categoryId, percentValue]) => ({ categoryId, percentValue }))
+   973→      if (entries.length === 0) return
+   974→      const res = await allowancesApi.putGroupAllowances(groupId, entries)
+   975→      qc.setQueryData(qk.groupAllowances(groupId), res)
+   976→      void qc.invalidateQueries({ queryKey: qk.groups(projectId) })
+   977→      void qc.invalidateQueries({ queryKey: qk.projectSummary(projectId) })
+   978→    },
+   979→  })
+   980→
+   981→  const setPercent = (categoryId: string, v: number | null) => {
+   982→    setValues((s) => ({ ...s, [categoryId]: v === null ? null : Math.min(v, MAX_PERCENT_DECIMAL) }))
+   983→  }
+   984→
+   985→  return (
+   986→    <div className="space-y-3">
+   987→      <div className="flex flex-wrap items-center justify-between gap-2">
+   988→        <h3 className="flex items-center gap-1 text-sm font-bold">
+   989→          مجازهای گروه «{groupName}»
+   990→          <HelpDot
+   991→            label="مجازهای گروه"
+   992→            content={{
+   993→              what: 'مقدار درصدی هر دسته مجاز برای این گروه؛ فعالیت‌های این گروه این مقادیر را به ارث می‌برند و می‌توانند هر دسته را بازنویسی کنند.',
+   994→              input: 'عدد درصد وارد کنید (۰ تا ۹۹٫۹۹)؛ خالی بگذارید تا آن دسته مقداری نداشته باشد.',
+   995→              example: 'استراحت شخصی ۵٪ یا نیازهای طبیعی ۳٪ — درصد صرفاً مثال است و نرخ مصوب شرکت نیست.',
+   996→              note: 'فقط دسته‌های فعال در مجموع A لحاظ می‌شوند؛ درصدها به‌صورت مقدار اعشاری (۰٫۱۵ برای ۱۵٪) ذخیره می‌شوند.',
+   997→            }}
+   998→          />
+   999→        </h3>
+  1000→        <SaveIndicator status={status} onRetry={retry} />
+  1001→      </div>
+  1002→
+  1003→      {isMobile ? (
+  1004→        /* کارت موبایل */
+  1005→        <div className="space-y-3">
+  1006→          {allowances.values.map((cat) => (
+  1007→            <div key={cat.categoryId} className={cn('card-premium p-4', !cat.isActive && 'opacity-60')}>
+  1008→              <div className="flex items-start justify-between gap-2">
+  1009→                <div className="min-w-0">
+  1010→                  <p className="truncate font-bold">{cat.name}</p>
+  1011→                  {cat.code && (
+  1012→                    <p className="num text-xs text-faint" dir="ltr">
+  1013→                      {cat.code}
+  1014→                    </p>
+  1015→                  )}
+  1016→                </div>
+  1017→                {cat.isActive ? (
+  1018→                  <Badge className="bg-green-soft text-green">فعال</Badge>
+  1019→                ) : (
+  1020→                  <Badge variant="outline" className="text-faint">
+  1021→                    غیرفعال — در A لحاظ نمی‌شود
+  1022→                  </Badge>
+  1023→                )}
+  1024→              </div>
+  1025→              <div className="mt-3 flex max-w-40 items-center gap-2">
+  1026→                <PercentInput
+  1027→                  value={values[cat.categoryId] ?? null}
+  1028→                  onChange={(v) => setPercent(cat.categoryId, v)}
+  1029→                  aria-label={`درصد مجاز دسته ${cat.name}`}
+  1030→                />
+  1031→              </div>
+  1032→            </div>
+  1033→          ))}
+  1034→          <div className="card-premium flex items-center justify-between p-4">
+  1035→            <span className="text-sm font-bold">جمع A (دسته‌های فعال)</span>
+  1036→            <span className="num font-bold text-brand">{formatPercent(allowances.totalA, prefs)}</span>
+  1037→          </div>
+  1038→        </div>
+  1039→      ) : (
+  1040→        /* جدول دسکتاپ */
+  1041→        <div className="card-premium overflow-hidden">
+  1042→          <table className="w-full text-sm">
+  1043→            <thead>
+  1044→              <tr className="border-b bg-surface-2/70 text-right text-xs text-muted-foreground">
+  1045→                <th className="px-4 py-2.5 font-bold">دسته مجاز</th>
+  1046→                <th className="px-4 py-2.5 font-bold">وضعیت</th>
+  1047→                <th className="px-4 py-2.5 font-bold">مقدار (درصد)</th>
+  1048→              </tr>
+  1049→            </thead>
+  1050→            <tbody>
+  1051→              {allowances.values.map((cat) => (
+  1052→                <tr key={cat.categoryId} className={cn('border-b last:border-0', !cat.isActive && 'opacity-60')}>
+  1053→                  <td className="px-4 py-2">
+  1054→                    <span className="font-medium">{cat.name}</span>
+  1055→                    {cat.code && (
+  1056→                      <span className="num ms-2 text-xs text-faint" dir="ltr">
+  1057→                        {cat.code}
+  1058→                      </span>
+  1059→                    )}
+  1060→                  </td>
+  1061→                  <td className="px-4 py-2">
+  1062→                    {cat.isActive ? (
+  1063→                      <Badge className="bg-green-soft text-green">فعال</Badge>
+  1064→                    ) : (
+  1065→                      <Badge variant="outline" className="text-faint">
+  1066→                        غیرفعال — در A لحاظ نمی‌شود
+  1067→                      </Badge>
+  1068→                    )}
+  1069→                  </td>
+  1070→                  <td className="w-44 px-4 py-2">
+  1071→                    <PercentInput
+  1072→                      value={values[cat.categoryId] ?? null}
+  1073→                      onChange={(v) => setPercent(cat.categoryId, v)}
+  1074→                      aria-label={`درصد مجاز دسته ${cat.name}`}
+  1075→                    />
+  1076→                  </td>
+  1077→                </tr>
+  1078→              ))}
+  1079→              <tr className="border-t-2 bg-surface-2/70 font-bold">
+  1080→                <td colSpan={2} className="px-4 py-2.5">
+  1081→                  جمع A (دسته‌های فعال)
+  1082→                </td>
+  1083→                <td className="num px-4 py-2.5 text-brand">{formatPercent(allowances.totalA, prefs)}</td>
+  1084→              </tr>
+  1085→            </tbody>
+  1086→          </table>
+  1087→        </div>
+  1088→      )}
+  1089→      <p className="text-xs leading-6 text-muted-foreground">
+  1090→        فعالیت‌های این گروه مقادیر بالا را به ارث می‌برند؛ بازنویسی هر دسته در صفحه همان فعالیت انجام می‌شود و منبع هر مقدار
+  1091→        (ارث از گروه یا اختصاصی فعالیت) آنجا مشخص می‌گردد.
+  1092→      </p>
+  1093→    </div>
+  1094→  )
+  1095→}
+  1096→

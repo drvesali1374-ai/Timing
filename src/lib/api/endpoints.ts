@@ -1,0 +1,403 @@
+// ═══════════════════════════════════════════════════════════
+// توابع تایپ‌شده‌ی کلاینت API — قرارداد کامل فاز ۱ و ۲
+// ═══════════════════════════════════════════════════════════
+import { api } from '../api-client'
+
+// ── انواع مشترک ──
+export interface ProjectSummaryItem {
+  id: string
+  name: string
+  lineName: string
+  productName: string
+  studyDate: string | null
+  status: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+  counts: { stations: number; activities: number; elements: number; operators: number }
+  progress: number
+  finalized: boolean
+}
+
+export interface StageState {
+  status: 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'NEEDS_REVIEW' | 'FUTURE_PHASE'
+  phase?: number
+  hint: string
+}
+
+export interface StageSummaryDto {
+  stages: Record<string, StageState>
+  progress: number
+  counts: {
+    stations: number
+    activities: number
+    elements: number
+    operators: number
+    groups: number
+    categories: number
+    elementsWithRating: number
+    finalized: boolean
+  }
+}
+
+export interface ProjectDetailDto {
+  project: {
+    id: string
+    name: string
+    lineName: string
+    productName: string
+    studyDate: string | null
+    status: string
+    description: string | null
+    createdAt: string
+    updatedAt: string
+    settings: Record<string, string>
+  }
+  dependencyCounts: {
+    stations: number
+    activities: number
+    elements: number
+    operators: number
+    groups: number
+    sessions: number
+    observations: number
+  }
+  stageSummary: StageSummaryDto
+}
+
+export interface StationDto {
+  id: string
+  projectId: string
+  name: string
+  description: string | null
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+  activities: ActivityDto[]
+}
+
+export interface ActivityDto {
+  id: string
+  stationId: string
+  groupId: string | null
+  name: string
+  description: string | null
+  processType: string
+  sortOrder: number
+  targetSampleCount: number | null
+  createdAt: string
+  updatedAt: string
+  group?: { id: string; name: string } | null
+  _count?: { workElements: number; sessions: number }
+  elements?: ElementDto[]
+}
+
+export interface ElementDto {
+  id: string
+  activityId: string
+  name: string
+  description: string | null
+  elementType: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+  rating?: { totalFactor: number } | null
+}
+
+export interface OperatorDto {
+  id: string
+  projectId: string
+  displayName: string
+  code: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+  sessionsCount: number
+  activitiesCount: number
+}
+
+export interface GroupDto {
+  id: string
+  projectId: string
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+  totalA: number
+  groupAllowances: { categoryId: string; percentValue: number; category: { name: string; isActive: boolean } }[]
+  activities: { id: string; name: string; station: { name: string } }[]
+}
+
+export interface CategoryDto {
+  id: string
+  projectId: string
+  name: string
+  code: string | null
+  isActive: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+  groupValuesCount: number
+  overrideCount: number
+}
+
+export interface GroupAllowancesDto {
+  group: { id: string; name: string }
+  values: { categoryId: string; name: string; code: string | null; isActive: boolean; percentValue: number | null }[]
+  totalA: number
+}
+
+export interface EffectiveAllowancesDto {
+  method: string
+  methodLabel: string
+  formula: string
+  hasGroup: boolean
+  groupId: string | null
+  groupName: string | null
+  totalA: number
+  categories: {
+    categoryId: string
+    name: string
+    code: string | null
+    isActive: boolean
+    source: 'GROUP' | 'OVERRIDE' | 'NONE'
+    sourceLabel: string
+    groupValue: number | null
+    overrideValue: number | null
+    effectiveValue: number | null
+  }[]
+}
+
+export interface RatingTableDto {
+  id: string
+  projectId: string
+  name: string
+  version: number
+  source: string | null
+  notes: string | null
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+  gradesCount: number
+  assessmentsCount: number
+}
+
+export interface RatingGradeDto {
+  id: string
+  ratingTableId: string
+  factor: string
+  gradeCode: string
+  label: string
+  value: number
+  hint: string | null
+  sortOrder: number
+}
+
+export interface RatingTableDetailDto extends RatingTableDto {
+  grades: RatingGradeDto[]
+}
+
+export interface ElementRatingDto {
+  element: { id: string; name: string }
+  projectId: string
+  assessment: {
+    ratingTableId: string
+    ratingTableName: string
+    ratingTableVersion: number
+    ratingTableSource: string | null
+    skillGrade: string | null
+    effortGrade: string | null
+    conditionsGrade: string | null
+    consistencyGrade: string | null
+    skillValue: number
+    effortValue: number
+    conditionsValue: number
+    consistencyValue: number
+    totalFactor: number
+    notes: string | null
+  } | null
+}
+
+export interface RatingMatrixDto {
+  tables: { id: string; name: string; version: number; isDefault: boolean; source: string | null }[]
+  defaultTableId: string | null
+  stations: {
+    id: string
+    name: string
+    activities: {
+      id: string
+      name: string
+      elements: {
+        id: string
+        name: string
+        elementType: string
+        rating: { totalFactor: number; ratingTableId: string; ratingTableName: string; ratingTableVersion: number } | null
+      }[]
+    }[]
+  }[]
+}
+
+export interface BackupDto {
+  id: string
+  fileName: string
+  kind: string
+  sizeBytes: number
+  checksum: string
+  schemaVersion: string
+  projectCount: number
+  createdAt: string
+}
+
+export interface AuditDto {
+  id: string
+  entityType: string
+  entityId: string
+  action: string
+  entityName: string | null
+  beforeJson: string | null
+  afterJson: string | null
+  projectId: string | null
+  actor: string
+  occurredAt: string
+}
+
+export interface AppSettingsDto {
+  settings: Record<string, string>
+}
+
+// ── پروژه ──
+export const projectsApi = {
+  list: (params?: { q?: string; sort?: string; dir?: string }) => {
+    const sp = new URLSearchParams()
+    if (params?.q) sp.set('q', params.q)
+    if (params?.sort) sp.set('sort', params.sort)
+    if (params?.dir) sp.set('dir', params.dir)
+    const qs = sp.toString()
+    return api.get<{ items: ProjectSummaryItem[] }>(`/api/projects${qs ? `?${qs}` : ''}`)
+  },
+  get: (id: string) => api.get<ProjectDetailDto>(`/api/projects/${id}`),
+  create: (body: { name: string; lineName: string; productName: string; studyDate?: string | null; description?: string | null }) =>
+    api.post<{ project: { id: string } }>('/api/projects', body),
+  update: (id: string, body: Record<string, unknown>, changeId?: string) =>
+    api.put<{ project: { id: string; updatedAt: string } }>(`/api/projects/${id}`, body, changeId),
+  remove: (id: string) => api.del<{ deleted: boolean }>(`/api/projects/${id}`),
+  duplicate: (id: string, body: unknown) => api.post<{ projectId: string }>(`/api/projects/${id}/duplicate`, body),
+  finalize: (id: string, reason?: string | null) => api.post<{ finalized: boolean }>(`/api/projects/${id}/finalize`, { reason: reason ?? null }),
+  unfinalize: (id: string) => api.del<{ finalized: boolean }>(`/api/projects/${id}/finalize`),
+  summary: (id: string) => api.get<StageSummaryDto>(`/api/projects/${id}/summary`),
+  calcSettings: (id: string) => api.get<{ allowanceMethod: string; aggregationMethod: string }>(`/api/projects/${id}/calc-settings`),
+  putCalcSettings: (id: string, body: { allowanceMethod?: string; aggregationMethod?: string }) =>
+    api.put<{ allowanceMethod: string; aggregationMethod: string }>(`/api/projects/${id}/calc-settings`, body),
+}
+
+// ── ساختار ──
+export const structureApi = {
+  tree: (projectId: string) => api.get<{ stations: StationDto[] }>(`/api/projects/${projectId}/structure`),
+  stations: (projectId: string) => api.get<{ items: StationDto[] }>(`/api/projects/${projectId}/stations`),
+  createStation: (projectId: string, body: { name: string; description?: string | null }) =>
+    api.post<{ station: StationDto }>(`/api/projects/${projectId}/stations`, body),
+  updateStation: (id: string, body: Record<string, unknown>, changeId?: string) =>
+    api.put<{ station: StationDto }>(`/api/stations/${id}`, body, changeId),
+  deleteStation: (id: string) => api.del<{ deleted: boolean; removedCounts: { activities: number; elements: number; sessions: number; observations: number } }>(`/api/stations/${id}`),
+  reorderStations: (projectId: string, ids: string[]) =>
+    api.post<{ reordered: boolean }>(`/api/projects/${projectId}/stations/reorder`, { ids }),
+
+  activities: (stationId: string) => api.get<{ items: ActivityDto[] }>(`/api/stations/${stationId}/activities`),
+  createActivity: (stationId: string, body: Record<string, unknown>) =>
+    api.post<{ activity: ActivityDto }>(`/api/stations/${stationId}/activities`, body),
+  updateActivity: (id: string, body: Record<string, unknown>, changeId?: string) =>
+    api.put<{ activity: ActivityDto }>(`/api/activities/${id}`, body, changeId),
+  deleteActivity: (id: string) => api.del<{ deleted: boolean; removedCounts: { elements: number; sessions: number; observations: number } }>(`/api/activities/${id}`),
+  reorderActivities: (stationId: string, ids: string[]) =>
+    api.post<{ reordered: boolean }>(`/api/stations/${stationId}/activities/reorder`, { ids }),
+
+  elements: (activityId: string) => api.get<{ activity: { id: string; name: string; stationId: string }; elements: ElementDto[] }>(`/api/activities/${activityId}/elements`),
+  createElement: (activityId: string, body: Record<string, unknown>) =>
+    api.post<{ element: ElementDto }>(`/api/activities/${activityId}/elements`, body),
+  updateElement: (id: string, body: Record<string, unknown>, changeId?: string) =>
+    api.put<{ element: ElementDto }>(`/api/elements/${id}`, body, changeId),
+  deleteElement: (id: string) => api.del<{ deleted: boolean; removedCounts: { observations: number; hasRating: boolean } }>(`/api/elements/${id}`),
+  reorderElements: (activityId: string, ids: string[]) =>
+    api.post<{ reordered: boolean }>(`/api/activities/${activityId}/elements/reorder`, { ids }),
+
+  effectiveAllowances: (activityId: string) => api.get<EffectiveAllowancesDto>(`/api/activities/${activityId}/allowances`),
+  putActivityAllowances: (activityId: string, overrides: { categoryId: string; percentValue: number | null }[], expectedUpdatedAt?: string) =>
+    api.put<EffectiveAllowancesDto>(`/api/activities/${activityId}/allowances`, { overrides }, undefined),
+}
+
+// ── اپراتورها ──
+export const operatorsApi = {
+  list: (projectId: string) => api.get<{ items: OperatorDto[] }>(`/api/projects/${projectId}/operators`),
+  create: (projectId: string, body: { displayName: string; code?: string | null; notes?: string | null }) =>
+    api.post<{ operator: OperatorDto }>(`/api/projects/${projectId}/operators`, body),
+  update: (id: string, body: Record<string, unknown>, changeId?: string) =>
+    api.put<{ operator: OperatorDto }>(`/api/operators/${id}`, body, changeId),
+  delete: (id: string) => api.del<{ deleted: boolean; removedCounts: { sessions: number; observations: number } }>(`/api/operators/${id}`),
+}
+
+// ── گروه‌ها و مجازها ──
+export const allowancesApi = {
+  categories: (projectId: string) => api.get<{ items: CategoryDto[] }>(`/api/projects/${projectId}/allowance-categories`),
+  createCategory: (projectId: string, body: Record<string, unknown>) =>
+    api.post<{ category: CategoryDto }>(`/api/projects/${projectId}/allowance-categories`, body),
+  updateCategory: (id: string, body: Record<string, unknown>, changeId?: string) =>
+    api.put<{ category: CategoryDto }>(`/api/allowance-categories/${id}`, body, changeId),
+  deleteCategory: (id: string) => api.del<{ deleted: boolean; removedCounts: { groupValues: number; overrides: number } }>(`/api/allowance-categories/${id}`),
+
+  groups: (projectId: string) => api.get<{ items: GroupDto[] }>(`/api/projects/${projectId}/groups`),
+  createGroup: (projectId: string, body: { name: string; description?: string | null }) =>
+    api.post<{ group: GroupDto }>(`/api/projects/${projectId}/groups`, body),
+  updateGroup: (id: string, body: Record<string, unknown>, changeId?: string) =>
+    api.put<{ group: GroupDto }>(`/api/groups/${id}`, body, changeId),
+  deleteGroup: (id: string) => api.del<{ deleted: boolean; removedCounts: { values: number; activities: number } }>(`/api/groups/${id}`),
+  groupAllowances: (groupId: string) => api.get<GroupAllowancesDto>(`/api/groups/${groupId}/allowances`),
+  putGroupAllowances: (groupId: string, values: { categoryId: string; percentValue: number | null }[]) =>
+    api.put<GroupAllowancesDto>(`/api/groups/${groupId}/allowances`, { values }),
+}
+
+// ── وستینگهاوس ──
+export const ratingApi = {
+  tables: (projectId: string) => api.get<{ items: RatingTableDto[] }>(`/api/projects/${projectId}/rating-tables`),
+  table: (tableId: string) => api.get<RatingTableDetailDto>(`/api/rating-tables/${tableId}`),
+  createTable: (projectId: string, body: Record<string, unknown>) =>
+    api.post<{ table: RatingTableDto }>(`/api/projects/${projectId}/rating-tables`, body),
+  updateTable: (id: string, body: Record<string, unknown>, changeId?: string) =>
+    api.put<{ table: RatingTableDto }>(`/api/rating-tables/${id}`, body, changeId),
+  deleteTable: (id: string) => api.del<{ deleted: boolean }>(`/api/rating-tables/${id}`),
+  elementRating: (elementId: string) => api.get<ElementRatingDto>(`/api/elements/${elementId}/rating`),
+  putElementRating: (elementId: string, body: Record<string, unknown>) =>
+    api.put<ElementRatingDto>(`/api/elements/${elementId}/rating`, body),
+  matrix: (projectId: string) => api.get<RatingMatrixDto>(`/api/projects/${projectId}/rating-matrix`),
+}
+
+// ── پشتیبان/تنظیمات/تاریخچه ──
+export const backupsApi = {
+  list: () => api.get<{ items: BackupDto[]; health: { total: number; missing: string[] } }>('/api/backups'),
+  createManual: () => api.post<BackupDto>('/api/backups'),
+  autoTick: () => api.post<{ skipped?: boolean }>('/api/backups?auto=1'),
+  remove: (id: string) => api.del<{ deleted: boolean }>(`/api/backups/${id}`),
+  restore: (id: string) => api.post(`/api/backups/${id}/restore`, { confirmReplace: true }),
+  restoreUpload: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('confirmReplace', 'true')
+    return fetch('/api/backups/restore-upload', { method: 'POST', body: form }).then(async (res) => {
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        const err = (data as { error?: { code?: string; message?: string } })?.error
+        throw new Error(err?.message ?? 'بازیابی ناموفق بود')
+      }
+      return data
+    })
+  },
+}
+
+export const settingsApi = {
+  get: () => api.get<AppSettingsDto>('/api/settings'),
+  put: (values: Record<string, string>) => api.put<AppSettingsDto>('/api/settings', values),
+}
+
+export const auditApi = {
+  list: (projectId?: string, limit = 100) =>
+    api.get<{ items: AuditDto[]; total: number }>(`/api/audit?limit=${limit}${projectId ? `&projectId=${projectId}` : ''}`),
+}

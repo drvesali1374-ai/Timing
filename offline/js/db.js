@@ -1,0 +1,2719 @@
+/* ═══════════════════════════════════════════════════════════
+   لایه داده — نسخه آفلاین
+   پورت وفادار از سرویس‌های نسخه وب + تمام اصلاحات باگ‌ها
+   ذخیره‌سازی: localStorage (روی file:// پشتیبانی می‌شود)
+   ⚠ هر تغییر در سرویس‌های وب باید همین‌جا هم اعمال شود.
+   ═══════════════════════════════════════════════════════════ */
+(function (g) {
+  'use strict';
+
+  var U = g.T2U, F = g.T2F;
+  var STORAGE_KEY = 'timing2-offline-db-v1';
+  var AUDIT_CAP = 300;
+
+  // ═══════════ ثابت‌ها (از src/domain/types.ts) ═══════════
+  var CONST = {
+    PROCESS_TYPE_LABELS: { OPERATION: 'عملیات', INSPECTION: 'بازرسی', TRANSPORT: 'حمل‌ونقل', DELAY: 'تأخیر', STORAGE: 'انبارش' },
+    PROCESS_TYPE_SYMBOLS: { OPERATION: '○', INSPECTION: '□', TRANSPORT: '⇨', DELAY: 'D', STORAGE: '▽' },
+    PROCESS_TYPES: ['OPERATION', 'INSPECTION', 'TRANSPORT', 'DELAY', 'STORAGE'],
+    ELEMENT_TYPE_LABELS: { MANUAL: 'دستی', MACHINE: 'خودکار ماشین', WAITING: 'انتظار', OVERLAP: 'هم‌زمان / دارای هم‌پوشانی' },
+    ELEMENT_TYPES: ['MANUAL', 'MACHINE', 'WAITING', 'OVERLAP'],
+    TIMING_METHOD_LABELS: { SNAPBACK: 'برگشت به صفر (Snapback)', CONTINUOUS: 'پیوسته (Continuous)' },
+    SESSION_STATUS_LABELS: { OPEN: 'باز (قابل ثبت داده)', CLOSED: 'بسته (فقط‌خواندنی)' },
+    VALIDITY_STATUS_LABELS: { VALID: 'معتبر برای محاسبات', SUSPECT: 'مشکوک و نیازمند بازبینی', EXCLUDED: 'خارج‌شده از محاسبات به انتخاب کاربر', INVALID: 'ناقص / نامعتبر' },
+    ALLOWANCE_METHOD_LABELS: { PERCENT_OF_NT: 'مجاز به‌صورت درصدی از زمان نرمال', SHARE_OF_ST: 'مجاز به‌صورت سهمی از زمان استاندارد' },
+    ALLOWANCE_METHOD_FORMULAS: { PERCENT_OF_NT: 'ST = NT × (1 + A)', SHARE_OF_ST: 'ST = NT / (1 − A)' },
+    AGGREGATION_METHOD_LABELS: {
+      WEIGHTED_BY_COUNT: 'میانگین وزنی بر اساس تعداد مشاهدات معتبر (پیش‌فرض)',
+      EQUAL_OPERATOR_MEAN: 'میانگین اپراتورها با وزن برابر',
+    },
+    PROJECT_STATUS_LABELS: { DRAFT: 'پیش‌نویس', IN_PROGRESS: 'در حال انجام', FINALIZED: 'نهایی‌شده' },
+    STAGE_STATUS_LABELS: { PENDING: 'انجام‌نشده', IN_PROGRESS: 'در حال انجام', DONE: 'تکمیل‌شده', NEEDS_REVIEW: 'نیازمند بررسی' },
+    STUDY_STAGES: [
+      { key: 'info', label: 'مشخصات پروژه', desc: 'نام، خط تولید، محصول و تنظیمات محاسبات' },
+      { key: 'structure', label: 'ساختار تولید', desc: 'ایستگاه‌ها، فعالیت‌ها و عناصر کاری' },
+      { key: 'operators', label: 'اپراتورها', desc: 'معرفی اپراتورهای شرکت‌کننده در مطالعه' },
+      { key: 'allowances', label: 'گروه‌ها و مجازها', desc: 'گروه فعالیت، دسته‌های مجاز و بازنویسی' },
+      { key: 'westinghouse', label: 'ارزیابی وستینگهاوس', desc: 'جدول مرجع و ارزیابی عناصر کاری' },
+      { key: 'timing', label: 'زمان‌سنجی', desc: 'جلسه، جدول چرخه‌محور، Paste از Excel' },
+      { key: 'analysis', label: 'تحلیل نتایج', desc: 'آمار، داده غیرعادی و مقایسه اپراتورها' },
+      { key: 'charts', label: 'نمودار فرایند', desc: 'OPC و FPC با گره‌های فعالیت' },
+      { key: 'dashboard', label: 'داشبورد', desc: 'کارت‌های خلاصه و شاخص‌های تخصصی' },
+      { key: 'reports', label: 'گزارش‌ها', desc: 'خروجی Excel و PDF رسمی' },
+    ],
+    RATING_FACTOR_LABELS: { SKILL: 'مهارت', EFFORT: 'تلاش', CONDITIONS: 'شرایط', CONSISTENCY: 'یکنواختی' },
+    RATING_FACTORS: ['SKILL', 'EFFORT', 'CONDITIONS', 'CONSISTENCY'],
+    FORMULA_VERSION: '1.0.0',
+    FORMULAS: {
+      ratingFactor: 'R = 1 + Skill + Effort + Conditions + Consistency',
+      normalTime: 'NT = OT × R',
+      standardTimeM1: 'ST = NT × (1 + A)',
+      standardTimeM2: 'ST = NT / (1 − A)',
+      continuousElement: 'زمان عنصر = قرائت تجمعی فعلی − قرائت تجمعی قبلی (در همان خط زمانی)',
+      parallelDuration: 'مدت بازه = پایان − شروع',
+      elapsedCycle: 'زمان سپری‌شده چرخه = دیرترین پایان − زودترین شروع',
+    },
+    EXCLUSION_REASONS: [
+      'اپراتور کار را در میانهٔ چرخه متوقف کرد',
+      'مداخلهٔ بیرونی در چرخه (سرپرست/مواد/قطعه)',
+      'خطای ثبت یا خواندن زمان',
+      'مواد یا قطعهٔ غیرمعیار',
+      'چرخهٔ نمایندهٔ شرایط عادی نیست',
+    ],
+    APP_SETTING_DEFAULTS: {
+      'ui.language': 'fa', 'ui.calendar': 'jalali', 'ui.digits': 'persian', 'ui.decimals': '2',
+      'backup.autoEnabled': 'true', 'backup.intervalMinutes': '30', 'backup.retention': '10',
+      'outlier.method': 'mad', 'outlier.threshold': '3.5',
+    },
+    SCHEMA_VERSION: 1,
+  };
+
+  // ═══════════ وضعیت و ماندگاری ═══════════
+
+  var TABLES = [
+    'projects', 'projectSettings', 'stations', 'activities', 'workElements',
+    'activityGroups', 'allowanceCategories', 'groupAllowances', 'activityAllowanceOverrides',
+    'operators', 'studySessions', 'cycleObservations', 'timelineLanes', 'elementObservations',
+    'ratingTables', 'ratingTableGrades', 'ratingAssessments',
+    'calculationRuns', 'chartNodes', 'chartEdges', 'finalizationInfos',
+    'auditEvents', 'deletionMarkers', 'appSettings', 'backups',
+  ];
+
+  function emptyState() {
+    var s = { version: 1 };
+    TABLES.forEach(function (t) { s[t] = []; });
+    return s;
+  }
+
+  var state = null;
+  var listeners = [];
+  var storageOk = true;
+  var dirtySinceBackup = false;
+
+  function load() {
+    try {
+      var raw = g.localStorage ? g.localStorage.getItem(STORAGE_KEY) : null;
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        var s = emptyState();
+        TABLES.forEach(function (t) { if (Array.isArray(parsed[t])) s[t] = parsed[t]; });
+        return s;
+      }
+    } catch (e) { storageOk = false; }
+    return emptyState();
+  }
+
+  function persist() {
+    try {
+      g.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      storageOk = true;
+    } catch (e) {
+      storageOk = false;
+    }
+  }
+
+  function commit() {
+    persist();
+    dirtySinceBackup = true;
+    listeners.slice().forEach(function (fn) { try { fn(); } catch (e) { console.error(e); } });
+  }
+
+  function subscribe(fn) {
+    listeners.push(fn);
+    return function () { listeners = listeners.filter(function (x) { return x !== fn; }); };
+  }
+  function getState() { return state; }
+
+  function byId(table, id) {
+    for (var i = 0; i < state[table].length; i++) if (state[table][i].id === id) return state[table][i];
+    return null;
+  }
+  function filterBy(table, key, value) {
+    return state[table].filter(function (r) { return r[key] === value; });
+  }
+  function nextSortOrder(table, key, value) {
+    var rows = filterBy(table, key, value);
+    return rows.length ? Math.max.apply(null, rows.map(function (r) { return r.sortOrder || 0; })) + 1 : 0;
+  }
+  function touch(row) { row.updatedAt = U.nowISO(); }
+  function cmpStr(a, b) { return String(a).localeCompare(String(b), 'fa'); }
+  function sortStations(projectId) {
+    return filterBy('stations', 'projectId', projectId).sort(function (a, b) { return (a.sortOrder - b.sortOrder) || (a.createdAt < b.createdAt ? -1 : 1); });
+  }
+  function sortActivities(stationId) {
+    return filterBy('activities', 'stationId', stationId).sort(function (a, b) { return (a.sortOrder - b.sortOrder) || (a.createdAt < b.createdAt ? -1 : 1); });
+  }
+  function sortElements(activityId) {
+    return filterBy('workElements', 'activityId', activityId).sort(function (a, b) { return (a.sortOrder - b.sortOrder) || (a.createdAt < b.createdAt ? -1 : 1); });
+  }
+  function projectIdOfActivity(activityId) {
+    var a = byId('activities', activityId);
+    if (!a) return null;
+    var st = byId('stations', a.stationId);
+    return st ? st.projectId : null;
+  }
+
+  // ═══════════ Audit ═══════════
+  function recordAudit(ev) {
+    state.auditEvents.push({
+      id: U.uid(),
+      entityType: ev.entityType, entityId: ev.entityId, action: ev.action,
+      entityName: ev.entityName || null,
+      beforeJson: ev.before ? JSON.stringify(ev.before) : null,
+      afterJson: ev.after ? JSON.stringify(ev.after) : null,
+      projectId: ev.projectId || null,
+      actor: 'کاربر محلی',
+      occurredAt: U.nowISO(),
+    });
+    if (state.auditEvents.length > AUDIT_CAP) state.auditEvents = state.auditEvents.slice(-AUDIT_CAP);
+  }
+  function listAudit(limit, projectId) {
+    var rows = state.auditEvents.slice().sort(function (a, b) { return a.occurredAt < b.occurredAt ? 1 : -1; });
+    if (projectId) rows = rows.filter(function (r) { return r.projectId === projectId; });
+    return rows.slice(0, limit || 100);
+  }
+
+  // ═══════════ نشانگر حذف دائمی ═══════════
+  function markDeleted(entityType, ids) {
+    ids.forEach(function (id) {
+      var exists = state.deletionMarkers.some(function (m) { return m.entityType === entityType && m.entityId === id; });
+      if (!exists) state.deletionMarkers.push({ id: U.uid(), entityType: entityType, entityId: id, deletedAt: U.nowISO() });
+    });
+  }
+  function isDeleted(entityType, entityId) {
+    return state.deletionMarkers.some(function (m) { return m.entityType === entityType && m.entityId === entityId; });
+  }
+
+  // ═══════════ Stale (FR-27) ═══════════
+  function markProjectCalculationsStale(projectId) {
+    if (!projectId) return;
+    state.calculationRuns.forEach(function (r) {
+      if (r.projectId === projectId && r.status === 'DONE') r.status = 'STALE';
+    });
+  }
+
+  // ═══════════ تنظیمات ═══════════
+  function getAppSettings() {
+    var out = {};
+    Object.keys(CONST.APP_SETTING_DEFAULTS).forEach(function (k) { out[k] = CONST.APP_SETTING_DEFAULTS[k]; });
+    state.appSettings.forEach(function (s) { out[s.id] = s.value; });
+    return out;
+  }
+  function setAppSettings(values) {
+    Object.keys(values).forEach(function (k) {
+      var existing = state.appSettings.find(function (s) { return s.id === k; });
+      if (existing) existing.value = String(values[k]);
+      else state.appSettings.push({ id: k, value: String(values[k]) });
+    });
+    commit();
+  }
+  function getDisplayPrefs() {
+    var s = getAppSettings();
+    return {
+      calendar: s['ui.calendar'] === 'gregorian' ? 'gregorian' : 'jalali',
+      digits: s['ui.digits'] === 'latin' ? 'latin' : 'persian',
+      decimals: Math.max(1, Math.min(4, parseInt(s['ui.decimals'], 10) || 2)),
+    };
+  }
+  function setDisplayPrefs(patch) {
+    var values = {};
+    if (patch.calendar) values['ui.calendar'] = patch.calendar;
+    if (patch.digits) values['ui.digits'] = patch.digits;
+    if (patch.decimals !== undefined) values['ui.decimals'] = String(patch.decimals);
+    setAppSettings(values);
+  }
+  function getProjectSettings(projectId) {
+    var out = { 'calc.allowanceMethod': 'PERCENT_OF_NT', 'calc.aggregationMethod': 'WEIGHTED_BY_COUNT' };
+    filterBy('projectSettings', 'projectId', projectId).forEach(function (s) { out[s.key] = s.value; });
+    return out;
+  }
+  function putProjectSettings(projectId, values) {
+    Object.keys(values).forEach(function (k) {
+      var existing = state.projectSettings.find(function (s) { return s.projectId === projectId && s.key === k; });
+      if (existing) { existing.value = String(values[k]); existing.version = (existing.version || 1) + 1; touch(existing); }
+      else state.projectSettings.push({ id: U.uid(), projectId: projectId, key: k, value: String(values[k]), version: 1, updatedAt: U.nowISO() });
+    });
+  }
+  function getCalcSettings(projectId) {
+    var s = getProjectSettings(projectId);
+    return { allowanceMethod: s['calc.allowanceMethod'], aggregationMethod: s['calc.aggregationMethod'] };
+  }
+  function putCalcSettings(projectId, input) {
+    var values = {};
+    if (input.allowanceMethod) values['calc.allowanceMethod'] = input.allowanceMethod;
+    if (input.aggregationMethod) values['calc.aggregationMethod'] = input.aggregationMethod;
+    putProjectSettings(projectId, values);
+    markProjectCalculationsStale(projectId);
+    if (input.allowanceMethod === 'SHARE_OF_ST') {
+      var violations = [];
+      activitiesOfProject(projectId).forEach(function (a) {
+        var eff = getEffectiveAllowances(a.id);
+        if (eff.totalA >= 1) violations.push(a.name);
+      });
+      if (violations.length > 0) {
+        putProjectSettings(projectId, { 'calc.allowanceMethod': 'PERCENT_OF_NT' });
+        commit();
+        throw new Error('در روش «سهم از زمان استاندارد» مجموع مجازها باید کمتر از ۱۰۰٪ باشد. ' + violations.length + ' فعالیت دارای مجموع غیرمجاز است و تغییر روش اعمال نشد: ' + violations.join('، '));
+      }
+    }
+    recordAudit({ entityType: 'Project', entityId: projectId, action: 'UPDATE', entityName: 'تنظیمات محاسبات', after: input, projectId: projectId });
+    commit();
+    return getCalcSettings(projectId);
+  }
+
+  // ═══════════ پروژه‌ها ═══════════
+  function listProjects(opts) {
+    opts = opts || {};
+    var rows = state.projects.slice();
+    if (opts.q) {
+      var q = opts.q.toLowerCase();
+      rows = rows.filter(function (p) {
+        return p.name.toLowerCase().includes(q) || p.lineName.toLowerCase().includes(q) || p.productName.toLowerCase().includes(q);
+      });
+    }
+    var dir = opts.dir === 'asc' ? 1 : -1;
+    rows.sort(function (a, b) {
+      if (opts.sort === 'name') return cmpStr(a.name, b.name) * (opts.dir === 'desc' ? -1 : 1);
+      if (opts.sort === 'progress') return (getProjectSummary(a.id).progress - getProjectSummary(b.id).progress) * (opts.dir === 'desc' ? -1 : 1);
+      return (a.createdAt < b.createdAt ? -1 : 1) * dir;
+    });
+    return rows;
+  }
+  function createProject(input) {
+    var now = U.nowISO();
+    var p = {
+      id: U.uid(), name: input.name, lineName: input.lineName, productName: input.productName,
+      studyDate: input.studyDate || null, status: 'IN_PROGRESS', description: input.description || null,
+      createdAt: now, updatedAt: now,
+    };
+    state.projects.push(p);
+    getOrCreateSeedTable(p.id);
+    recordAudit({ entityType: 'Project', entityId: p.id, action: 'CREATE', entityName: p.name, after: { name: p.name }, projectId: p.id });
+    commit();
+    return p;
+  }
+  function updateProject(id, patch) {
+    var p = byId('projects', id);
+    if (!p) throw new Error('پروژه یافت نشد.');
+    ['name', 'lineName', 'productName', 'studyDate', 'description'].forEach(function (k) {
+      if (patch[k] !== undefined) p[k] = patch[k];
+    });
+    touch(p);
+    recordAudit({ entityType: 'Project', entityId: id, action: 'UPDATE', entityName: p.name, after: patch, projectId: id });
+    commit();
+    return p;
+  }
+  function deleteProject(id) {
+    var p = byId('projects', id);
+    if (!p) throw new Error('پروژه یافت نشد.');
+    var stations = filterBy('stations', 'projectId', id);
+    var acts = [], els = [], sessions = [], obs = 0;
+    stations.forEach(function (st) {
+      sortActivities(st.id).forEach(function (a) {
+        acts.push(a);
+        sortElements(a.id).forEach(function (e) {
+          els.push(e);
+          obs += filterBy('elementObservations', 'workElementId', e.id).length;
+        });
+        sessions = sessions.concat(filterBy('studySessions', 'activityId', a.id));
+      });
+    });
+    var groups = filterBy('activityGroups', 'projectId', id);
+    var categories = filterBy('allowanceCategories', 'projectId', id);
+    var tables = filterBy('ratingTables', 'projectId', id);
+    var deps = {
+      'ایستگاه': stations.length, 'فعالیت': acts.length, 'عنصر کاری': els.length,
+      'اپراتور': filterBy('operators', 'projectId', id).length,
+      'گروه مجاز': groups.length,
+      'جلسه زمان‌سنجی': sessions.length, 'مشاهده خام': obs,
+    };
+    var actIds = acts.map(function (a) { return a.id; });
+    var elIds = els.map(function (e) { return e.id; });
+    var sesIds = sessions.map(function (s) { return s.id; });
+    var cycIds = [];
+    sessions.forEach(function (s) { filterBy('cycleObservations', 'sessionId', s.id).forEach(function (c) { cycIds.push(c.id); }); });
+    var grpIds = groups.map(function (x) { return x.id; });
+    var catIds = categories.map(function (x) { return x.id; });
+    var tblIds = tables.map(function (x) { return x.id; });
+    state.elementObservations = state.elementObservations.filter(function (o) { return elIds.indexOf(o.workElementId) < 0 && cycIds.indexOf(o.cycleId) < 0; });
+    state.timelineLanes = state.timelineLanes.filter(function (l) { return cycIds.indexOf(l.cycleId) < 0; });
+    state.cycleObservations = state.cycleObservations.filter(function (c) { return sesIds.indexOf(c.sessionId) < 0; });
+    state.ratingAssessments = state.ratingAssessments.filter(function (r) { return elIds.indexOf(r.workElementId) < 0 && tblIds.indexOf(r.ratingTableId) < 0; });
+    state.studySessions = state.studySessions.filter(function (s) { return actIds.indexOf(s.activityId) < 0; });
+    state.workElements = state.workElements.filter(function (e) { return actIds.indexOf(e.activityId) < 0; });
+    state.activityAllowanceOverrides = state.activityAllowanceOverrides.filter(function (o) { return actIds.indexOf(o.activityId) < 0 && catIds.indexOf(o.categoryId) < 0; });
+    state.activities = state.activities.filter(function (a) { return actIds.indexOf(a.id) < 0; });
+    state.groupAllowances = state.groupAllowances.filter(function (ga) { return grpIds.indexOf(ga.groupId) < 0 && catIds.indexOf(ga.categoryId) < 0; });
+    state.ratingTableGrades = state.ratingTableGrades.filter(function (gr) { return tblIds.indexOf(gr.ratingTableId) < 0; });
+    ['projectSettings', 'stations', 'activityGroups', 'allowanceCategories', 'operators', 'ratingTables', 'chartNodes', 'chartEdges', 'calculationRuns', 'finalizationInfos'].forEach(function (t) {
+      state[t] = state[t].filter(function (r) { return r.projectId !== id; });
+    });
+    state.projects = state.projects.filter(function (x) { return x.id !== id; });
+    markDeleted('Project', [id]);
+    recordAudit({ entityType: 'Project', entityId: id, action: 'DELETE', entityName: p.name, projectId: id });
+    commit();
+    return deps;
+  }
+  function finalizeProject(id, reason) {
+    var p = byId('projects', id);
+    if (!p) throw new Error('پروژه یافت نشد.');
+    p.status = 'FINALIZED'; touch(p);
+    state.finalizationInfos = state.finalizationInfos.filter(function (f) { return f.projectId !== id; });
+    state.finalizationInfos.push({ id: U.uid(), projectId: id, reason: reason || null, finalizedAt: U.nowISO() });
+    recordAudit({ entityType: 'Project', entityId: id, action: 'FINALIZE', entityName: p.name, after: { reason: reason || null }, projectId: id });
+    commit();
+  }
+  function unfinalizeProject(id) {
+    var p = byId('projects', id);
+    if (!p) throw new Error('پروژه یافت نشد.');
+    p.status = 'IN_PROGRESS'; touch(p);
+    state.finalizationInfos = state.finalizationInfos.filter(function (f) { return f.projectId !== id; });
+    recordAudit({ entityType: 'Project', entityId: id, action: 'UPDATE', entityName: 'بازگشت از نهایی‌سازی', projectId: id });
+    commit();
+  }
+  function activitiesOfProject(projectId) {
+    var out = [];
+    sortStations(projectId).forEach(function (st) { sortActivities(st.id).forEach(function (a) { out.push(a); }); });
+    return out;
+  }
+  function getProjectSummary(id) {
+    var p = byId('projects', id);
+    if (!p) return null;
+    var stg = computeStageSummary(id);
+    return {
+      project: p, finalized: p.status === 'FINALIZED',
+      counts: stg.counts, progress: stg.progress, stages: stg.stages,
+    };
+  }
+
+  // ═══════════ ساختار تولید ═══════════
+  function createStation(projectId, input) {
+    var st = {
+      id: U.uid(), projectId: projectId, name: input.name, description: input.description || null,
+      sortOrder: nextSortOrder('stations', 'projectId', projectId), createdAt: U.nowISO(), updatedAt: U.nowISO(),
+    };
+    state.stations.push(st);
+    recordAudit({ entityType: 'Station', entityId: st.id, action: 'CREATE', entityName: st.name, after: { name: st.name }, projectId: projectId });
+    commit();
+    return st;
+  }
+  function updateStation(id, patch) {
+    var st = byId('stations', id);
+    if (!st) throw new Error('ایستگاه یافت نشد.');
+    if (patch.name !== undefined) st.name = patch.name;
+    if (patch.description !== undefined) st.description = patch.description;
+    touch(st);
+    recordAudit({ entityType: 'Station', entityId: id, action: 'UPDATE', entityName: st.name, projectId: st.projectId });
+    commit();
+  }
+  function deleteStation(id) {
+    var st = byId('stations', id);
+    if (!st) throw new Error('ایستگاه یافت نشد.');
+    var acts = sortActivities(id);
+    var els = [], sessions = [];
+    acts.forEach(function (a) {
+      els = els.concat(sortElements(a.id));
+      sessions = sessions.concat(filterBy('studySessions', 'activityId', a.id));
+    });
+    var deps = { 'فعالیت': acts.length, 'عنصر کاری': els.length, 'جلسه زمان‌سنجی': sessions.length };
+    var ids = [id].concat(acts.map(function (a) { return a.id; })).concat(els.map(function (e) { return e.id; })).concat(sessions.map(function (s) { return s.id; }));
+    cascadeDelete(ids);
+    markDeleted('Station', [id]);
+    recordAudit({ entityType: 'Station', entityId: id, action: 'DELETE', entityName: st.name, projectId: st.projectId });
+    commit();
+    return deps;
+  }
+  function cascadeDelete(ids) {
+    state.ratingAssessments = state.ratingAssessments.filter(function (r) { return ids.indexOf(r.workElementId) < 0; });
+    state.elementObservations = state.elementObservations.filter(function (r) { return ids.indexOf(r.workElementId) < 0 && ids.indexOf(r.cycleId) < 0; });
+    state.timelineLanes = state.timelineLanes.filter(function (r) { return ids.indexOf(r.cycleId) < 0; });
+    state.cycleObservations = state.cycleObservations.filter(function (r) { return ids.indexOf(r.id) < 0 && ids.indexOf(r.sessionId) < 0; });
+    state.studySessions = state.studySessions.filter(function (r) { return ids.indexOf(r.id) < 0 && ids.indexOf(r.activityId) < 0 && ids.indexOf(r.operatorId) < 0; });
+    state.workElements = state.workElements.filter(function (r) { return ids.indexOf(r.id) < 0 && ids.indexOf(r.activityId) < 0; });
+    state.activityAllowanceOverrides = state.activityAllowanceOverrides.filter(function (r) { return ids.indexOf(r.activityId) < 0; });
+    state.activities = state.activities.filter(function (r) { return ids.indexOf(r.id) < 0 && ids.indexOf(r.stationId) < 0; });
+    state.stations = state.stations.filter(function (r) { return ids.indexOf(r.id) < 0; });
+    state.groupAllowances = state.groupAllowances.filter(function (r) { return ids.indexOf(r.groupId) < 0 && ids.indexOf(r.categoryId) < 0; });
+    state.operators = state.operators.filter(function (r) { return ids.indexOf(r.id) < 0; });
+    state.allowanceCategories = state.allowanceCategories.filter(function (r) { return ids.indexOf(r.id) < 0; });
+    state.ratingTableGrades = state.ratingTableGrades.filter(function (r) { return ids.indexOf(r.ratingTableId) < 0; });
+    state.ratingTables = state.ratingTables.filter(function (r) { return ids.indexOf(r.id) < 0; });
+    state.chartEdges = state.chartEdges.filter(function (r) { return ids.indexOf(r.sourceNodeId) < 0 && ids.indexOf(r.targetNodeId) < 0; });
+    state.chartNodes = state.chartNodes.filter(function (r) { return ids.indexOf(r.activityId) < 0; });
+  }
+  function reorderStations(projectId, ids) {
+    ids.forEach(function (id, i) {
+      var st = byId('stations', id);
+      if (st) { st.sortOrder = i; touch(st); }
+    });
+    commit();
+  }
+  function createActivity(stationId, input) {
+    var st = byId('stations', stationId);
+    if (!st) throw new Error('ایستگاه یافت نشد.');
+    var a = {
+      id: U.uid(), stationId: stationId, groupId: input.groupId || null, name: input.name,
+      description: input.description || null, processType: input.processType || 'OPERATION',
+      sortOrder: nextSortOrder('activities', 'stationId', stationId),
+      targetSampleCount: input.targetSampleCount !== undefined && input.targetSampleCount !== null ? input.targetSampleCount : null,
+      createdAt: U.nowISO(), updatedAt: U.nowISO(),
+    };
+    state.activities.push(a);
+    markProjectCalculationsStale(st.projectId);
+    recordAudit({ entityType: 'Activity', entityId: a.id, action: 'CREATE', entityName: a.name, after: { name: a.name }, projectId: st.projectId });
+    commit();
+    return a;
+  }
+  function updateActivity(id, patch) {
+    var a = byId('activities', id);
+    if (!a) throw new Error('فعالیت یافت نشد.');
+    var effective = false;
+    ['name', 'description'].forEach(function (k) { if (patch[k] !== undefined) a[k] = patch[k]; });
+    if (patch.processType !== undefined) a.processType = patch.processType;
+    if (patch.groupId !== undefined) { a.groupId = patch.groupId || null; effective = true; }
+    if (patch.targetSampleCount !== undefined) { a.targetSampleCount = patch.targetSampleCount === null || patch.targetSampleCount === '' ? null : patch.targetSampleCount; effective = true; }
+    touch(a);
+    if (effective) markProjectCalculationsStale(projectIdOfActivity(id));
+    recordAudit({ entityType: 'Activity', entityId: id, action: 'UPDATE', entityName: a.name, projectId: projectIdOfActivity(id) });
+    commit();
+    return a;
+  }
+  function deleteActivity(id) {
+    var a = byId('activities', id);
+    if (!a) throw new Error('فعالیت یافت نشد.');
+    var els = sortElements(id);
+    var sessions = filterBy('studySessions', 'activityId', id);
+    var deps = { 'عنصر کاری': els.length, 'جلسه زمان‌سنجی': sessions.length };
+    var ids = [id].concat(els.map(function (e) { return e.id; })).concat(sessions.map(function (s) { return s.id; }));
+    cascadeDelete(ids);
+    markDeleted('Activity', [id]);
+    recordAudit({ entityType: 'Activity', entityId: id, action: 'DELETE', entityName: a.name, projectId: projectIdOfActivity(id) });
+    commit();
+    return deps;
+  }
+  function reorderActivities(stationId, ids) {
+    ids.forEach(function (id, i) { var a = byId('activities', id); if (a) { a.sortOrder = i; touch(a); } });
+    commit();
+  }
+  function createElement(activityId, input) {
+    var e = {
+      id: U.uid(), activityId: activityId, name: input.name, description: input.description || null,
+      elementType: input.elementType || 'MANUAL',
+      sortOrder: nextSortOrder('workElements', 'activityId', activityId),
+      createdAt: U.nowISO(), updatedAt: U.nowISO(),
+    };
+    state.workElements.push(e);
+    markProjectCalculationsStale(projectIdOfActivity(activityId));
+    recordAudit({ entityType: 'WorkElement', entityId: e.id, action: 'CREATE', entityName: e.name, after: { name: e.name, elementType: e.elementType }, projectId: projectIdOfActivity(activityId) });
+    commit();
+    return e;
+  }
+  function updateElement(id, patch) {
+    var e = byId('workElements', id);
+    if (!e) throw new Error('عنصر کاری یافت نشد.');
+    if (patch.name !== undefined) e.name = patch.name;
+    if (patch.description !== undefined) e.description = patch.description;
+    if (patch.elementType !== undefined && patch.elementType !== e.elementType) {
+      e.elementType = patch.elementType;
+      markProjectCalculationsStale(projectIdOfActivity(e.activityId));
+    }
+    touch(e);
+    recordAudit({ entityType: 'WorkElement', entityId: id, action: 'UPDATE', entityName: e.name, projectId: projectIdOfActivity(e.activityId) });
+    commit();
+    return e;
+  }
+  function deleteElement(id) {
+    var e = byId('workElements', id);
+    if (!e) throw new Error('عنصر کاری یافت نشد.');
+    var obs = filterBy('elementObservations', 'workElementId', id);
+    var deps = { 'مشاهده': obs.length, 'ارزیابی وستینگهاوس این عنصر': state.ratingAssessments.filter(function (r) { return r.workElementId === id; }).length };
+    cascadeDelete([id]);
+    markDeleted('WorkElement', [id]);
+    markProjectCalculationsStale(projectIdOfActivity(e.activityId));
+    recordAudit({ entityType: 'WorkElement', entityId: id, action: 'DELETE', entityName: e.name, projectId: projectIdOfActivity(e.activityId) });
+    commit();
+    return deps;
+  }
+  function reorderElements(activityId, ids) {
+    ids.forEach(function (id, i) { var e = byId('workElements', id); if (e) { e.sortOrder = i; touch(e); } });
+    markProjectCalculationsStale(projectIdOfActivity(activityId));
+    commit();
+  }
+
+  // ═══════════ اپراتورها ═══════════
+  function listOperators(projectId) {
+    return filterBy('operators', 'projectId', projectId).sort(function (a, b) { return cmpStr(a.displayName, b.displayName); });
+  }
+  function createOperator(projectId, input) {
+    var o = {
+      id: U.uid(), projectId: projectId, displayName: input.displayName, code: input.code || null,
+      notes: input.notes || null, createdAt: U.nowISO(), updatedAt: U.nowISO(),
+    };
+    state.operators.push(o);
+    recordAudit({ entityType: 'Operator', entityId: o.id, action: 'CREATE', entityName: o.displayName, after: { displayName: o.displayName }, projectId: projectId });
+    commit();
+    return o;
+  }
+  function updateOperator(id, patch) {
+    var o = byId('operators', id);
+    if (!o) throw new Error('اپراتور یافت نشد.');
+    ['displayName', 'code', 'notes'].forEach(function (k) { if (patch[k] !== undefined) o[k] = patch[k]; });
+    touch(o);
+    recordAudit({ entityType: 'Operator', entityId: id, action: 'UPDATE', entityName: o.displayName, projectId: o.projectId });
+    commit();
+  }
+  function deleteOperator(id) {
+    var o = byId('operators', id);
+    if (!o) throw new Error('اپراتور یافت نشد.');
+    var sessions = filterBy('studySessions', 'operatorId', id);
+    var deps = { 'جلسات زمان‌سنجی': sessions.length };
+    cascadeDelete([id]);
+    markDeleted('Operator', [id]);
+    recordAudit({ entityType: 'Operator', entityId: id, action: 'DELETE', entityName: o.displayName, projectId: o.projectId });
+    commit();
+    return deps;
+  }
+
+  // ═══════════ گروه‌ها و مجازها ═══════════
+  function listCategories(projectId) {
+    return filterBy('allowanceCategories', 'projectId', projectId).sort(function (a, b) { return (a.sortOrder - b.sortOrder) || cmpStr(a.name, b.name); });
+  }
+  function createCategory(projectId, input) {
+    var c = {
+      id: U.uid(), projectId: projectId, name: input.name, code: input.code || null,
+      isActive: input.isActive !== false, sortOrder: input.sortOrder !== undefined ? input.sortOrder : nextSortOrder('allowanceCategories', 'projectId', projectId),
+      createdAt: U.nowISO(), updatedAt: U.nowISO(),
+    };
+    state.allowanceCategories.push(c);
+    recordAudit({ entityType: 'AllowanceCategory', entityId: c.id, action: 'CREATE', entityName: c.name, after: { name: c.name, isActive: c.isActive }, projectId: projectId });
+    commit();
+    return c;
+  }
+  function updateCategory(id, patch) {
+    var c = byId('allowanceCategories', id);
+    if (!c) throw new Error('دسته مجاز یافت نشد.');
+    var wasActive = c.isActive;
+    if (patch.name !== undefined) c.name = patch.name;
+    if (patch.code !== undefined) c.code = patch.code;
+    if (patch.isActive !== undefined) c.isActive = patch.isActive;
+    if (patch.sortOrder !== undefined) c.sortOrder = patch.sortOrder;
+    touch(c);
+    if (wasActive !== c.isActive) markProjectCalculationsStale(c.projectId);
+    recordAudit({ entityType: 'AllowanceCategory', entityId: id, action: 'UPDATE', entityName: c.name, before: { isActive: wasActive }, after: { isActive: c.isActive }, projectId: c.projectId });
+    commit();
+  }
+  function deleteCategory(id) {
+    var c = byId('allowanceCategories', id);
+    if (!c) throw new Error('دسته مجاز یافت نشد.');
+    var gv = filterBy('groupAllowances', 'categoryId', id).length;
+    var ov = filterBy('activityAllowanceOverrides', 'categoryId', id).length;
+    state.groupAllowances = state.groupAllowances.filter(function (r) { return r.categoryId !== id; });
+    state.activityAllowanceOverrides = state.activityAllowanceOverrides.filter(function (r) { return r.categoryId !== id; });
+    state.allowanceCategories = state.allowanceCategories.filter(function (r) { return r.id !== id; });
+    markDeleted('AllowanceCategory', [id]);
+    markProjectCalculationsStale(c.projectId);
+    recordAudit({ entityType: 'AllowanceCategory', entityId: id, action: 'DELETE', entityName: c.name, projectId: c.projectId });
+    commit();
+    return { 'مقدار ثبت‌شده در گروه‌ها': gv, 'بازنویسی اختصاصی فعالیت‌ها': ov };
+  }
+  function listGroups(projectId) {
+    return filterBy('activityGroups', 'projectId', projectId).sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : 1; }).map(function (grp) {
+      var activeCats = {};
+      listCategories(projectId).forEach(function (c) { if (c.isActive) activeCats[c.id] = true; });
+      var gas = filterBy('groupAllowances', 'groupId', grp.id);
+      var totalA = F.sumAllowances(gas.filter(function (ga) { return activeCats[ga.categoryId]; }).map(function (ga) { return { categoryId: ga.categoryId, percentValue: ga.percentValue }; }));
+      return { group: grp, allowances: gas, totalA: totalA, activitiesCount: state.activities.filter(function (a) { return a.groupId === grp.id; }).length };
+    });
+  }
+  function createGroup(projectId, input) {
+    var grp = { id: U.uid(), projectId: projectId, name: input.name, description: input.description || null, createdAt: U.nowISO(), updatedAt: U.nowISO() };
+    state.activityGroups.push(grp);
+    recordAudit({ entityType: 'ActivityGroup', entityId: grp.id, action: 'CREATE', entityName: grp.name, after: { name: grp.name }, projectId: projectId });
+    commit();
+    return grp;
+  }
+  function updateGroup(id, patch) {
+    var grp = byId('activityGroups', id);
+    if (!grp) throw new Error('گروه فعالیت یافت نشد.');
+    if (patch.name !== undefined) grp.name = patch.name;
+    if (patch.description !== undefined) grp.description = patch.description;
+    touch(grp);
+    recordAudit({ entityType: 'ActivityGroup', entityId: id, action: 'UPDATE', entityName: grp.name, projectId: grp.projectId });
+    commit();
+  }
+  function deleteGroup(id) {
+    var grp = byId('activityGroups', id);
+    if (!grp) throw new Error('گروه فعالیت یافت نشد.');
+    var values = filterBy('groupAllowances', 'groupId', id).length;
+    var acts = state.activities.filter(function (a) { return a.groupId === id; });
+    state.groupAllowances = state.groupAllowances.filter(function (r) { return r.groupId !== id; });
+    state.activityGroups = state.activityGroups.filter(function (r) { return r.id !== id; });
+    acts.forEach(function (a) { a.groupId = null; touch(a); });
+    markDeleted('ActivityGroup', [id]);
+    markProjectCalculationsStale(grp.projectId);
+    recordAudit({ entityType: 'ActivityGroup', entityId: id, action: 'DELETE', entityName: grp.name, projectId: grp.projectId });
+    commit();
+    return { 'مقدار مجاز ثبت‌شده در این گروه (حذف می‌شود)': values, 'فعالیت — فقط بدون گروه می‌شوند؛ داده آن‌ها حذف نمی‌شود': acts.length };
+  }
+  function setGroupAllowance(groupId, categoryId, percentValue) {
+    var existing = state.groupAllowances.find(function (ga) { return ga.groupId === groupId && ga.categoryId === categoryId; });
+    var grp = byId('activityGroups', groupId);
+    if (percentValue === null || percentValue === undefined) {
+      state.groupAllowances = state.groupAllowances.filter(function (ga) { return !(ga.groupId === groupId && ga.categoryId === categoryId); });
+    } else if (existing) { existing.percentValue = percentValue; touch(existing); }
+    else state.groupAllowances.push({ id: U.uid(), groupId: groupId, categoryId: categoryId, percentValue: percentValue, updatedAt: U.nowISO() });
+    if (grp) markProjectCalculationsStale(grp.projectId);
+    commit();
+  }
+  function getEffectiveAllowances(activityId) {
+    var a = byId('activities', activityId);
+    if (!a) throw new Error('فعالیت یافت نشد.');
+    var projectId = projectIdOfActivity(activityId);
+    var settings = getProjectSettings(projectId);
+    var method = settings['calc.allowanceMethod'];
+    var group = a.groupId ? byId('activityGroups', a.groupId) : null;
+    var gas = group ? filterBy('groupAllowances', 'groupId', group.id) : [];
+    var ovs = filterBy('activityAllowanceOverrides', 'activityId', activityId);
+    var cats = listCategories(projectId).map(function (c) {
+      var gv = gas.find(function (x) { return x.categoryId === c.id; });
+      var ov = ovs.find(function (x) { return x.categoryId === c.id; });
+      var groupValue = gv ? gv.percentValue : null;
+      var overrideValue = ov ? ov.percentValue : null;
+      var source = 'NONE', sourceLabel = 'بدون مقدار', effectiveValue = null;
+      if (overrideValue !== null) { source = 'OVERRIDE'; sourceLabel = 'اختصاصی فعالیت (بازنویسی)'; effectiveValue = overrideValue; }
+      else if (groupValue !== null) { source = 'GROUP'; sourceLabel = 'ارث‌رسیده از گروه «' + (group ? group.name : '') + '»'; effectiveValue = groupValue; }
+      return { categoryId: c.id, name: c.name, code: c.code, isActive: c.isActive, source: source, sourceLabel: sourceLabel, groupValue: groupValue, overrideValue: overrideValue, effectiveValue: effectiveValue };
+    });
+    var totalA = F.sumAllowances(cats.filter(function (c) { return c.isActive && c.effectiveValue !== null; }).map(function (c) { return { categoryId: c.categoryId, percentValue: c.effectiveValue || 0 }; }));
+    return {
+      method: method,
+      methodLabel: CONST.ALLOWANCE_METHOD_LABELS[method] || method,
+      formula: CONST.ALLOWANCE_METHOD_FORMULAS[method] || '',
+      hasGroup: !!group, groupId: a.groupId, groupName: group ? group.name : null,
+      totalA: totalA, categories: cats,
+    };
+  }
+  function putActivityAllowances(activityId, overrides) {
+    var projectId = projectIdOfActivity(activityId);
+    overrides.forEach(function (v) {
+      var c = byId('allowanceCategories', v.categoryId);
+      if (!c || c.projectId !== projectId) throw new Error('یکی از دسته‌های انتخاب‌شده به این پروژه تعلق ندارد.');
+      if (v.percentValue === null) {
+        state.activityAllowanceOverrides = state.activityAllowanceOverrides.filter(function (o) { return !(o.activityId === activityId && o.categoryId === v.categoryId); });
+      } else {
+        var existing = state.activityAllowanceOverrides.find(function (o) { return o.activityId === activityId && o.categoryId === v.categoryId; });
+        if (existing) { existing.percentValue = v.percentValue; touch(existing); }
+        else state.activityAllowanceOverrides.push({ id: U.uid(), activityId: activityId, categoryId: v.categoryId, percentValue: v.percentValue, updatedAt: U.nowISO() });
+      }
+    });
+    var eff = getEffectiveAllowances(activityId);
+    var err = F.allowanceError(eff.totalA, eff.method);
+    if (err) { commit(); throw new Error(err); }
+    markProjectCalculationsStale(projectId);
+    recordAudit({ entityType: 'Activity', entityId: activityId, action: 'UPDATE', entityName: byId('activities', activityId).name, after: { allowanceOverrides: overrides }, projectId: projectId });
+    commit();
+    return eff;
+  }
+
+  // ═══════════ وستینگهاوس ═══════════
+  var SEED_GRADES = [
+    { factor: 'SKILL', gradeCode: 'A1', label: 'عالی‌تر', value: 0.15, sortOrder: 1, hint: 'تسلط کامل و روان؛ حرکات دقیق، پیوسته و بدون مکث' },
+    { factor: 'SKILL', gradeCode: 'A2', label: 'عالی', value: 0.13, sortOrder: 2, hint: 'تسلط بالا؛ هماهنگی عالی دست و چشم با توقف ناچیز' },
+    { factor: 'SKILL', gradeCode: 'B1', label: 'خوب‌تر', value: 0.11, sortOrder: 3, hint: 'مهارت خوب؛ حرکات روان با مکث‌های گاه‌به‌گاه' },
+    { factor: 'SKILL', gradeCode: 'B2', label: 'خوب', value: 0.08, sortOrder: 4, hint: 'مهارت قابل اتکا؛ روش کار منظم و پیوسته' },
+    { factor: 'SKILL', gradeCode: 'C1', label: 'متوسط رو به بالا', value: 0.06, sortOrder: 5, hint: 'بالاتر از متوسط؛ با کمی تردید در حرکات' },
+    { factor: 'SKILL', gradeCode: 'C2', label: 'متوسط', value: 0.03, sortOrder: 6, hint: 'مهارت متوسط؛ گاهی دقت و هماهنگی کم می‌شود' },
+    { factor: 'SKILL', gradeCode: 'D', label: 'قابل قبول (مرجع)', value: 0.0, sortOrder: 7, hint: 'سطح مرجع ارزیابی؛ عملکرد معمول انتظارشده' },
+    { factor: 'SKILL', gradeCode: 'E1', label: 'ضعیف‌تر', value: -0.05, sortOrder: 8, hint: 'کمی ضعیف‌تر از قابل قبول؛ مکث و تردید محسوس' },
+    { factor: 'SKILL', gradeCode: 'E2', label: 'ضعیف', value: -0.1, sortOrder: 9, hint: 'مهارت ضعیف؛ حرکات ناهماهنگ و مکرر' },
+    { factor: 'SKILL', gradeCode: 'F1', label: 'بسیار ضعیف‌تر', value: -0.16, sortOrder: 10, hint: 'آشنا با کار اما ناتوان در اجرای روان' },
+    { factor: 'SKILL', gradeCode: 'F2', label: 'بسیار ضعیف', value: -0.22, sortOrder: 11, hint: 'ناآشنا با کار؛ حرکات بسیار ناکارآمد' },
+    { factor: 'EFFORT', gradeCode: 'A1', label: 'کوشش فوق‌العاده', value: 0.13, sortOrder: 1, hint: 'تمرکز و سرعت بی‌وقفه در کل چرخه' },
+    { factor: 'EFFORT', gradeCode: 'A2', label: 'کوشش بسیار زیاد', value: 0.12, sortOrder: 2, hint: 'مصمم و پرانگیزه با حداقل وقفه' },
+    { factor: 'EFFORT', gradeCode: 'B1', label: 'کوشش زیاد', value: 0.1, sortOrder: 3, hint: 'از متوسط بیشتر؛ ریتم پایدار و هدفمند' },
+    { factor: 'EFFORT', gradeCode: 'B2', label: 'کوشش خوب', value: 0.08, sortOrder: 4, hint: 'علاقه و توجه مشخص به کار' },
+    { factor: 'EFFORT', gradeCode: 'C1', label: 'کوشش متوسط رو به بالا', value: 0.05, sortOrder: 5, hint: 'کمی بیش از متوسط' },
+    { factor: 'EFFORT', gradeCode: 'C2', label: 'کوشش متوسط', value: 0.02, sortOrder: 6, hint: 'حالت معمول و روان کار' },
+    { factor: 'EFFORT', gradeCode: 'D', label: 'قابل قبول (مرجع)', value: 0.0, sortOrder: 7, hint: 'سطح مرجع ارزیابی تلاش' },
+    { factor: 'EFFORT', gradeCode: 'E1', label: 'کوشش کم', value: -0.04, sortOrder: 8, hint: 'بی‌میلی محسوس و کندی گاه‌به‌گاه' },
+    { factor: 'EFFORT', gradeCode: 'E2', label: 'کوشش بسیار کم', value: -0.08, sortOrder: 9, hint: 'کند و بی‌انگیزه؛ وقفه‌های مکرر' },
+    { factor: 'EFFORT', gradeCode: 'F1', label: 'کوشش ناچیز', value: -0.12, sortOrder: 10, hint: 'بی‌توجه به پیشرفت کار' },
+    { factor: 'EFFORT', gradeCode: 'F2', label: 'بی‌انگیزه', value: -0.17, sortOrder: 11, hint: 'مقاومت آشکار در برابر کار' },
+    { factor: 'CONDITIONS', gradeCode: 'A', label: 'ایده‌آل', value: 0.06, sortOrder: 1, hint: 'شرایط کاری ممتاز؛ روشنایی، دما و نظم عالی' },
+    { factor: 'CONDITIONS', gradeCode: 'B', label: 'خوب', value: 0.04, sortOrder: 2, hint: 'شرایط مطلوب و راحت برای کار' },
+    { factor: 'CONDITIONS', gradeCode: 'C', label: 'متوسط', value: 0.02, sortOrder: 3, hint: 'قابل تحمل؛ کمی بهتر از معمول' },
+    { factor: 'CONDITIONS', gradeCode: 'D', label: 'قابل قبول (مرجع)', value: 0.0, sortOrder: 4, hint: 'سطح مرجع ارزیابی شرایط' },
+    { factor: 'CONDITIONS', gradeCode: 'E', label: 'ضعیف', value: -0.03, sortOrder: 5, hint: 'عوامل مزاحم (سر و صدا، دما، نور ناکافی)' },
+    { factor: 'CONDITIONS', gradeCode: 'F', label: 'بسیار ضعیف', value: -0.07, sortOrder: 6, hint: 'شرایط نامطلوب و خسته‌کننده؛ اثر محسوس بر عملکرد' },
+    { factor: 'CONSISTENCY', gradeCode: 'A', label: 'کاملاً یکنواخت', value: 0.04, sortOrder: 1, hint: 'ریتم کار بدون تغییر محسوس در تمام چرخه‌ها' },
+    { factor: 'CONSISTENCY', gradeCode: 'B', label: 'یکنواخت', value: 0.03, sortOrder: 2, hint: 'تغییرات بسیار جزئی بین چرخه‌ها' },
+    { factor: 'CONSISTENCY', gradeCode: 'C', label: 'تقریباً یکنواخت', value: 0.01, sortOrder: 3, hint: 'پراکندگی کم در زمان‌های تکراری' },
+    { factor: 'CONSISTENCY', gradeCode: 'D', label: 'قابل قبول (مرجع)', value: 0.0, sortOrder: 4, hint: 'سطح مرجع ارزیابی یکنواختی' },
+    { factor: 'CONSISTENCY', gradeCode: 'E', label: 'ناپایدار', value: -0.02, sortOrder: 5, hint: 'نوسان قابل مشاهده در زمان‌ها؛ نیازمند بازبینی' },
+    { factor: 'CONSISTENCY', gradeCode: 'F', label: 'بسیار ناپایدار', value: -0.04, sortOrder: 6, hint: 'نوسان شدید؛ احتمال داده غیرعادی یا نیاز به آموزش' },
+  ];
+  var SEED_META = {
+    name: 'جدول وستینگهاوس — نسخه مرجع اولیه',
+    source: 'نسخه رایج از نظام Westinghouse (در بازنشرهای آموزشی؛ در یکی از منابع به Lowry, Maynard & Stegemerten, 1940, p.233 نسبت داده شده). این نسخه صرفاً نقطه شروع است و استاندارد جهان‌شمول یا رویه مصوب شرکت نیست؛ پیش از استفاده عملی توسط کارشناس تأیید شود.',
+    notes: 'Seed اولیه نرم‌افزار. مقادیر و برچسب‌ها قابل ویرایش است؛ هر تغییر باید با «ذخیره نسخه جدید» ثبت شود تا محاسبات تاریخی بی‌صدا تغییر نکند.',
+  };
+
+  function getOrCreateSeedTable(projectId) {
+    var existing = filterBy('ratingTables', 'projectId', projectId);
+    if (existing.length > 0) return existing[0];
+    var t = {
+      id: U.uid(), projectId: projectId, name: SEED_META.name, version: 1,
+      source: SEED_META.source, notes: SEED_META.notes, isDefault: true,
+      createdAt: U.nowISO(), updatedAt: U.nowISO(),
+    };
+    state.ratingTables.push(t);
+    SEED_GRADES.forEach(function (gr) {
+      state.ratingTableGrades.push({ id: U.uid(), ratingTableId: t.id, factor: gr.factor, gradeCode: gr.gradeCode, label: gr.label, value: gr.value, hint: gr.hint, sortOrder: gr.sortOrder });
+    });
+    commit();
+    return t;
+  }
+  function listRatingTables(projectId) {
+    return filterBy('ratingTables', 'projectId', projectId).sort(function (a, b) { return a.version - b.version; }).map(function (t) {
+      return {
+        table: t,
+        grades: filterBy('ratingTableGrades', 'ratingTableId', t.id).sort(function (a, b) { return (a.factor === b.factor ? a.sortOrder - b.sortOrder : CONST.RATING_FACTORS.indexOf(a.factor) - CONST.RATING_FACTORS.indexOf(b.factor)); }),
+        assessmentsCount: state.ratingAssessments.filter(function (r) { return r.ratingTableId === t.id; }).length,
+      };
+    });
+  }
+  function createRatingTableVersion(tableId) {
+    var src = byId('ratingTables', tableId);
+    if (!src) throw new Error('جدول ارزیابی یافت نشد.');
+    var maxV = Math.max.apply(null, filterBy('ratingTables', 'projectId', src.projectId).map(function (t) { return t.version; }));
+    var t = {
+      id: U.uid(), projectId: src.projectId, name: src.name, version: maxV + 1,
+      source: src.source, notes: src.notes, isDefault: true,
+      createdAt: U.nowISO(), updatedAt: U.nowISO(),
+    };
+    state.ratingTables.push(t);
+    filterBy('ratingTableGrades', 'ratingTableId', tableId).forEach(function (gr) {
+      state.ratingTableGrades.push(Object.assign({}, gr, { id: U.uid(), ratingTableId: t.id }));
+    });
+    filterBy('ratingTables', 'projectId', src.projectId).forEach(function (x) { if (x.id !== t.id) { x.isDefault = false; touch(x); } });
+    recordAudit({ entityType: 'RatingTable', entityId: t.id, action: 'CREATE', entityName: t.name + ' — نسخه ' + t.version, projectId: src.projectId });
+    commit();
+    return t;
+  }
+  function updateRatingTableMeta(id, patch) {
+    var t = byId('ratingTables', id);
+    if (!t) throw new Error('جدول ارزیابی یافت نشد.');
+    if (patch.name !== undefined) t.name = patch.name;
+    if (patch.source !== undefined) t.source = patch.source;
+    if (patch.notes !== undefined) t.notes = patch.notes;
+    if (patch.isDefault === true) {
+      filterBy('ratingTables', 'projectId', t.projectId).forEach(function (x) { x.isDefault = x.id === id; touch(x); });
+    }
+    touch(t);
+    commit();
+  }
+  function updateRatingTableGrade(gradeId, patch) {
+    var gr = byId('ratingTableGrades', gradeId);
+    if (!gr) throw new Error('درجه یافت نشد.');
+    if (patch.label !== undefined) gr.label = patch.label;
+    if (patch.value !== undefined) gr.value = Math.max(-0.5, Math.min(0.5, patch.value));
+    if (patch.hint !== undefined) gr.hint = patch.hint;
+    commit();
+  }
+  function deleteRatingTable(id) {
+    var t = byId('ratingTables', id);
+    if (!t) throw new Error('جدول ارزیابی یافت نشد.');
+    var inUse = state.ratingAssessments.filter(function (r) { return r.ratingTableId === id; }).length;
+    if (inUse > 0) {
+      throw new Error('این جدول توسط ' + inUse + ' ارزیابی در حال استفاده است؛ حذف آن ممنوع می‌شود تا سابقه محاسباتی حفظ شود.');
+    }
+    state.ratingTableGrades = state.ratingTableGrades.filter(function (gr) { return gr.ratingTableId !== id; });
+    state.ratingTables = state.ratingTables.filter(function (x) { return x.id !== id; });
+    if (t.isDefault) {
+      var remaining = filterBy('ratingTables', 'projectId', t.projectId).sort(function (a, b) { return b.version - a.version; });
+      if (remaining.length > 0) { remaining[0].isDefault = true; touch(remaining[0]); }
+    }
+    markDeleted('RatingTable', [id]);
+    recordAudit({ entityType: 'RatingTable', entityId: id, action: 'DELETE', entityName: t.name, projectId: t.projectId });
+    commit();
+    return { 'ارزیابی ارجاع‌دار به این جدول': inUse };
+  }
+  function getElementRating(elementId) {
+    var ra = state.ratingAssessments.find(function (r) { return r.workElementId === elementId; });
+    if (!ra) return null;
+    var t = byId('ratingTables', ra.ratingTableId);
+    return { assessment: ra, table: t || null };
+  }
+  function saveElementRating(elementId, input) {
+    var e = byId('workElements', elementId);
+    if (!e) throw new Error('عنصر کاری یافت نشد.');
+    var t = byId('ratingTables', input.ratingTableId);
+    if (!t) throw new Error('جدول ارزیابی یافت نشد.');
+    var grades = filterBy('ratingTableGrades', 'ratingTableId', t.id);
+    function valFor(factor, code) {
+      if (!code) return 0;
+      var gr = grades.find(function (x) { return x.factor === factor && x.gradeCode === code; });
+      if (!gr) throw new Error('درجه انتخاب‌شده برای ' + CONST.RATING_FACTOR_LABELS[factor] + ' در جدول فعلی وجود ندارد؛ درجه را مجدداً انتخاب کنید یا جدول را عوض کنید.');
+      return gr.value;
+    }
+    var vals = {
+      skill: valFor('SKILL', input.skillGrade || null),
+      effort: valFor('EFFORT', input.effortGrade || null),
+      conditions: valFor('CONDITIONS', input.conditionsGrade || null),
+      consistency: valFor('CONSISTENCY', input.consistencyGrade || null),
+    };
+    var totalFactor = F.computeRatingFactor(vals);
+    var existing = state.ratingAssessments.find(function (r) { return r.workElementId === elementId; });
+    if (existing) {
+      Object.assign(existing, {
+        ratingTableId: t.id,
+        skillGrade: input.skillGrade || null, effortGrade: input.effortGrade || null,
+        conditionsGrade: input.conditionsGrade || null, consistencyGrade: input.consistencyGrade || null,
+        skillValue: vals.skill, effortValue: vals.effort, conditionsValue: vals.conditions, consistencyValue: vals.consistency,
+        totalFactor: totalFactor, notes: input.notes !== undefined ? input.notes : existing.notes,
+      });
+      touch(existing);
+    } else {
+      state.ratingAssessments.push({
+        id: U.uid(), workElementId: elementId, ratingTableId: t.id,
+        skillGrade: input.skillGrade || null, effortGrade: input.effortGrade || null,
+        conditionsGrade: input.conditionsGrade || null, consistencyGrade: input.consistencyGrade || null,
+        skillValue: vals.skill, effortValue: vals.effort, conditionsValue: vals.conditions, consistencyValue: vals.consistency,
+        totalFactor: totalFactor, notes: input.notes || null,
+        createdAt: U.nowISO(), updatedAt: U.nowISO(),
+      });
+    }
+    markProjectCalculationsStale(projectIdOfActivity(e.activityId));
+    recordAudit({ entityType: 'RatingAssessment', entityId: elementId, action: 'CREATE', entityName: e.name, after: { totalFactor: totalFactor, table: t.name }, projectId: projectIdOfActivity(e.activityId) });
+    commit();
+    return totalFactor;
+  }
+  function deleteElementRating(elementId) {
+    state.ratingAssessments = state.ratingAssessments.filter(function (r) { return r.workElementId !== elementId; });
+    var e = byId('workElements', elementId);
+    if (e) markProjectCalculationsStale(projectIdOfActivity(e.activityId));
+    commit();
+  }
+  function getRatingMatrix(projectId) {
+    var els = [];
+    activitiesOfProject(projectId).forEach(function (a) {
+      sortElements(a.id).forEach(function (e) { els.push({ element: e, activity: a }); });
+    });
+    return els.map(function (x) {
+      var r = getElementRating(x.element.id);
+      return {
+        element: x.element, activity: x.activity,
+        rated: !!r, totalFactor: r ? r.assessment.totalFactor : null,
+        tableName: r && r.table ? r.table.name : null, tableVersion: r && r.table ? r.table.version : null,
+      };
+    });
+  }
+
+  // ═══════════ زمان‌سنجی ═══════════
+  function listSessions(activityId) {
+    return filterBy('studySessions', 'activityId', activityId).sort(function (a, b) { return a.startedAt < b.startedAt ? -1 : 1; });
+  }
+  function createSession(activityId, input) {
+    var a = byId('activities', activityId);
+    if (!a) throw new Error('فعالیت یافت نشد.');
+    if (!input.operatorId) throw new Error('ابتدا اپراتور را انتخاب کنید.');
+    var s = {
+      id: U.uid(), activityId: activityId, operatorId: input.operatorId,
+      timingMethod: input.timingMethod, status: 'OPEN', notes: input.notes || null,
+      startedAt: U.nowISO(), endedAt: null, updatedAt: U.nowISO(),
+    };
+    state.studySessions.push(s);
+    recordAudit({ entityType: 'StudySession', entityId: s.id, action: 'CREATE', entityName: 'جلسه زمان‌سنجی', after: { timingMethod: s.timingMethod }, projectId: projectIdOfActivity(activityId) });
+    commit();
+    return s;
+  }
+  function updateSession(id, patch) {
+    var s = byId('studySessions', id);
+    if (!s) throw new Error('جلسه یافت نشد.');
+    if (patch.notes !== undefined) s.notes = patch.notes;
+    touch(s);
+    commit();
+  }
+  function closeSession(id) { var s = byId('studySessions', id); if (s) { s.status = 'CLOSED'; s.endedAt = U.nowISO(); touch(s); commit(); } }
+  function reopenSession(id) { var s = byId('studySessions', id); if (s) { s.status = 'OPEN'; s.endedAt = null; touch(s); commit(); } }
+  function deleteSession(id) {
+    var s = byId('studySessions', id);
+    if (!s) throw new Error('جلسه یافت نشد.');
+    var cycles = filterBy('cycleObservations', 'sessionId', id);
+    var deps = { 'چرخه‌های ثبت‌شده': cycles.length };
+    cascadeDelete([id]);
+    markDeleted('StudySession', [id]);
+    markProjectCalculationsStale(projectIdOfActivity(s.activityId));
+    recordAudit({ entityType: 'StudySession', entityId: id, action: 'DELETE', entityName: 'جلسه زمان‌سنجی', projectId: projectIdOfActivity(s.activityId) });
+    commit();
+    return deps;
+  }
+
+  function obsOfCycle(cycleId) { return filterBy('elementObservations', 'cycleId', cycleId); }
+  function cyclesOfSession(sessionId) {
+    return filterBy('cycleObservations', 'sessionId', sessionId).sort(function (a, b) { return a.cycleNo - b.cycleNo; });
+  }
+
+  function defaultEntryFor(elementType) { return elementType === 'MANUAL' ? 'SEQ' : 'INT'; }
+  function laneTypeForElement(elementType) { return elementType === 'MACHINE' || elementType === 'OVERLAP' ? 'MACHINE' : 'OPERATOR'; }
+  function getOrCreateLane(cycleId, laneType) {
+    var existing = state.timelineLanes.find(function (l) { return l.cycleId === cycleId && l.laneType === laneType; });
+    if (existing) return existing.id;
+    var lane = { id: U.uid(), cycleId: cycleId, laneType: laneType, label: laneType === 'OPERATOR' ? 'خط زمانی اپراتور' : 'خط زمانی ماشین' };
+    state.timelineLanes.push(lane);
+    return lane.id;
+  }
+
+  function computeCycleIndicators(observations, elementIds) {
+    var byElement = {};
+    observations.forEach(function (o) { byElement[o.workElementId] = o; });
+    var fullIntervals = observations.filter(function (o) { return o.startOffset !== null && o.endOffset !== null; });
+    var seqObs = observations.filter(function (o) { return o.rawDuration !== null || o.cumulativeReading !== null; });
+    var elapsed = null, elapsedExcludesSequential = false;
+    if (fullIntervals.length > 0) {
+      var earliest = Math.min.apply(null, fullIntervals.map(function (o) { return o.startOffset; }));
+      var latest = Math.max.apply(null, fullIntervals.map(function (o) { return o.endOffset; }));
+      elapsed = F.round12(latest - earliest);
+      elapsedExcludesSequential = seqObs.length > 0;
+    } else if (seqObs.length > 0) {
+      elapsed = F.round12(seqObs.reduce(function (s, o) { return s + (o.derivedDuration || 0); }, 0));
+    }
+    var hasIncompleteInterval = observations.some(function (o) { return (o.startOffset !== null) !== (o.endOffset !== null); });
+    var hasExcluded = observations.some(function (o) { return o.validityStatus === 'EXCLUDED'; });
+    var hasSuspect = observations.some(function (o) { return o.validityStatus === 'SUSPECT'; });
+    var hasInvalid = observations.some(function (o) { return o.validityStatus === 'INVALID'; });
+    var complete = elementIds.length > 0 && elementIds.every(function (eid) {
+      var o = byElement[eid];
+      return o !== undefined && o.derivedDuration !== null;
+    });
+    var isValidCycle = complete && !hasExcluded && !hasInvalid;
+    return { elapsed: elapsed, elapsedExcludesSequential: elapsedExcludesSequential, hasExcluded: hasExcluded, hasSuspect: hasSuspect, hasInvalid: hasInvalid, hasIncompleteInterval: hasIncompleteInterval, complete: complete, isValidCycle: isValidCycle };
+  }
+
+  function recomputeSession(sessionId) {
+    var session = byId('studySessions', sessionId);
+    if (!session) throw new Error('جلسه زمان‌سنجی یافت نشد.');
+    var elements = sortElements(session.activityId);
+    var elementIds = elements.map(function (e) { return e.id; });
+    var cycles = cyclesOfSession(sessionId);
+
+    cycles.forEach(function (cycle) {
+      obsOfCycle(cycle.id).forEach(function (o) {
+        if (o.startOffset !== null && o.endOffset !== null) {
+          var err = F.intervalError({ startOffset: o.startOffset, endOffset: o.endOffset });
+          if (err) throw new Error('چرخه ' + cycle.cycleNo + ': ' + err);
+          var derived = F.round12(o.endOffset - o.startOffset);
+          if (o.derivedDuration !== derived) o.derivedDuration = derived;
+        } else if (o.derivedDuration !== null && o.rawDuration === null && o.cumulativeReading === null) {
+          o.derivedDuration = null;
+        }
+      });
+    });
+
+    if (session.timingMethod === 'CONTINUOUS') {
+      var seq = [];
+      cycles.forEach(function (cycle) {
+        obsOfCycle(cycle.id).forEach(function (o) {
+          if (o.cumulativeReading !== null) {
+            var el = byId('workElements', o.workElementId);
+            seq.push({ o: o, cycleNo: cycle.cycleNo, elSort: el ? el.sortOrder : 0 });
+          }
+        });
+      });
+      seq.sort(function (a, b) { return a.cycleNo !== b.cycleNo ? a.cycleNo - b.cycleNo : a.elSort - b.elSort; });
+      var prev = 0;
+      for (var i = 0; i < seq.length; i++) {
+        var reading = seq[i].o.cumulativeReading;
+        if (reading < prev) {
+          throw new Error('قرائت تجمعی در چرخه ' + seq[i].cycleNo + ' از قرائت قبلی (' + prev + ') کمتر است (' + reading + ')؛ قرائت نزولی مجاز نیست. برای شروع مجدد، جلسه جدید ایجاد کنید.');
+        }
+        seq[i].o.derivedDuration = F.round12(reading - prev);
+        prev = reading;
+      }
+    } else {
+      cycles.forEach(function (cycle) {
+        obsOfCycle(cycle.id).forEach(function (o) {
+          if (o.rawDuration !== null && o.derivedDuration !== o.rawDuration) o.derivedDuration = o.rawDuration;
+        });
+      });
+    }
+
+    cycles.forEach(function (cycle) {
+      var ind = computeCycleIndicators(obsOfCycle(cycle.id), elementIds);
+      cycle.isComplete = ind.complete;
+      touch(cycle);
+    });
+    return cycles;
+  }
+
+  function addCycles(sessionId, count) {
+    var session = byId('studySessions', sessionId);
+    if (!session) throw new Error('جلسه یافت نشد.');
+    if (session.status !== 'OPEN') throw new Error('جلسه بسته است؛ برای ثبت داده، جلسهٔ جدید ایجاد کنید.');
+    var existing = cyclesOfSession(sessionId);
+    var nextNo = existing.length ? Math.max.apply(null, existing.map(function (c) { return c.cycleNo; })) + 1 : 1;
+    var created = 0;
+    for (var i = 0; i < count; i++) {
+      state.cycleObservations.push({ id: U.uid(), sessionId: sessionId, cycleNo: nextNo + i, notes: null, isComplete: false, createdAt: U.nowISO(), updatedAt: U.nowISO() });
+      created++;
+    }
+    commit();
+    return created;
+  }
+  function deleteCycle(cycleId) {
+    var c = byId('cycleObservations', cycleId);
+    if (!c) throw new Error('چرخه یافت نشد.');
+    cascadeDelete([cycleId]);
+    commit();
+    return c.cycleNo;
+  }
+  function updateCycleNotes(cycleId, notes) {
+    var c = byId('cycleObservations', cycleId);
+    if (!c) throw new Error('چرخه یافت نشد.');
+    c.notes = notes || null;
+    touch(c);
+    commit();
+  }
+
+  function putCells(sessionId, cells) {
+    var session = byId('studySessions', sessionId);
+    if (!session) throw new Error('جلسه یافت نشد.');
+    if (session.status !== 'OPEN') throw new Error('جلسه بسته است؛ برای ثبت داده، جلسهٔ جدید ایجاد کنید.');
+    var cyclesByNo = {};
+    cyclesOfSession(sessionId).forEach(function (c) { cyclesByNo[c.cycleNo] = c; });
+    var touchedElements = {};
+    cells.forEach(function (cell) {
+      var cycle = cell.cycleId ? byId('cycleObservations', cell.cycleId) : cyclesByNo[cell.cycleNo];
+      if (!cycle) throw new Error('چرخه یافت نشد.');
+      var element = byId('workElements', cell.workElementId);
+      if (!element) throw new Error('عنصر کاری یافت نشد.');
+      var obs = obsOfCycle(cycle.id).find(function (o) { return o.workElementId === cell.workElementId; });
+      var merged = {
+        rawDuration: cell.rawDuration !== undefined ? cell.rawDuration : (obs ? obs.rawDuration : null),
+        cumulativeReading: cell.cumulativeReading !== undefined ? cell.cumulativeReading : (obs ? obs.cumulativeReading : null),
+        startOffset: cell.startOffset !== undefined ? cell.startOffset : (obs ? obs.startOffset : null),
+        endOffset: cell.endOffset !== undefined ? cell.endOffset : (obs ? obs.endOffset : null),
+      };
+      var willHaveInterval = merged.startOffset !== null || merged.endOffset !== null;
+      var willHaveReading = merged.cumulativeReading !== null;
+      var laneId = null;
+      var noDataAtAll = merged.rawDuration === null && merged.cumulativeReading === null && merged.startOffset === null && merged.endOffset === null;
+      if (!noDataAtAll) {
+        if (willHaveInterval) laneId = getOrCreateLane(cycle.id, laneTypeForElement(element.elementType));
+        else if (willHaveReading && session.timingMethod === 'CONTINUOUS') laneId = getOrCreateLane(cycle.id, 'OPERATOR');
+      }
+      if (!obs) {
+        var hasAny = merged.rawDuration !== null || merged.cumulativeReading !== null || merged.startOffset !== null || merged.endOffset !== null;
+        if (!hasAny) return;
+        obs = {
+          id: U.uid(), cycleId: cycle.id, workElementId: cell.workElementId, laneId: laneId,
+          rawDuration: merged.rawDuration, cumulativeReading: merged.cumulativeReading,
+          startOffset: merged.startOffset, endOffset: merged.endOffset,
+          derivedDuration: null, validityStatus: 'VALID', isUserExcluded: false,
+          exclusionReason: null, outlierScore: null, outlierRule: null, updatedAt: U.nowISO(),
+        };
+        state.elementObservations.push(obs);
+      } else {
+        obs.rawDuration = merged.rawDuration;
+        obs.cumulativeReading = merged.cumulativeReading;
+        obs.startOffset = merged.startOffset;
+        obs.endOffset = merged.endOffset;
+        obs.laneId = laneId;
+        if (obs.validityStatus === 'SUSPECT') { obs.validityStatus = 'VALID'; obs.outlierScore = null; obs.outlierRule = null; }
+        if (obs.validityStatus === 'INVALID') obs.validityStatus = 'VALID';
+        touch(obs);
+      }
+      touchedElements[cell.workElementId] = true;
+    });
+    recomputeSession(sessionId);
+    Object.keys(touchedElements).forEach(function (eid) { refreshOutliersForElement(eid, { silent: true }); });
+    markProjectCalculationsStale(projectIdOfActivity(session.activityId));
+    commit();
+  }
+
+  function setObservationValidity(observationId, action, reason) {
+    var o = byId('elementObservations', observationId);
+    if (!o) throw new Error('مشاهده یافت نشد.');
+    var cycle = byId('cycleObservations', o.cycleId);
+    var session = cycle ? byId('studySessions', cycle.sessionId) : null;
+    if (action === 'EXCLUDE') {
+      o.validityStatus = 'EXCLUDED';
+      o.isUserExcluded = true;
+      o.exclusionReason = reason || null;
+      touch(o);
+    } else {
+      o.validityStatus = 'VALID';
+      o.isUserExcluded = false;
+      o.exclusionReason = null;
+      touch(o);
+    }
+    if (session) refreshOutliersForElement(o.workElementId, { silent: true });
+    if (session) markProjectCalculationsStale(projectIdOfActivity(session.activityId));
+    commit();
+  }
+
+  function getSheet(sessionId) {
+    var session = byId('studySessions', sessionId);
+    if (!session) throw new Error('جلسه یافت نشد.');
+    var activity = byId('activities', session.activityId);
+    var station = activity ? byId('stations', activity.stationId) : null;
+    var operator = byId('operators', session.operatorId);
+    var elements = sortElements(session.activityId);
+    var elementIds = elements.map(function (e) { return e.id; });
+    var cycles = cyclesOfSession(sessionId);
+
+    var perElement = {};
+    elements.forEach(function (e) { perElement[e.id] = { calcCount: 0, excludedCount: 0, totalCount: 0 }; });
+    var sessionValidCycles = 0;
+    var cycleDtos = cycles.map(function (c) {
+      var obs = obsOfCycle(c.id);
+      var ind = computeCycleIndicators(obs, elementIds);
+      if (ind.isValidCycle) sessionValidCycles++;
+      var obsDtos = obs.map(function (o) {
+        var lane = o.laneId ? byId('timelineLanes', o.laneId) : null;
+        if (perElement[o.workElementId]) {
+          perElement[o.workElementId].totalCount++;
+          if (o.validityStatus === 'EXCLUDED') perElement[o.workElementId].excludedCount++;
+          if ((o.validityStatus === 'VALID' || o.validityStatus === 'SUSPECT') && o.derivedDuration !== null) perElement[o.workElementId].calcCount++;
+        }
+        return {
+          id: o.id, workElementId: o.workElementId, laneId: o.laneId, laneType: lane ? lane.laneType : null,
+          rawDuration: o.rawDuration, cumulativeReading: o.cumulativeReading,
+          startOffset: o.startOffset, endOffset: o.endOffset, derivedDuration: o.derivedDuration,
+          validityStatus: o.validityStatus, isUserExcluded: o.isUserExcluded, exclusionReason: o.exclusionReason,
+          outlierScore: o.outlierScore, outlierRule: o.outlierRule,
+        };
+      });
+      return {
+        id: c.id, cycleNo: c.cycleNo, notes: c.notes, isComplete: c.isComplete,
+        createdAt: c.createdAt, updatedAt: c.updatedAt,
+        elapsed: ind.elapsed, elapsedExcludesSequential: ind.elapsedExcludesSequential,
+        hasExcluded: ind.hasExcluded, hasSuspect: ind.hasSuspect, hasIncompleteInterval: ind.hasIncompleteInterval,
+        observations: obsDtos,
+      };
+    });
+
+    var activityValidCycles = 0;
+    filterBy('studySessions', 'activityId', session.activityId).forEach(function (se) {
+      cyclesOfSession(se.id).forEach(function (c) {
+        var obs = obsOfCycle(c.id);
+        var ind = computeCycleIndicators(obs, elementIds);
+        if (ind.isValidCycle) activityValidCycles++;
+      });
+    });
+
+    return {
+      session: {
+        id: session.id, activityId: session.activityId, operatorId: session.operatorId,
+        timingMethod: session.timingMethod, status: session.status, notes: session.notes,
+        startedAt: session.startedAt, endedAt: session.endedAt, updatedAt: session.updatedAt,
+      },
+      activity: { id: activity.id, name: activity.name, stationName: station ? station.name : '', targetSampleCount: activity.targetSampleCount, projectId: station ? station.projectId : '' },
+      operator: operator ? { id: operator.id, displayName: operator.displayName, code: operator.code } : { id: '', displayName: 'اپراتور حذف‌شده', code: null },
+      elements: elements.map(function (e) { return { id: e.id, name: e.name, elementType: e.elementType, sortOrder: e.sortOrder, defaultEntry: defaultEntryFor(e.elementType) }; }),
+      cycles: cycleDtos,
+      stats: {
+        perElement: perElement, sessionCycles: cycles.length, sessionValidCycles: sessionValidCycles,
+        activityValidCycles: activityValidCycles, targetSampleCount: activity.targetSampleCount,
+      },
+    };
+  }
+
+  function parseCellInput(raw) {
+    var s = U.normalizeDigits(String(raw)).trim();
+    if (s === '' || s === '-' || s === '—' || s === '–') return { kind: 'EMPTY' };
+    var interval = /^([0-9]*\.?[0-9]+)\s*(?:-|\.\.|:|تا)\s*([0-9]*\.?[0-9]+)$/.exec(s);
+    if (interval) {
+      var st = Number(interval[1]), en = Number(interval[2]);
+      if (!isFinite(st) || !isFinite(en)) return { kind: 'ERROR', message: 'عدد بازه معتبر نیست' };
+      return { kind: 'INTERVAL', start: st, end: en };
+    }
+    var n = Number(s);
+    if (!isFinite(n)) return { kind: 'ERROR', message: 'مقدار عددی معتبر نیست (ارقام فارسی یا لاتین)' };
+    return { kind: 'NUMBER', value: n };
+  }
+
+  function pastePreview(sessionId, anchorCycleNo, anchorElementId, text) {
+    var sheet = getSheet(sessionId);
+    var lines = text.replace(/\r/g, '').split('\n').filter(function (l, i, arr) { return l.trim() !== '' || (i > 0 && i < arr.length - 1); });
+    var elementIdx = sheet.elements.findIndex(function (e) { return e.id === anchorElementId; });
+    var startCycleNo = anchorCycleNo;
+    var cells = [];
+    var errors = 0, warnings = 0, healthy = 0, noChange = 0, newCycles = 0;
+    var maxCycle = sheet.cycles.length ? Math.max.apply(null, sheet.cycles.map(function (c) { return c.cycleNo; })) : 0;
+    var newCycleNos = {};
+    for (var r = 0; r < lines.length; r++) {
+      var cols = lines[r].split('\t');
+      for (var c = 0; c < cols.length; c++) {
+        var elIdx = elementIdx + c;
+        if (elIdx < 0 || elIdx >= sheet.elements.length) continue;
+        var el = sheet.elements[elIdx];
+        var cycNo = startCycleNo + r;
+        var parsed = parseCellInput(cols[c]);
+        var status = 'HEALTHY', message = null, value = null, interval = null;
+        if (cycNo > maxCycle) { if (!newCycleNos[cycNo]) { newCycleNos[cycNo] = true; newCycles++; } }
+        if (parsed.kind === 'ERROR') { status = 'ERROR'; message = parsed.message; errors++; }
+        else if (parsed.kind === 'EMPTY') { status = 'NO_CHANGE'; noChange++; }
+        else if (parsed.kind === 'INTERVAL') {
+          if (parsed.start < 0) { status = 'ERROR'; message = 'شروع بازه نمی‌تواند منفی باشد'; errors++; }
+          else if (parsed.end <= parsed.start) { status = 'ERROR'; message = 'پایان بازه باید بزرگ‌تر از شروع آن باشد'; errors++; }
+          else { interval = { start: parsed.start, end: parsed.end }; healthy++; }
+        } else {
+          if (parsed.value < 0) { status = 'ERROR'; message = 'زمان منفی مجاز نیست'; errors++; }
+          else { value = parsed.value; healthy++; }
+        }
+        if (status === 'HEALTHY' && interval === null && value === null) status = 'NO_CHANGE';
+        cells.push({ cycleNo: cycNo, elementId: el.id, elementIndex: elIdx, status: status, message: message, value: value, interval: interval, raw: cols[c] });
+      }
+    }
+    return { anchorCycleNo: startCycleNo, anchorElementId: anchorElementId, anchorElementIndex: elementIdx, elements: sheet.elements, cells: cells, counts: { healthy: healthy, warnings: warnings, errors: errors, noChange: noChange, newCycles: newCycles } };
+  }
+
+  function pasteCommit(sessionId, preview, mode) {
+    if (mode !== 'SKIP_INVALID' && preview.counts.errors > 0) {
+      throw new Error('خطاها را اصلاح کنید؛ در حالت «همه یا هیچ» با وجود خطا هیچ داده‌ای ثبت نمی‌شود.');
+    }
+    var session = byId('studySessions', sessionId);
+    if (!session) throw new Error('جلسه یافت نشد.');
+    var existing = cyclesOfSession(sessionId);
+    var maxCycle = existing.length ? Math.max.apply(null, existing.map(function (c) { return c.cycleNo; })) : 0;
+    var needed = preview.cells.reduce(function (m, cell) { return Math.max(m, cell.cycleNo); }, 0);
+    if (needed > maxCycle) addCycles(sessionId, needed - maxCycle);
+    var applied = 0, skipped = 0;
+    var cellsToApply = [];
+    preview.cells.forEach(function (cell) {
+      if (cell.status === 'ERROR') { skipped++; return; }
+      if (cell.status === 'NO_CHANGE' && cell.interval === null && cell.value === null) { skipped++; return; }
+      if (cell.interval !== null) {
+        cellsToApply.push({ cycleNo: cell.cycleNo, workElementId: cell.elementId, startOffset: cell.interval.start, endOffset: cell.interval.end });
+      } else if (cell.value !== null) {
+        if (session.timingMethod === 'CONTINUOUS') cellsToApply.push({ cycleNo: cell.cycleNo, workElementId: cell.elementId, cumulativeReading: cell.value });
+        else cellsToApply.push({ cycleNo: cell.cycleNo, workElementId: cell.elementId, rawDuration: cell.value });
+      }
+      applied++;
+    });
+    if (cellsToApply.length > 0) putCells(sessionId, cellsToApply);
+    return { applied: applied, skipped: skipped, newCycles: Math.max(0, needed - maxCycle) };
+  }
+
+  // ═══════════ تشخیص غیرعادی ═══════════
+  function getOutlierConfig() {
+    var s = getAppSettings();
+    var method = s['outlier.method'] === 'iqr' ? 'iqr' : 'mad';
+    var thresholdRaw = Number(s['outlier.threshold']);
+    var threshold = isFinite(thresholdRaw) && thresholdRaw > 0 ? thresholdRaw : 3.5;
+    return { method: method, threshold: threshold };
+  }
+  function setOutlierConfig(patch) {
+    var values = {};
+    if (patch.method) values['outlier.method'] = patch.method;
+    if (patch.threshold !== undefined) values['outlier.threshold'] = String(Math.max(0.5, Math.min(10, patch.threshold)));
+    setAppSettings(values);
+    var projects = state.projects.map(function (p) { return p.id; });
+    projects.forEach(function (pid) { refreshOutliersForProject(pid, { silent: true }); });
+    commit();
+  }
+  function refreshOutliersForElement(elementId, opts) {
+    var config = getOutlierConfig();
+    var obs = filterBy('elementObservations', 'workElementId', elementId);
+    var basis = obs.filter(function (o) { return (o.validityStatus === 'VALID' || o.validityStatus === 'SUSPECT') && o.derivedDuration !== null; });
+    var flags = F.detectOutliers(basis.map(function (o) { return { value: o.derivedDuration, ref: o.id }; }), { method: config.method, threshold: config.threshold });
+    var flaggedById = {};
+    flags.forEach(function (f) { flaggedById[f.ref] = f; });
+    var flagged = 0, unflagged = 0;
+    basis.forEach(function (o) {
+      var flag = flaggedById[o.id];
+      if (flag) {
+        if (o.validityStatus !== 'SUSPECT' || o.outlierScore !== flag.score || o.outlierRule !== flag.rule) {
+          o.validityStatus = 'SUSPECT'; o.outlierScore = flag.score; o.outlierRule = flag.rule;
+          flagged++;
+        }
+      } else if (o.validityStatus === 'SUSPECT' || o.outlierScore !== null || o.outlierRule !== null) {
+        o.validityStatus = 'VALID'; o.outlierScore = null; o.outlierRule = null;
+        unflagged++;
+      }
+    });
+    if (flagged + unflagged > 0) {
+      var e = byId('workElements', elementId);
+      if (e) markProjectCalculationsStale(projectIdOfActivity(e.activityId));
+      if (!(opts && opts.silent)) commit();
+    }
+    return { elementId: elementId, basisCount: basis.length, flagged: flagged, unflagged: unflagged };
+  }
+  function refreshOutliersForActivity(activityId, opts) {
+    return sortElements(activityId).map(function (e) { return refreshOutliersForElement(e.id, opts); });
+  }
+  function refreshOutliersForProject(projectId, opts) {
+    var out = [];
+    activitiesOfProject(projectId).forEach(function (a) { out = out.concat(refreshOutliersForActivity(a.id, opts)); });
+    return out;
+  }
+
+  // ═══════════ تحلیل فعالیت — پورت دقیق analysis-service ═══════════
+  function isInCalc(o) { return (o.validityStatus === 'VALID' || o.validityStatus === 'SUSPECT') && o.derivedDuration !== null; }
+
+  function buildHistogram(values) {
+    if (values.length < 2) return [];
+    var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+    if (max === min) return [{ binStart: min, binEnd: max, count: values.length }];
+    var bins = Math.min(12, Math.max(4, Math.ceil(1 + Math.log2(values.length))));
+    var width = (max - min) / bins;
+    var counts = new Array(bins).fill(0);
+    values.forEach(function (v) {
+      var idx = Math.floor((v - min) / width);
+      if (idx >= bins) idx = bins - 1;
+      if (idx < 0) idx = 0;
+      counts[idx]++;
+    });
+    var out = [];
+    for (var i = 0; i < bins; i++) out.push({ binStart: F.round12(min + i * width), binEnd: F.round12(min + (i + 1) * width), count: counts[i] });
+    return out;
+  }
+
+  function cycleElapsedAnalysis(observations) {
+    var fullIntervals = observations.filter(function (o) { return o.startOffset !== null && o.endOffset !== null; });
+    if (fullIntervals.length > 0) {
+      var earliest = Math.min.apply(null, fullIntervals.map(function (o) { return o.startOffset; }));
+      var latest = Math.max.apply(null, fullIntervals.map(function (o) { return o.endOffset; }));
+      return F.round12(latest - earliest);
+    }
+    var seq = observations.filter(isInCalc);
+    if (seq.length === 0) return null;
+    return F.round12(seq.reduce(function (s, o) { return s + o.derivedDuration; }, 0));
+  }
+
+  function getActivityAnalysis(activityId) {
+    var activity = byId('activities', activityId);
+    if (!activity) throw new Error('فعالیت یافت نشد.');
+    var station = byId('stations', activity.stationId);
+    var projectId = station.projectId;
+    var group = activity.groupId ? byId('activityGroups', activity.groupId) : null;
+    var elements = sortElements(activityId);
+    var settingsRaw = getProjectSettings(projectId);
+    var allowanceMethod = settingsRaw['calc.allowanceMethod'];
+    var aggregationMethod = settingsRaw['calc.aggregationMethod'];
+    var allowances = getEffectiveAllowances(activityId);
+    var outlierConfig = getOutlierConfig();
+    var sessions = listSessions(activityId);
+    var cycles = [];
+    sessions.forEach(function (se) {
+      cyclesOfSession(se.id).forEach(function (c) { cycles.push(c); });
+    });
+
+    var observationsByElement = {};
+    var cycleCtx = {};
+    cycles.forEach(function (c) {
+      var session = byId('studySessions', c.sessionId);
+      cycleCtx[c.id] = { cycle: c, session: session, operator: byId('operators', session.operatorId) };
+      obsOfCycle(c.id).forEach(function (o) {
+        if (!observationsByElement[o.workElementId]) observationsByElement[o.workElementId] = [];
+        observationsByElement[o.workElementId].push(Object.assign({ ctx: cycleCtx[c.id] }, o));
+      });
+    });
+
+    var elementIds = elements.map(function (e) { return e.id; });
+    var validCycles = 0;
+    cycles.forEach(function (c) {
+      var obs = obsOfCycle(c.id);
+      var hasBad = obs.some(function (o) { return o.validityStatus === 'EXCLUDED' || o.validityStatus === 'INVALID'; });
+      var complete = elementIds.length > 0 && elementIds.every(function (eid) { return obs.some(function (o) { return o.workElementId === eid && o.derivedDuration !== null; }); });
+      if (complete && !hasBad) validCycles++;
+    });
+    var target = activity.targetSampleCount;
+    var sampleProgress = {
+      targetSampleCount: target, validCycles: validCycles, totalCycles: cycles.length, sessionsCount: sessions.length,
+      reached: target === null ? null : validCycles >= target,
+      message: target === null
+        ? 'تعداد نمونه هدف برای این فعالیت ثبت نشده است؛ در مشخصات فعالیت می‌توانید هدف را تعیین کنید.'
+        : validCycles >= target
+          ? 'هدف تعداد نمونه تکمیل شد (' + validCycles + ' از ' + target + ' چرخهٔ معتبر). توجه: رسیدن به هدف تعداد، تضمین کفایت آماری نیست — شاخص‌های پراکندی را بازبینی کنید.'
+          : 'تا هدف تعداد نمونه ' + Math.max(0, target - validCycles) + ' چرخهٔ معتبر باقی مانده است (' + validCycles + ' از ' + target + ').',
+    };
+
+    var operatorById = {};
+    sessions.forEach(function (s) {
+      var op = byId('operators', s.operatorId);
+      if (op) operatorById[s.operatorId] = op;
+    });
+
+    var elementDtos = elements.map(function (el) {
+      var rows = observationsByElement[el.id] || [];
+      var calcRows = rows.filter(isInCalc);
+      var values = calcRows.map(function (o) { return o.derivedDuration; });
+      var stats = F.descriptiveStats(values);
+      var perOperatorSamples = {};
+      calcRows.forEach(function (o) {
+        var oid = o.ctx.session.operatorId;
+        if (!perOperatorSamples[oid]) perOperatorSamples[oid] = [];
+        perOperatorSamples[oid].push(o.derivedDuration);
+      });
+      var samplesArr = Object.keys(perOperatorSamples).map(function (oid) { return { operatorId: oid, values: perOperatorSamples[oid] }; });
+      var agg = F.aggregateElement(samplesArr, aggregationMethod);
+      var rating = state.ratingAssessments.find(function (r) { return r.workElementId === el.id; });
+      var ratingDto = null;
+      if (rating) {
+        var t = byId('ratingTables', rating.ratingTableId);
+        ratingDto = { totalFactor: rating.totalFactor, tableName: t ? t.name : '؟', tableVersion: t ? t.version : 0 };
+      }
+      var ot = agg.value;
+      var nt = ot !== null && ratingDto !== null ? F.round12(ot * ratingDto.totalFactor) : null;
+      var st = null, stError = null;
+      if (nt !== null) {
+        try { st = F.computeStandardTime(nt, allowances.totalA, allowanceMethod); }
+        catch (err) { stError = err.message; }
+      }
+      var operators = [];
+      Object.keys(perOperatorSamples).forEach(function (oid) {
+        var opStats = F.descriptiveStats(perOperatorSamples[oid]);
+        var opMean = opStats.mean;
+        var opNt = opMean !== null && ratingDto !== null ? F.round12(opMean * ratingDto.totalFactor) : null;
+        var opSt = null;
+        if (opNt !== null) { try { opSt = F.computeStandardTime(opNt, allowances.totalA, allowanceMethod); } catch (e) { opSt = null; } }
+        var opRows = rows.filter(function (r) { return r.ctx.session.operatorId === oid; });
+        operators.push({
+          operatorId: oid, operatorName: operatorById[oid] ? operatorById[oid].displayName : 'اپراتور حذف‌شده',
+          count: perOperatorSamples[oid].length, mean: opMean, median: opStats.median, sampleSD: opStats.sampleSD,
+          cvPercent: opStats.cvPercent, ci95: opStats.ci95,
+          suspectCount: opRows.filter(function (r) { return r.validityStatus === 'SUSPECT'; }).length,
+          excludedCount: opRows.filter(function (r) { return r.validityStatus === 'EXCLUDED'; }).length,
+          nt: opNt, st: opSt,
+        });
+      });
+      operators.sort(function (a, b) { return cmpStr(a.operatorName, b.operatorName); });
+      var trend = rows
+        .filter(function (o) { return o.derivedDuration !== null && o.validityStatus !== 'INVALID'; })
+        .map(function (o) { return { cycleNo: o.ctx.cycle.cycleNo, operatorId: o.ctx.session.operatorId, value: o.derivedDuration, status: o.validityStatus }; });
+      return {
+        id: el.id, name: el.name, elementType: el.elementType,
+        counts: {
+          total: rows.length, calcBasis: calcRows.length,
+          valid: rows.filter(function (r) { return r.validityStatus === 'VALID'; }).length,
+          suspect: rows.filter(function (r) { return r.validityStatus === 'SUSPECT'; }).length,
+          excluded: rows.filter(function (r) { return r.validityStatus === 'EXCLUDED'; }).length,
+          invalid: rows.filter(function (r) { return r.validityStatus === 'INVALID'; }).length,
+        },
+        stats: stats, ot: ot, otAggregationMethod: aggregationMethod,
+        otAggregationMethodLabel: CONST.AGGREGATION_METHOD_LABELS[aggregationMethod],
+        rating: ratingDto, nt: nt, st: st, stError: stError,
+        operators: operators, trend: trend, histogram: buildHistogram(values),
+      };
+    });
+
+    var elapsedValues = [];
+    var hasIntervalCycle = false;
+    cycles.forEach(function (c) {
+      var obs = obsOfCycle(c.id);
+      var bad = obs.some(function (o) { return o.validityStatus === 'EXCLUDED' || o.validityStatus === 'INVALID'; });
+      if (bad || !c.isComplete) return;
+      if (obs.some(function (o) { return o.startOffset !== null && o.endOffset !== null; })) hasIntervalCycle = true;
+      var e = cycleElapsedAnalysis(obs);
+      if (e !== null) elapsedValues.push(e);
+    });
+    var cycleStats = {
+      count: elapsedValues.length, stats: F.descriptiveStats(elapsedValues),
+      methodNote: hasIntervalCycle
+        ? 'چرخه‌های دارای بازهٔ هم‌زمان: زمان سپری‌شده = دیرترین پایان − زودترین شروع (گستره)؛ هرگز جمع مدت‌های هم‌پوشان گزارش نمی‌شود.'
+        : 'چرخه‌های ترتیبی: زمان سپری‌شده = جمع مدت عناصر درون محاسبات.',
+    };
+
+    function sumOt(type) {
+      var list = elementDtos.filter(function (e) { return e.elementType === type && e.ot !== null; });
+      if (list.length === 0) return null;
+      return F.round12(list.reduce(function (s, e) { return s + e.ot; }, 0));
+    }
+    var elementTypeTotals = { manual: sumOt('MANUAL'), machine: sumOt('MACHINE'), waiting: sumOt('WAITING'), overlapSum: sumOt('OVERLAP') };
+
+    var hasOverlapElements = elements.some(function (e) { return e.elementType === 'OVERLAP'; });
+    var hasAnyInterval = cycles.some(function (c) { return obsOfCycle(c.id).some(function (o) { return o.startOffset !== null; }); });
+    var activityTotal;
+    if (hasOverlapElements || hasAnyInterval) {
+      activityTotal = {
+        st: null, status: 'NEEDS_AGGREGATION_RULE',
+        reason: 'این فعالیت دارای کار هم‌زمان/هم‌پوشان است؛ جمع سادهٔ زمان استاندارد عناصر، زمان استاندارد کل چرخه را به دست نمی‌دهد. تا تعریف و تأیید قاعدهٔ تجمیع مهندسی، زمان استاندارد عناصر و زمان سپری‌شدهٔ مشاهده‌شدهٔ چرخه را ملاک قرار دهید.',
+      };
+    } else if (elementDtos.length === 0) {
+      activityTotal = { st: null, status: 'INCOMPLETE', reason: 'برای این فعالیت عنصر کاری تعریف نشده است.' };
+    } else {
+      var missing = elementDtos.filter(function (e) { return e.st === null; });
+      if (missing.length > 0) {
+        activityTotal = {
+          st: null, status: 'INCOMPLETE',
+          reason: 'زمان استاندارد ' + missing.length + ' عنصر از ' + elementDtos.length + ' عنصر قابل محاسبه نیست (' + missing.slice(0, 3).map(function (e) { return '«' + e.name + '»'; }).join('، ') + (missing.length > 3 ? ' و …' : '') + '). علت رایج: نبود دادهٔ معتبر، نبود ارزیابی وستینگهاوس یا خطای مجازها.',
+        };
+      } else {
+        activityTotal = { st: F.round12(elementDtos.reduce(function (s, e) { return s + e.st; }, 0)), status: 'OK', reason: 'فعالیت کاملاً ترتیبی است؛ زمان استاندارد کل = جمع زمان استاندارد عناصر.' };
+      }
+    }
+
+    var elementNameById = {};
+    elements.forEach(function (e) { elementNameById[e.id] = e.name; });
+    var suspects = [];
+    cycles.forEach(function (c) {
+      var ctx = cycleCtx[c.id];
+      obsOfCycle(c.id).forEach(function (o) {
+        if (o.validityStatus !== 'SUSPECT' && o.validityStatus !== 'EXCLUDED') return;
+        if (o.derivedDuration === null) return;
+        suspects.push({
+          observationId: o.id, elementId: o.workElementId,
+          elementName: elementNameById[o.workElementId] || 'عنصر حذف‌شده',
+          cycleNo: c.cycleNo, sessionId: c.sessionId, operatorId: ctx.session.operatorId,
+          operatorName: ctx.operator ? ctx.operator.displayName : 'اپراتور حذف‌شده',
+          value: o.derivedDuration, score: o.outlierScore, rule: o.outlierRule,
+          validityStatus: o.validityStatus, exclusionReason: o.exclusionReason,
+        });
+      });
+    });
+
+    return {
+      activity: {
+        id: activity.id, name: activity.name, stationName: station.name, processType: activity.processType,
+        targetSampleCount: activity.targetSampleCount, groupId: activity.groupId,
+        groupName: group ? group.name : null, projectId: projectId,
+      },
+      settings: {
+        allowanceMethod: allowanceMethod, allowanceMethodLabel: CONST.ALLOWANCE_METHOD_LABELS[allowanceMethod],
+        formula: CONST.ALLOWANCE_METHOD_FORMULAS[allowanceMethod],
+        aggregationMethod: aggregationMethod, aggregationMethodLabel: CONST.AGGREGATION_METHOD_LABELS[aggregationMethod],
+        formulaVersion: CONST.FORMULA_VERSION,
+        outlierMethod: outlierConfig.method === 'iqr' ? 'iqr' : 'mad',
+        outlierThreshold: outlierConfig.threshold,
+      },
+      allowances: allowances, sampleProgress: sampleProgress, elements: elementDtos,
+      cycleStats: cycleStats, elementTypeTotals: elementTypeTotals, activityTotal: activityTotal,
+      suspects: suspects, generatedAt: U.nowISO(),
+    };
+  }
+
+  function listActivitiesForAnalysis(projectId) {
+    return sortStations(projectId).map(function (st) {
+      return {
+        id: st.id, name: st.name,
+        activities: sortActivities(st.id).map(function (a) {
+          var cyclesCount = filterBy('studySessions', 'activityId', a.id).reduce(function (sum, se) { return sum + filterBy('cycleObservations', 'sessionId', se.id).length; }, 0);
+          return { id: a.id, name: a.name, processType: a.processType, targetSampleCount: a.targetSampleCount, elementsCount: sortElements(a.id).length, cyclesCount: cyclesCount };
+        }),
+      };
+    });
+  }
+
+  // ═══════════ Snapshot محاسبات — FR-27 ═══════════
+  function compactActivity(a) {
+    return {
+      id: a.activity.id, name: a.activity.name, stationName: a.activity.stationName, groupName: a.activity.groupName,
+      sampleProgress: { validCycles: a.sampleProgress.validCycles, totalCycles: a.sampleProgress.totalCycles, targetSampleCount: a.sampleProgress.targetSampleCount },
+      totalA: a.allowances.totalA,
+      activityTotal: { st: a.activityTotal.st, status: a.activityTotal.status },
+      elements: a.elements.map(function (e) {
+        return {
+          id: e.id, name: e.name, elementType: e.elementType,
+          counts: { calcBasis: e.counts.calcBasis, suspect: e.counts.suspect, excluded: e.counts.excluded },
+          ot: e.ot, nt: e.nt, st: e.st, stError: e.stError, ratingFactor: e.rating ? e.rating.totalFactor : null,
+        };
+      }),
+      cycleStats: { count: a.cycleStats.count, mean: a.cycleStats.stats.mean },
+    };
+  }
+  function runProjectCalculation(projectId) {
+    var project = byId('projects', projectId);
+    if (!project) throw new Error('پروژه یافت نشد.');
+    var settings = getProjectSettings(projectId);
+    var outlierConfig = getOutlierConfig();
+    var analyses = activitiesOfProject(projectId).map(function (a) { return getActivityAnalysis(a.id); });
+    var settingsSnapshot = {
+      allowanceMethod: settings['calc.allowanceMethod'],
+      allowanceMethodLabel: CONST.ALLOWANCE_METHOD_LABELS[settings['calc.allowanceMethod']],
+      aggregationMethod: settings['calc.aggregationMethod'],
+      aggregationMethodLabel: CONST.AGGREGATION_METHOD_LABELS[settings['calc.aggregationMethod']],
+      outlierMethod: outlierConfig.method === 'iqr' ? 'iqr' : 'mad',
+      outlierThreshold: outlierConfig.threshold,
+      formulaVersion: CONST.FORMULA_VERSION,
+      generatedAt: U.nowISO(),
+    };
+    var resultSnapshot = {
+      activities: analyses.map(compactActivity),
+      summary: {
+        activitiesCount: analyses.length,
+        needsAggregationRule: analyses.filter(function (a) { return a.activityTotal.status === 'NEEDS_AGGREGATION_RULE'; }).length,
+        incomplete: analyses.filter(function (a) { return a.activityTotal.status === 'INCOMPLETE'; }).length,
+        totalSuspects: analyses.reduce(function (s, a) { return s + a.suspects.filter(function (x) { return x.validityStatus === 'SUSPECT'; }).length; }, 0),
+      },
+    };
+    var run = {
+      id: U.uid(), projectId: projectId, formulaVersion: CONST.FORMULA_VERSION,
+      settingsSnapshot: JSON.stringify(settingsSnapshot), resultSnapshot: JSON.stringify(resultSnapshot),
+      status: 'DONE', createdAt: U.nowISO(), updatedAt: U.nowISO(),
+    };
+    state.calculationRuns.push(run);
+    recordAudit({ entityType: 'CalculationRun', entityId: run.id, action: 'CREATE', entityName: 'اجرای محاسبهٔ پروژه «' + project.name + '»', after: { activitiesCount: analyses.length, formulaVersion: CONST.FORMULA_VERSION }, projectId: projectId });
+    commit();
+    return { id: run.id, createdAt: run.createdAt, status: run.status, formulaVersion: run.formulaVersion, settings: settingsSnapshot, result: resultSnapshot };
+  }
+  function getLatestCalculation(projectId) {
+    var runs = filterBy('calculationRuns', 'projectId', projectId).sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : -1; });
+    var latest = runs[0] || null;
+    var hasAnyData = state.studySessions.some(function (s) { return projectIdOfActivity(s.activityId) === projectId; });
+    var run = null;
+    if (latest) {
+      run = {
+        id: latest.id, createdAt: latest.createdAt, status: latest.status, formulaVersion: latest.formulaVersion,
+        settings: safeParse(latest.settingsSnapshot), result: latest.resultSnapshot ? safeParse(latest.resultSnapshot) : null,
+      };
+    }
+    return { run: run, needsRecalc: run === null ? hasAnyData : run.status === 'STALE', hasAnyData: hasAnyData, runsCount: runs.length };
+  }
+  function safeParse(json) { try { return JSON.parse(json); } catch (e) { return {}; } }
+
+  // ═══════════ نمودار فرایند OPC/FPC ═══════════
+  var NODE_W = 200, NODE_H_EST = 92, COL_GAP = 56, ROW_GAP = 72, CANVAS_MARGIN = 48;
+  var OPC_TYPES = ['OPERATION', 'INSPECTION'];
+
+  function computeAutoLayout(nodes, edges) {
+    var positions = {};
+    if (nodes.length === 0) return positions;
+    var indeg = {}, out = {};
+    nodes.forEach(function (n) { indeg[n.id] = 0; out[n.id] = []; });
+    edges.forEach(function (e) {
+      if (indeg.hasOwnProperty(e.sourceNodeId) && indeg.hasOwnProperty(e.targetNodeId)) {
+        indeg[e.targetNodeId]++;
+        out[e.sourceNodeId].push(e.targetNodeId);
+      }
+    });
+    var layer = {};
+    var queue = nodes.filter(function (n) { return indeg[n.id] === 0; }).map(function (n) { return n.id; });
+    queue.forEach(function (id) { layer[id] = 0; });
+    var maxLayer = 0;
+    while (queue.length > 0) {
+      var next = [];
+      queue.forEach(function (id) {
+        var cur = layer[id] || 0;
+        (out[id] || []).forEach(function (succ) {
+          layer[succ] = Math.max(layer[succ] || 0, cur + 1);
+          maxLayer = Math.max(maxLayer, layer[succ]);
+          indeg[succ]--;
+          if (indeg[succ] === 0) next.push(succ);
+        });
+      });
+      queue = next;
+    }
+    var cyclic = nodes.filter(function (n) { return !layer.hasOwnProperty(n.id); }).sort(function (a, b) { return a.sortOrder - b.sortOrder; });
+    var fallbackLayer = maxLayer + 1;
+    cyclic.forEach(function (n) { layer[n.id] = fallbackLayer++; });
+    var byLayer = {};
+    nodes.forEach(function (n) {
+      var l = layer[n.id] || 0;
+      if (!byLayer[l]) byLayer[l] = [];
+      byLayer[l].push(n);
+    });
+    var minX = Infinity, minY = Infinity;
+    Object.keys(byLayer).forEach(function (l) {
+      var members = byLayer[l].sort(function (a, b) { return a.sortOrder - b.sortOrder; });
+      var step = NODE_W + COL_GAP;
+      var startX = -((members.length - 1) * step) / 2;
+      members.forEach(function (m, i) {
+        var x = startX + i * step;
+        var y = Number(l) * (NODE_H_EST + ROW_GAP);
+        positions[m.id] = { x: x, y: y };
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+      });
+    });
+    var dx = CANVAS_MARGIN - (isFinite(minX) ? minX : 0);
+    var dy = CANVAS_MARGIN - (isFinite(minY) ? minY : 0);
+    Object.keys(positions).forEach(function (id) {
+      positions[id] = { x: Math.round(positions[id].x + dx), y: Math.round(positions[id].y + dy) };
+    });
+    return positions;
+  }
+
+  function loadProjectActivities(projectId) {
+    var out = [];
+    sortStations(projectId).forEach(function (st) {
+      sortActivities(st.id).forEach(function (a) { out.push({ id: a.id, name: a.name, processType: a.processType, stationId: st.id, stationName: st.name }); });
+    });
+    return out;
+  }
+
+  function rebuildChain(projectId, chartType, orderedIds) {
+    var edges = filterBy('chartEdges', 'chartType', chartType).filter(function (e) { return e.projectId === projectId; });
+    var desired = [];
+    for (var i = 0; i + 1 < orderedIds.length; i++) desired.push({ source: orderedIds[i], target: orderedIds[i + 1] });
+    var desiredKeys = {};
+    desired.forEach(function (d) { desiredKeys[d.source + '->' + d.target] = true; });
+    edges.forEach(function (edge) {
+      if (edge.isChain && !desiredKeys[edge.sourceNodeId + '->' + edge.targetNodeId]) {
+        state.chartEdges = state.chartEdges.filter(function (e) { return e.id !== edge.id; });
+      }
+    });
+    desired.forEach(function (d) {
+      var existing = state.chartEdges.find(function (e) { return e.projectId === projectId && e.chartType === chartType && e.sourceNodeId === d.source && e.targetNodeId === d.target; });
+      if (!existing) {
+        state.chartEdges.push({ id: U.uid(), projectId: projectId, chartType: chartType, sourceNodeId: d.source, targetNodeId: d.target, isChain: true, sortOrder: 0 });
+      } else if (!existing.isChain) existing.isChain = true;
+    });
+  }
+
+  function syncChart(projectId, chartType) {
+    var allActivities = loadProjectActivities(projectId);
+    var qualifying = allActivities.filter(function (a) { return chartType === 'OPC' ? OPC_TYPES.indexOf(a.processType) >= 0 : true; });
+    var qualifyingIds = {};
+    qualifying.forEach(function (a) { qualifyingIds[a.id] = true; });
+    var activityById = {};
+    allActivities.forEach(function (a) { activityById[a.id] = a; });
+    var existing = filterBy('chartNodes', 'chartType', chartType).filter(function (n) { return n.projectId === projectId; }).sort(function (a, b) { return a.sortOrder - b.sortOrder; });
+    var orphans = existing.filter(function (n) { return !n.isManual && !(n.activityId && qualifyingIds[n.activityId]); });
+    var kept = existing.filter(function (n) { return orphans.indexOf(n) < 0; });
+    var keptActivityIds = {};
+    kept.forEach(function (n) { if (!n.isManual) keptActivityIds[n.activityId] = true; });
+    var missing = qualifying.filter(function (a) { return !keptActivityIds[a.id]; });
+
+    if (orphans.length === 0 && missing.length === 0) {
+      kept.forEach(function (node) {
+        if (node.isManual || !node.activityId) return;
+        var activity = activityById[node.activityId];
+        if (!activity) return;
+        if (node.label !== activity.name || node.nodeType !== activity.processType) {
+          node.label = activity.name; node.nodeType = activity.processType; touch(node);
+        }
+      });
+      return;
+    }
+
+    orphans.forEach(function (orphan) {
+      state.chartEdges = state.chartEdges.filter(function (e) { return e.sourceNodeId !== orphan.id && e.targetNodeId !== orphan.id; });
+      state.chartNodes = state.chartNodes.filter(function (n) { return n.id !== orphan.id; });
+    });
+    kept.forEach(function (node) {
+      if (node.isManual || !node.activityId) return;
+      var activity = activityById[node.activityId];
+      if (!activity) return;
+      if (node.label !== activity.name || node.nodeType !== activity.processType) {
+        node.label = activity.name; node.nodeType = activity.processType; touch(node);
+      }
+    });
+    if (missing.length > 0) {
+      var wasEmpty = kept.length === 0;
+      var nextOrder = kept.length > 0 ? Math.max.apply(null, kept.map(function (n) { return n.sortOrder; })) + 1 : 0;
+      var created = [];
+      missing.forEach(function (activity) {
+        var node = {
+          id: U.uid(), projectId: projectId, chartType: chartType, nodeType: activity.processType,
+          activityId: activity.id, label: activity.name, isManual: false,
+          sortOrder: nextOrder++, positionX: 0, positionY: 0, updatedAt: U.nowISO(),
+        };
+        state.chartNodes.push(node);
+        created.push(node);
+      });
+      var allOrdered = kept.concat(created);
+      if (wasEmpty) {
+        var virtualEdges = [];
+        for (var i = 0; i + 1 < allOrdered.length; i++) virtualEdges.push({ sourceNodeId: allOrdered[i].id, targetNodeId: allOrdered[i + 1].id });
+        var positions = computeAutoLayout(allOrdered, virtualEdges);
+        allOrdered.forEach(function (node) {
+          var p = positions[node.id];
+          if (p) { node.positionX = p.x; node.positionY = p.y; }
+        });
+      } else {
+        var last = kept[kept.length - 1];
+        var y = last.positionY;
+        created.forEach(function (node) {
+          node.positionX = last.positionX;
+          node.positionY = y + NODE_H_EST + ROW_GAP;
+          y += NODE_H_EST + ROW_GAP;
+        });
+      }
+      kept = kept.concat(created);
+    }
+    var finalNodes = filterBy('chartNodes', 'chartType', chartType).filter(function (n) { return n.projectId === projectId; }).sort(function (a, b) { return a.sortOrder - b.sortOrder; });
+    rebuildChain(projectId, chartType, finalNodes.map(function (n) { return n.id; }));
+    commit();
+  }
+
+  function getChart(projectId, chartType) {
+    if (chartType !== 'OPC' && chartType !== 'FPC') throw new Error('نوع نمودار معتبر نیست (OPC یا FPC).');
+    syncChart(projectId, chartType);
+    var nodes = filterBy('chartNodes', 'chartType', chartType).filter(function (n) { return n.projectId === projectId; }).sort(function (a, b) { return a.sortOrder - b.sortOrder; });
+    var edges = filterBy('chartEdges', 'chartType', chartType).filter(function (e) { return e.projectId === projectId; });
+    var allActivities = loadProjectActivities(projectId);
+    var activityById = {};
+    allActivities.forEach(function (a) { activityById[a.id] = a; });
+    var byType = {};
+    ['OPERATION', 'INSPECTION', 'TRANSPORT', 'DELAY', 'STORAGE', 'MANUAL'].forEach(function (t) { byType[t] = 0; });
+    var maxX = CANVAS_MARGIN * 2, maxY = CANVAS_MARGIN * 2;
+    var nodeDtos = nodes.map(function (n) {
+      byType[n.nodeType] = (byType[n.nodeType] || 0) + 1;
+      maxX = Math.max(maxX, n.positionX + NODE_W + CANVAS_MARGIN);
+      maxY = Math.max(maxY, n.positionY + NODE_H_EST + CANVAS_MARGIN);
+      var activity = n.activityId ? activityById[n.activityId] : null;
+      return {
+        id: n.id, nodeType: n.nodeType, label: n.label, activityId: n.activityId,
+        activityName: activity ? activity.name : null, stationName: activity ? activity.stationName : null,
+        isManual: n.isManual, sortOrder: n.sortOrder, positionX: n.positionX, positionY: n.positionY,
+      };
+    });
+    var qualifyingCount = allActivities.filter(function (a) { return chartType === 'OPC' ? OPC_TYPES.indexOf(a.processType) >= 0 : true; }).length;
+    return {
+      chartType: chartType, nodes: nodeDtos,
+      edges: edges.map(function (e) { return { id: e.id, sourceNodeId: e.sourceNodeId, targetNodeId: e.targetNodeId, isChain: e.isChain, sortOrder: e.sortOrder }; }),
+      counts: {
+        total: nodes.length, auto: nodes.filter(function (n) { return !n.isManual; }).length,
+        manual: nodes.filter(function (n) { return n.isManual; }).length, byType: byType,
+        activitiesIncluded: qualifyingCount, activitiesTotal: allActivities.length,
+      },
+      canvas: { width: maxX, height: maxY },
+    };
+  }
+  function createManualNode(projectId, chartType, input) {
+    var allowed = chartType === 'OPC' ? OPC_TYPES : ['OPERATION', 'INSPECTION', 'TRANSPORT', 'DELAY', 'STORAGE'];
+    if (allowed.indexOf(input.nodeType) < 0) {
+      throw new Error(chartType === 'OPC'
+        ? 'در نمودار OPC فقط گره عملیات و بازرسی مجاز است؛ گره سایر انواع را در FPC بسازید.'
+        : 'نوع گره معتبر نیست.');
+    }
+    var nodes = filterBy('chartNodes', 'chartType', chartType).filter(function (n) { return n.projectId === projectId; });
+    var nextOrder = nodes.length ? Math.max.apply(null, nodes.map(function (n) { return n.sortOrder; })) + 1 : 0;
+    var node = {
+      id: U.uid(), projectId: projectId, chartType: chartType, nodeType: input.nodeType,
+      activityId: null, label: input.label, isManual: true, sortOrder: nextOrder,
+      positionX: 48, positionY: 48 + nextOrder * (NODE_H_EST + ROW_GAP), updatedAt: U.nowISO(),
+    };
+    state.chartNodes.push(node);
+    recordAudit({ entityType: 'ChartNode', entityId: node.id, action: 'CREATE', entityName: node.label, projectId: projectId });
+    commit();
+    return node;
+  }
+  function updateChartNode(nodeId, patch) {
+    var n = byId('chartNodes', nodeId);
+    if (!n) throw new Error('گره یافت نشد.');
+    if (patch.label !== undefined) n.label = patch.label;
+    if (patch.nodeType !== undefined && n.isManual) n.nodeType = patch.nodeType;
+    touch(n);
+    commit();
+  }
+  function deleteChartNode(nodeId) {
+    var n = byId('chartNodes', nodeId);
+    if (!n) throw new Error('گره یافت نشد.');
+    state.chartEdges = state.chartEdges.filter(function (e) { return e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId; });
+    state.chartNodes = state.chartNodes.filter(function (x) { return x.id !== nodeId; });
+    commit();
+  }
+  function saveChartLayout(projectId, chartType, positions) {
+    Object.keys(positions).forEach(function (nodeId) {
+      var n = byId('chartNodes', nodeId);
+      if (n && n.projectId === projectId && n.chartType === chartType) {
+        n.positionX = Math.round(positions[nodeId].x);
+        n.positionY = Math.round(positions[nodeId].y);
+        touch(n);
+      }
+    });
+    commit();
+  }
+  function moveChartNodeOrder(projectId, chartType, nodeId, dir) {
+    var nodes = filterBy('chartNodes', 'chartType', chartType).filter(function (n) { return n.projectId === projectId; }).sort(function (a, b) { return a.sortOrder - b.sortOrder; });
+    var idx = nodes.findIndex(function (n) { return n.id === nodeId; });
+    if (idx < 0) return;
+    var swapWith = dir === 'up' ? idx - 1 : idx + 1;
+    if (swapWith < 0 || swapWith >= nodes.length) return;
+    var tmp = nodes[idx].sortOrder;
+    nodes[idx].sortOrder = nodes[swapWith].sortOrder;
+    nodes[swapWith].sortOrder = tmp;
+    touch(nodes[idx]); touch(nodes[swapWith]);
+    var orderedIds = nodes.slice().sort(function (a, b) { return a.sortOrder - b.sortOrder; }).map(function (n) { return n.id; });
+    rebuildChain(projectId, chartType, orderedIds);
+    commit();
+  }
+  function createChartEdge(projectId, chartType, sourceNodeId, targetNodeId) {
+    if (sourceNodeId === targetNodeId) throw new Error('اتصال یک گره به خودش معنا ندارد.');
+    var exists = state.chartEdges.find(function (e) { return e.projectId === projectId && e.chartType === chartType && e.sourceNodeId === sourceNodeId && e.targetNodeId === targetNodeId; });
+    if (exists) throw new Error('این اتصال قبلاً ثبت شده است.');
+    state.chartEdges.push({ id: U.uid(), projectId: projectId, chartType: chartType, sourceNodeId: sourceNodeId, targetNodeId: targetNodeId, isChain: false, sortOrder: 0 });
+    commit();
+  }
+  function deleteChartEdge(edgeId) {
+    state.chartEdges = state.chartEdges.filter(function (e) { return e.id !== edgeId; });
+    commit();
+  }
+  function getChartsStageState(projectId) {
+    var activitiesCount = loadProjectActivities(projectId).length;
+    var opcNodes = filterBy('chartNodes', 'chartType', 'OPC').filter(function (n) { return n.projectId === projectId; });
+    var opcEdges = filterBy('chartEdges', 'chartType', 'OPC').filter(function (e) { return e.projectId === projectId; });
+    var connected = {};
+    opcEdges.forEach(function (e) { connected[e.sourceNodeId] = true; connected[e.targetNodeId] = true; });
+    var unconnected = opcNodes.filter(function (n) { return !connected[n.id]; }).length;
+    return { activitiesCount: activitiesCount, opcNodes: opcNodes.length, unconnectedOpc: unconnected };
+  }
+
+  // ═══════════ داشبورد — پورت دقیق ═══════════
+  function getProjectDashboard(projectId) {
+    var project = byId('projects', projectId);
+    if (!project) throw new Error('پروژه یافت نشد.');
+    var finalization = state.finalizationInfos.find(function (f) { return f.projectId === projectId; });
+    var operatorsList = listOperators(projectId);
+    var sessionsCount = state.studySessions.filter(function (s) { return projectIdOfActivity(s.activityId) === projectId; }).length;
+    var latestCalc = getLatestCalculation(projectId);
+    var analyses = activitiesOfProject(projectId).map(function (a) { return getActivityAnalysis(a.id); });
+
+    var rows = analyses.map(function (an) {
+      var otParts = an.elements.filter(function (e) { return e.ot !== null; });
+      return {
+        activityId: an.activity.id, stationName: an.activity.stationName, activityName: an.activity.name,
+        processType: an.activity.processType, elementsCount: an.elements.length,
+        validCycles: an.sampleProgress.validCycles, totalCycles: an.sampleProgress.totalCycles,
+        target: an.sampleProgress.targetSampleCount, targetReached: an.sampleProgress.reached,
+        otSum: otParts.length === 0 ? null : otParts.length === an.elements.length ? F.round12(otParts.reduce(function (s, e) { return s + e.ot; }, 0)) : null,
+        st: an.activityTotal.st, stStatus: an.activityTotal.status, stReason: an.activityTotal.reason,
+        suspectsPending: an.suspects.filter(function (s) { return s.validityStatus === 'SUSPECT'; }).length,
+      };
+    });
+
+    var blocking = rows.filter(function (r) { return r.stStatus !== 'OK'; });
+    var stCard = rows.length === 0
+      ? { key: 'st', title: 'زمان استاندارد کل پروژه', value: null, unit: 'ثانیه', denominator: null, reason: 'هنوز فعالیتی تعریف نشده است؛ ابتدا ساختار تولید را تکمیل کنید.', note: 'جمع زمان استاندارد فعالیت‌ها', tone: 'INFO' }
+      : blocking.length > 0
+        ? { key: 'st', title: 'زمان استاندارد کل پروژه', value: null, unit: 'ثانیه', denominator: null, reason: 'استاندارد ' + blocking.length + ' فعالیت از ' + rows.length + ' فعالیت قابل تعیین نیست (' + blocking.slice(0, 3).map(function (r) { return '«' + r.activityName + '»'; }).join('، ') + (blocking.length > 3 ? ' و …' : '') + '). ' + (blocking.some(function (r) { return r.stStatus === 'NEEDS_AGGREGATION_RULE'; }) ? 'فعالیت دارای کار هم‌زمان نیازمند قاعدهٔ تجمیع است؛ جمع ساده ممنوع.' : 'علت رایج: دادهٔ ناکافی یا ارزیابی وستینگهاوس ناقص.'), note: 'جمع زمان استاندارد فعالیت‌ها', tone: 'WARNING' }
+        : { key: 'st', title: 'زمان استاندارد کل پروژه', value: F.round12(rows.reduce(function (s, r) { return s + r.st; }, 0)), unit: 'ثانیه', denominator: null, reason: null, note: 'جمع ' + rows.length + ' فعالیت — همهٔ فعالیت‌ها ترتیبی و کامل', tone: 'OK' };
+
+    var cycleCount = 0, weightedSum = 0;
+    analyses.forEach(function (an) {
+      if (an.cycleStats.stats.mean !== null && an.cycleStats.count > 0) {
+        cycleCount += an.cycleStats.count;
+        weightedSum += an.cycleStats.stats.mean * an.cycleStats.count;
+      }
+    });
+    var meanCycleCard = cycleCount === 0
+      ? { key: 'meanCycle', title: 'میانگین زمان چرخه', value: null, unit: 'ثانیه', denominator: null, reason: rows.length === 0 ? 'فعالیتی تعریف نشده است.' : 'هنوز چرخهٔ کامل معتبری ثبت نشده است؛ در مرحلهٔ زمان‌سنجی داده ثبت کنید.', note: 'زمان سپری‌شدهٔ چرخه‌های قابل استفاده', tone: 'INFO' }
+      : { key: 'meanCycle', title: 'میانگین زمان چرخه', value: F.round12(weightedSum / cycleCount), unit: 'ثانیه', denominator: null, reason: null, note: 'از ' + cycleCount + ' چرخهٔ قابل استفاده در کل پروژه — برای فعالیت‌های هم‌زمان، گسترهٔ بازه‌ها ملاک است نه جمع مدت‌ها', tone: 'OK' };
+
+    var totalValid = rows.reduce(function (s, r) { return s + r.validCycles; }, 0);
+    var totalCyclesAll = rows.reduce(function (s, r) { return s + r.totalCycles; }, 0);
+    var samplesCard = rows.length === 0
+      ? { key: 'samples', title: 'تعداد نمونهٔ معتبر', value: null, unit: 'چرخه', denominator: null, reason: 'فعالیتی تعریف نشده است.', note: 'چرخهٔ کامل بدون دادهٔ خارج/نامعتبر', tone: 'INFO' }
+      : { key: 'samples', title: 'تعداد نمونهٔ معتبر', value: totalValid, unit: 'چرخه', denominator: null, reason: null, note: totalCyclesAll + ' چرخهٔ ثبت‌شده در ' + sessionsCount + ' جلسه — مبنای شمارش: چرخهٔ کامل بدون مشاهدهٔ خارج‌شده/نامعتبر', tone: totalValid === 0 ? 'WARNING' : 'OK' };
+
+    var withTarget = rows.filter(function (r) { return r.target !== null; });
+    var reached = withTarget.filter(function (r) { return r.targetReached === true; });
+    var shortfall = withTarget.filter(function (r) { return r.targetReached !== true; }).map(function (r) { return { activityName: r.activityName, valid: r.validCycles, target: r.target }; });
+    var targetCard = rows.length === 0
+      ? { key: 'target', title: 'وضعیت هدف نمونه', value: null, unit: '', denominator: null, reason: 'فعالیتی تعریف نشده است.', note: 'بر اساس هدف ثبت‌شدهٔ هر فعالیت', tone: 'INFO' }
+      : withTarget.length === 0
+        ? { key: 'target', title: 'وضعیت هدف نمونه', value: null, unit: '', denominator: null, reason: 'برای هیچ فعالیتی هدف تعداد نمونه ثبت نشده است؛ در مشخصات فعالیت قابل تعیین است.', note: 'بر اساس هدف ثبت‌شدهٔ هر فعالیت', tone: 'WARNING' }
+        : shortfall.length === 0
+          ? { key: 'target', title: 'وضعیت هدف نمونه', value: reached.length, unit: 'فعالیت', denominator: withTarget.length, reason: null, note: 'هدف همهٔ ' + withTarget.length + ' فعالیت دارای هدف تکمیل شده — توجه: رسیدن به هدف تعداد، تضمین کفایت آماری نیست؛ شاخص‌های پراکندی را بازبینی کنید.', tone: 'OK' }
+          : { key: 'target', title: 'وضعیت هدف نمونه', value: reached.length, unit: 'فعالیت', denominator: withTarget.length, reason: shortfall.length + ' فعالیت به هدف نمونه نرسیده است. توجه: هدف، کاربرمحور است و کفایت آماری را تضمین نمی‌کند.', note: shortfall.slice(0, 3).map(function (s) { return '«' + s.activityName + '»: ' + s.valid + '/' + s.target; }).join('، ') + (shortfall.length > 3 ? ' و …' : ''), tone: 'WARNING' };
+
+    var observationStatus = { valid: 0, suspect: 0, excluded: 0, invalid: 0 };
+    analyses.forEach(function (an) {
+      an.elements.forEach(function (el) {
+        observationStatus.valid += el.counts.valid;
+        observationStatus.suspect += el.counts.suspect;
+        observationStatus.excluded += el.counts.excluded;
+        observationStatus.invalid += el.counts.invalid;
+      });
+    });
+
+    var opAcc = {};
+    var operatorNameById = {};
+    operatorsList.forEach(function (o) { operatorNameById[o.id] = o.displayName; });
+    analyses.forEach(function (an) {
+      an.elements.forEach(function (el) {
+        el.operators.forEach(function (op) {
+          if (!opAcc[op.operatorId]) opAcc[op.operatorId] = { name: operatorNameById[op.operatorId] || 'اپراتور حذف‌شده', observations: 0, suspect: 0, excluded: 0, activities: {}, ratios: [] };
+          var acc = opAcc[op.operatorId];
+          acc.observations += op.count;
+          acc.suspect += op.suspectCount;
+          acc.excluded += op.excludedCount;
+          if (op.count > 0) acc.activities[an.activity.id] = true;
+          if (op.mean !== null && el.ot !== null && el.ot > 0) acc.ratios.push(op.mean / el.ot);
+        });
+      });
+    });
+    var operators = Object.keys(opAcc).map(function (oid) {
+      var acc = opAcc[oid];
+      return {
+        operatorId: oid, operatorName: acc.name, observations: acc.observations,
+        activitiesCount: Object.keys(acc.activities).length, suspectCount: acc.suspect, excludedCount: acc.excluded,
+        relativeIndex: acc.ratios.length > 0 ? F.round12(acc.ratios.reduce(function (s, r) { return s + r; }, 0) / acc.ratios.length) : null,
+      };
+    }).sort(function (a, b) { return cmpStr(a.operatorName, b.operatorName); });
+
+    var elementCv = [];
+    analyses.forEach(function (an) {
+      an.elements.forEach(function (el) {
+        elementCv.push({ elementName: el.name, activityName: an.activity.name, elementType: el.elementType, cvPercent: el.stats.cvPercent, count: el.counts.calcBasis, ot: el.ot });
+      });
+    });
+    elementCv.sort(function (a, b) { return (b.cvPercent === null ? -1 : b.cvPercent) - (a.cvPercent === null ? -1 : a.cvPercent); });
+    elementCv = elementCv.slice(0, 20);
+
+    var suspectsByActivity = rows.filter(function (r) { return r.suspectsPending > 0; }).map(function (r) { return { activityName: r.activityName, count: r.suspectsPending }; });
+    var elementsWithoutRating = [];
+    analyses.forEach(function (an) {
+      an.elements.forEach(function (el) { if (!el.rating) elementsWithoutRating.push('«' + el.name + '» (' + an.activity.name + ')'); });
+    });
+
+    return {
+      project: { id: project.id, name: project.name, lineName: project.lineName, productName: project.productName, studyDate: project.studyDate, finalized: !!finalization },
+      settings: { allowanceMethod: analyses[0] ? analyses[0].settings.allowanceMethod : 'PERCENT_OF_NT', aggregationMethod: analyses[0] ? analyses[0].settings.aggregationMethod : 'WEIGHTED_BY_COUNT' },
+      cards: [stCard, meanCycleCard, samplesCard, targetCard],
+      activities: rows, observationStatus: observationStatus, operators: operators, elementCv: elementCv,
+      reviewNeeds: {
+        suspectsPending: suspectsByActivity.reduce(function (s, x) { return s + x.count; }, 0),
+        suspectsByActivity: suspectsByActivity,
+        elementsWithoutRating: elementsWithoutRating.slice(0, 12),
+        activitiesNeedingAggregationRule: rows.filter(function (r) { return r.stStatus === 'NEEDS_AGGREGATION_RULE'; }).map(function (r) { return r.activityName; }),
+        activitiesIncomplete: rows.filter(function (r) { return r.stStatus === 'INCOMPLETE'; }).map(function (r) { return r.activityName; }),
+        sampleShortfall: shortfall,
+        needsRecalc: latestCalc.needsRecalc,
+        lastCalculationAt: latestCalc.run ? latestCalc.run.createdAt : null,
+        lastCalculationStatus: latestCalc.run ? latestCalc.run.status : null,
+      },
+      cycleSummary: { count: cycleCount, weightedMean: cycleCount > 0 ? F.round12(weightedSum / cycleCount) : null },
+      counts: {
+        stations: sortStations(projectId).length, activities: rows.length,
+        elements: analyses.reduce(function (s, an) { return s + an.elements.length; }, 0),
+        operators: operatorsList.length, sessions: sessionsCount,
+      },
+      generatedAt: U.nowISO(),
+    };
+  }
+
+  // ═══════════ وضعیت مراحل — پورت دقیق ═══════════
+  function computeStageSummary(projectId) {
+    var project = byId('projects', projectId);
+    var stations = sortStations(projectId);
+    var activities = activitiesOfProject(projectId);
+    var elements = [];
+    activities.forEach(function (a) { elements = elements.concat(sortElements(a.id)); });
+    var operators = listOperators(projectId);
+    var groups = listGroups(projectId);
+    var categories = listCategories(projectId);
+    var assessments = state.ratingAssessments.filter(function (r) {
+      return elements.some(function (e) { return e.id === r.workElementId; });
+    });
+    var sessions = state.studySessions.filter(function (s) { return activities.some(function (a) { return a.id === s.activityId; }); });
+    var finalized = !!(project && state.finalizationInfos.find(function (f) { return f.projectId === projectId; }));
+    var chartsState = getChartsStageState(projectId);
+
+    var elementCount = elements.length;
+    var elementsWithRating = assessments.length;
+
+    var validCycles = 0, suspectCount = 0;
+    sessions.forEach(function (se) {
+      cyclesOfSession(se.id).forEach(function (c) {
+        var obs = obsOfCycle(c.id);
+        var bad = obs.some(function (o) { return o.validityStatus === 'EXCLUDED' || o.validityStatus === 'INVALID'; });
+        var act = byId('activities', se.activityId);
+        var actElements = act ? sortElements(act.id) : [];
+        var actComplete = actElements.length > 0 && actElements.every(function (el) { return obs.some(function (o) { return o.workElementId === el.id && o.derivedDuration !== null; }); });
+        if (actComplete && !bad) validCycles++;
+        suspectCount += obs.filter(function (o) { return o.validityStatus === 'SUSPECT'; }).length;
+      });
+    });
+
+    var activitiesWithoutElements = activities.filter(function (a) { return sortElements(a.id).length === 0; });
+    var stages = {};
+
+    stages.info = project && project.studyDate
+      ? { status: 'DONE', hint: 'مشخصات اصلی پروژه تکمیل شده است.' }
+      : { status: 'IN_PROGRESS', hint: 'تاریخ مطالعه را در مشخصات پروژه ثبت کنید.' };
+
+    if (stations.length === 0) stages.structure = { status: 'PENDING', hint: 'هنوز ایستگاهی ثبت نشده است.' };
+    else if (activities.length === 0) stages.structure = { status: 'IN_PROGRESS', hint: 'برای ایستگاه‌ها فعالیت ثبت کنید.' };
+    else if (activitiesWithoutElements.length > 0) stages.structure = { status: 'NEEDS_REVIEW', hint: activitiesWithoutElements.length + ' فعالیت بدون عنصر کاری است؛ عناصر را تکمیل کنید.' };
+    else stages.structure = { status: 'DONE', hint: 'ساختار خط، ایستگاه‌ها و فعالیت‌ها کامل است.' };
+
+    stages.operators = operators.length
+      ? { status: 'DONE', hint: 'اپراتورهای مطالعه ثبت شده‌اند.' }
+      : { status: 'PENDING', hint: 'حداقل یک اپراتور برای زمان‌سنجی لازم است.' };
+
+    var activeCategories = categories.filter(function (c) { return c.isActive; }).length;
+    if (activeCategories === 0 && groups.length === 0) stages.allowances = { status: 'PENDING', hint: 'دسته مجاز و گروه فعالیت تعریف نشده است.' };
+    else if (groups.length === 0) stages.allowances = { status: 'IN_PROGRESS', hint: 'دسته‌ها ثبت شده؛ گروه فعالیت بسازید.' };
+    else {
+      var activeCatIds = {};
+      categories.forEach(function (c) { if (c.isActive) activeCatIds[c.id] = true; });
+      var groupsWithoutValues = groups.filter(function (g) {
+        return g.allowances.filter(function (ga) { return activeCatIds[ga.categoryId]; }).length === 0;
+      }).length;
+      stages.allowances = groupsWithoutValues > 0
+        ? { status: 'IN_PROGRESS', hint: groupsWithoutValues + ' گروه بدون مقدار مجاز فعال است.' }
+        : { status: 'DONE', hint: 'گروه‌ها و دسته‌های مجاز تکمیل شده‌اند.' };
+    }
+
+    if (elementCount === 0) stages.westinghouse = { status: 'PENDING', hint: 'ابتدا عناصر کاری را در ساختار تولید تعریف کنید.' };
+    else if (elementsWithRating === 0) stages.westinghouse = { status: 'PENDING', hint: 'هیچ عنصری ارزیابی نشده است.' };
+    else if (elementsWithRating < elementCount) stages.westinghouse = { status: 'IN_PROGRESS', hint: elementsWithRating + ' از ' + elementCount + ' عنصر ارزیابی شده است.' };
+    else stages.westinghouse = { status: 'DONE', hint: 'همه عناصر کاری ارزیابی شده‌اند.' };
+
+    var activitiesWithElements = {};
+    elements.forEach(function (e) { activitiesWithElements[e.activityId] = true; });
+    var sessionActivityIds = {};
+    sessions.forEach(function (s) { sessionActivityIds[s.activityId] = true; });
+    var activitiesMissingSessions = activities.filter(function (a) { return activitiesWithElements[a.id] && !sessionActivityIds[a.id]; });
+    if (elementCount === 0 || operators.length === 0) stages.timing = { status: 'PENDING', hint: 'برای زمان‌سنجی، ابتدا عناصر کاری و اپراتورها را تکمیل کنید.' };
+    else if (sessions.length === 0) stages.timing = { status: 'PENDING', hint: 'هنوز جلسه‌ای ایجاد نشده است؛ جلسه = فعالیت × اپراتور × روش.' };
+    else if (validCycles === 0) stages.timing = { status: 'IN_PROGRESS', hint: 'جلسه‌ها ایجاد شده‌اند؛ چرخه‌ها را در برگه ثبت کنید.' };
+    else if (activitiesMissingSessions.length > 0) stages.timing = { status: 'NEEDS_REVIEW', hint: activitiesMissingSessions.length + ' فعالیت دارای عنصر، هنوز جلسه زمان‌سنجی ندارد.' };
+    else stages.timing = { status: 'DONE', hint: 'تاکنون ' + validCycles + ' چرخهٔ معتبر ثبت شده است.' };
+
+    if (validCycles === 0) stages.analysis = { status: 'PENDING', hint: 'برای تحلیل، ابتدا چرخهٔ معتبر در زمان‌سنجی ثبت کنید.' };
+    else if (suspectCount > 0) stages.analysis = { status: 'NEEDS_REVIEW', hint: suspectCount + ' مشاهدهٔ مشکوک نیازمند تصمیم شماست (نگه‌داشتن یا خروج از محاسبات).' };
+    else if (elementsWithRating < elementCount) stages.analysis = { status: 'IN_PROGRESS', hint: elementsWithRating + ' از ' + elementCount + ' عنصر ارزیابی وستینگهاوس دارد؛ بدون آن NT/ST قابل محاسبه نیست.' };
+    else stages.analysis = { status: 'DONE', hint: 'تحلیل کامل است؛ ' + validCycles + ' چرخهٔ معتبر در محاسبات است. وضعیت هدف نمونه را در نمای تحلیل بازبینی کنید.' };
+
+    if (chartsState.activitiesCount === 0) stages.charts = { status: 'PENDING', hint: 'برای ساخت نمودار، ابتدا فعالیت‌ها را در ساختار تولید تعریف کنید.' };
+    else if (chartsState.opcNodes === 0) stages.charts = { status: 'IN_PROGRESS', hint: 'نمودار با بازکردن این مرحله به‌صورت خودکار از فعالیت‌ها ساخته می‌شود.' };
+    else if (chartsState.unconnectedOpc > 0) stages.charts = { status: 'NEEDS_REVIEW', hint: chartsState.unconnectedOpc + ' گره بدون اتصال در نمودار است؛ توالی گره‌ها را کامل کنید.' };
+    else stages.charts = { status: 'DONE', hint: 'نمودار فرایند ساخته شده و توالی کامل است (' + chartsState.opcNodes + ' گره).' };
+
+    if (validCycles === 0) stages.dashboard = { status: 'PENDING', hint: 'برای مشاهدهٔ کارت‌ها و شاخص‌های تخصصی، ابتدا دادهٔ زمان‌سنجی ثبت کنید.' };
+    else if (suspectCount > 0) stages.dashboard = { status: 'NEEDS_REVIEW', hint: suspectCount + ' مشاهدهٔ مشکوک نیازمند تصمیم است؛ تا بازبینی، شاخص‌های داشبورد بر مبنای آن‌ها محاسبه می‌شود.' };
+    else if (elementsWithRating < elementCount) stages.dashboard = { status: 'IN_PROGRESS', hint: 'دادهٔ زمان‌سنجی موجود است؛ برای محاسبهٔ NT/ST در کارت‌ها، ارزیابی وستینگهاوس همهٔ عناصر لازم است.' };
+    else stages.dashboard = { status: 'DONE', hint: 'داشبورد آماده است؛ کارت‌ها و شاخص‌ها هر بار از جدیدترین داده محاسبه می‌شوند.' };
+
+    if (validCycles === 0) stages.reports = { status: 'PENDING', hint: 'برای تهیهٔ گزارش Excel/PDF، ابتدا دادهٔ زمان‌سنجی ثبت کنید.' };
+    else if (suspectCount > 0) stages.reports = { status: 'NEEDS_REVIEW', hint: suspectCount + ' مشاهدهٔ مشکوک بازبینی نشده است؛ گزارش رسمی باید وضعیت بازبینی را شفاف بیان کند.' };
+    else stages.reports = { status: 'DONE', hint: 'مرکز گزارش‌ها آماده است؛ خروجی Excel برای تحلیل و PDF برای گزارش رسمی.' };
+
+    stages.data = { status: state.backups.length > 0 ? 'DONE' : 'PENDING', hint: state.backups.length > 0 ? 'حداقل یک نسخهٔ پشتیبان ثبت شده است.' : 'هنوز نسخهٔ پشتیبانی ثبت نشده است.' };
+
+    var activeKeys = ['info', 'structure', 'operators', 'allowances', 'westinghouse', 'timing', 'analysis', 'charts', 'dashboard', 'reports'];
+    function weight(s) { return s.status === 'DONE' ? 1 : (s.status === 'IN_PROGRESS' || s.status === 'NEEDS_REVIEW') ? 0.5 : 0; }
+    var progress = activeKeys.reduce(function (sum, k) { return sum + weight(stages[k]); }, 0) / activeKeys.length;
+
+    return {
+      stages: stages, progress: progress,
+      counts: {
+        stations: stations.length, activities: activities.length, elements: elementCount,
+        operators: operators.length, groups: groups.length, categories: categories.length,
+        elementsWithRating: elementsWithRating, finalized: finalized,
+      },
+    };
+  }
+
+  // ═══════════ سریال‌سازی / بسته / پشتیبان ═══════════
+  var SINGULAR = {
+    projects: 'project', projectSettings: 'projectSetting', stations: 'station', activities: 'activity',
+    workElements: 'workElement', activityGroups: 'activityGroup', allowanceCategories: 'allowanceCategory',
+    groupAllowances: 'groupAllowance', activityAllowanceOverrides: 'activityAllowanceOverride',
+    operators: 'operator', studySessions: 'studySession', cycleObservations: 'cycleObservation',
+    timelineLanes: 'timelineLane', elementObservations: 'elementObservation',
+    ratingTables: 'ratingTable', ratingTableGrades: 'ratingTableGrade', ratingAssessments: 'ratingAssessment',
+    calculationRuns: 'calculationRun', chartNodes: 'chartNode', chartEdges: 'chartEdge', finalizationInfos: 'finalizationInfo',
+  };
+  var PLURAL = {};
+  Object.keys(SINGULAR).forEach(function (p) { PLURAL[SINGULAR[p]] = p; });
+  var DOMAIN_ORDER = ['projects', 'projectSettings', 'stations', 'activityGroups', 'allowanceCategories', 'operators', 'ratingTables', 'activities', 'ratingTableGrades', 'groupAllowances', 'activityAllowanceOverrides', 'workElements', 'studySessions', 'ratingAssessments', 'cycleObservations', 'timelineLanes', 'elementObservations', 'chartNodes', 'chartEdges', 'calculationRuns', 'finalizationInfos'];
+
+  function dumpDomain(projectId) {
+    var snap = {};
+    DOMAIN_ORDER.forEach(function (plural) {
+      var rows = state[plural];
+      if (projectId) {
+        if (plural === 'projects') rows = rows.filter(function (r) { return r.id === projectId; });
+        else if (['projectSettings', 'stations', 'activityGroups', 'allowanceCategories', 'operators', 'ratingTables', 'chartNodes', 'chartEdges', 'calculationRuns', 'finalizationInfos'].indexOf(plural) >= 0) {
+          rows = rows.filter(function (r) { return r.projectId === projectId; });
+        } else if (plural === 'activities') {
+          var stIds = {};
+          sortStations(projectId).forEach(function (s) { stIds[s.id] = true; });
+          rows = rows.filter(function (r) { return stIds[r.stationId]; });
+        } else if (plural === 'workElements' || plural === 'studySessions' || plural === 'activityAllowanceOverrides') {
+          var actIds = {};
+          activitiesOfProject(projectId).forEach(function (a) { actIds[a.id] = true; });
+          rows = rows.filter(function (r) { return actIds[r.activityId]; });
+        } else if (plural === 'ratingTableGrades') {
+          var tIds = {};
+          filterBy('ratingTables', 'projectId', projectId).forEach(function (t) { tIds[t.id] = true; });
+          rows = rows.filter(function (r) { return tIds[r.ratingTableId]; });
+        } else if (plural === 'groupAllowances') {
+          var gIds = {};
+          filterBy('activityGroups', 'projectId', projectId).forEach(function (x) { gIds[x.id] = true; });
+          rows = rows.filter(function (r) { return gIds[r.groupId]; });
+        } else if (plural === 'ratingAssessments') {
+          var eIds = {};
+          activitiesOfProject(projectId).forEach(function (a) { sortElements(a.id).forEach(function (e) { eIds[e.id] = true; }); });
+          rows = rows.filter(function (r) { return eIds[r.workElementId]; });
+        } else if (plural === 'cycleObservations') {
+          var sIds = {};
+          state.studySessions.forEach(function (s) { if (projectIdOfActivity(s.activityId) === projectId) sIds[s.id] = true; });
+          rows = rows.filter(function (r) { return sIds[r.sessionId]; });
+        } else if (plural === 'timelineLanes' || plural === 'elementObservations') {
+          var cIds = {};
+          state.cycleObservations.forEach(function (c) {
+            var se = byId('studySessions', c.sessionId);
+            if (se && projectIdOfActivity(se.activityId) === projectId) cIds[c.id] = true;
+          });
+          rows = rows.filter(function (r) { return cIds[r.cycleId]; });
+        }
+      }
+      snap[SINGULAR[plural]] = rows.map(function (r) { return Object.assign({}, r); });
+    });
+    return snap;
+  }
+
+  function checksumOf(data) {
+    var canonical = JSON.stringify(data);
+    return g.crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical)).then(function (digest) {
+      return Array.from(new Uint8Array(digest)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+    });
+  }
+
+  function exportProjectPackage(projectId) {
+    var project = byId('projects', projectId);
+    if (!project) throw new Error('پروژه یافت نشد.');
+    var data = dumpDomain(projectId);
+    var manifest = {
+      format: 'timing-project-package', schemaVersion: CONST.SCHEMA_VERSION,
+      createdAt: U.nowISO(), appVersion: 'offline-1.0.0',
+      includes: ['settings', 'structure', 'operators', 'groupsAndAllowances', 'ratingTables', 'rawObservations', 'charts', 'calculations'],
+      projectName: project.name,
+    };
+    return checksumOf({ manifest: manifest, data: data }).then(function (sum) {
+      recordAudit({ entityType: 'Project', entityId: projectId, action: 'EXPORT', entityName: project.name, after: { checksum: sum }, projectId: projectId });
+      commit();
+      return { manifest: manifest, project: Object.assign({}, project), data: data, checksum: sum };
+    });
+  }
+
+  function validateProjectPackage(parsed) {
+    if (!parsed || !parsed.manifest || parsed.manifest.format !== 'timing-project-package') {
+      throw new Error('این فایل یک بسته پروژه معتبر این نرم‌افزار نیست.');
+    }
+    if (parsed.manifest.schemaVersion > CONST.SCHEMA_VERSION) {
+      throw new Error('نسخه ساختار بسته (' + parsed.manifest.schemaVersion + ') از نسخه فعلی (' + CONST.SCHEMA_VERSION + ') جدیدتر است.');
+    }
+    if (!parsed.data || typeof parsed.data !== 'object' || !parsed.project) {
+      throw new Error('ساختار داده بسته نامعتبر است.');
+    }
+    return checksumOf({ manifest: parsed.manifest, data: parsed.data }).then(function (actual) {
+      if (actual !== parsed.checksum) {
+        throw new Error('checksum بسته با محتوای آن مطابقت ندارد؛ فایل آسیب دیده است.');
+      }
+      var stations = parsed.data.station || [];
+      var activities = parsed.data.activity || [];
+      var stationIds = {};
+      stations.forEach(function (s) { stationIds[s.id] = true; });
+      for (var i = 0; i < activities.length; i++) {
+        if (typeof activities[i].stationId === 'string' && !stationIds[activities[i].stationId]) {
+          throw new Error('ارجاع فعالیت به ایستگاه ناموجود در بسته یافت شد.');
+        }
+      }
+      return parsed;
+    });
+  }
+
+  var FK_MAP = {
+    project: [], projectSetting: ['projectId'], station: ['projectId'], activityGroup: ['projectId'],
+    allowanceCategory: ['projectId'], operator: ['projectId'], ratingTable: ['projectId'],
+    activity: ['stationId', 'groupId'], ratingTableGrade: ['ratingTableId'],
+    groupAllowance: ['groupId', 'categoryId'], activityAllowanceOverride: ['activityId', 'categoryId'],
+    workElement: ['activityId'], studySession: ['activityId', 'operatorId'],
+    ratingAssessment: ['workElementId', 'ratingTableId'], cycleObservation: ['sessionId'],
+    timelineLane: ['cycleId'], elementObservation: ['cycleId', 'workElementId', 'laneId'],
+    chartNode: ['projectId', 'activityId'], chartEdge: ['projectId', 'sourceNodeId', 'targetNodeId'],
+    calculationRun: ['projectId'], finalizationInfo: ['projectId'],
+  };
+  var NULLABLE_FKS = { 'activity.groupId': true, 'chartNode.activityId': true, 'elementObservation.laneId': true };
+  function reverseFkTable(fk) {
+    return { projectId: 'project', stationId: 'station', groupId: 'activityGroup', categoryId: 'allowanceCategory', activityId: 'activity', ratingTableId: 'ratingTable', operatorId: 'operator', workElementId: 'workElement', sessionId: 'studySession', cycleId: 'cycleObservation', laneId: 'timelineLane', sourceNodeId: 'chartNode', targetNodeId: 'chartNode' }[fk];
+  }
+  function remapProjectData(data) {
+    var idMap = {};
+    Object.keys(FK_MAP).forEach(function (table) {
+      (data[table] || []).forEach(function (row) {
+        idMap[table + ':' + row.id] = U.uid();
+      });
+    });
+    var out = {};
+    Object.keys(FK_MAP).forEach(function (table) {
+      var rows = data[table] || [];
+      var kept = [];
+      rows.forEach(function (row) {
+        var newRow = Object.assign({}, row);
+        newRow.id = idMap[table + ':' + row.id] || row.id;
+        var drop = false;
+        FK_MAP[table].forEach(function (fk) {
+          var oldFk = row[fk];
+          if (oldFk === null || oldFk === undefined) { newRow[fk] = null; return; }
+          var mapped = idMap[reverseFkTable(fk) + ':' + oldFk];
+          if (mapped) newRow[fk] = mapped;
+          else if (NULLABLE_FKS[table + '.' + fk]) newRow[fk] = null;
+          else drop = true;
+        });
+        if (!drop) kept.push(newRow);
+      });
+      out[table] = kept;
+    });
+    return out;
+  }
+  function loadDomainData(data) {
+    Object.keys(FK_MAP).forEach(function (table) {
+      var plural = PLURAL[table];
+      if (!plural) return;
+      (data[table] || []).forEach(function (row) { state[plural].push(row); });
+    });
+  }
+  function importProjectPackage(parsed) {
+    var newName = String(parsed.project.name) + ' (ورودی)';
+    var data = remapProjectData(parsed.data);
+    if (data.project && data.project[0]) {
+      data.project[0].name = newName;
+      data.project[0].createdAt = U.nowISO();
+      data.project[0].updatedAt = U.nowISO();
+    }
+    delete data.finalizationInfo;
+    loadDomainData(data);
+    var newProjectId = data.project && data.project[0] ? data.project[0].id : '';
+    if (!data.ratingTable || data.ratingTable.length === 0) getOrCreateSeedTable(newProjectId);
+    recordAudit({ entityType: 'Project', entityId: newProjectId, action: 'IMPORT', entityName: newName, after: { source: parsed.manifest.projectName }, projectId: newProjectId });
+    commit();
+    return { projectId: newProjectId, name: newName };
+  }
+  function duplicateProject(projectId, newProjectName, sections) {
+    var project = byId('projects', projectId);
+    if (!project) throw new Error('پروژه یافت نشد.');
+    var selected = ['project', 'projectSetting'];
+    if (sections.structure) selected = selected.concat(['station', 'activity', 'workElement', 'activityAllowanceOverride', 'chartNode', 'chartEdge']);
+    if (sections.operators) selected.push('operator');
+    if (sections.groupsAndAllowances) selected = selected.concat(['activityGroup', 'allowanceCategory', 'groupAllowance']);
+    if (sections.ratingTables) selected = selected.concat(['ratingTable', 'ratingTableGrade', 'ratingAssessment']);
+    if (sections.rawObservations) selected = selected.concat(['studySession', 'cycleObservation', 'timelineLane', 'elementObservation']);
+    var full = dumpDomain(projectId);
+    var data = {};
+    selected.forEach(function (t) { data[t] = full[t] || []; });
+    var remapped = remapProjectData(data);
+    if (remapped.project && remapped.project[0]) {
+      remapped.project[0].name = newProjectName;
+      remapped.project[0].createdAt = U.nowISO();
+      remapped.project[0].updatedAt = U.nowISO();
+    }
+    delete remapped.finalizationInfo;
+    loadDomainData(remapped);
+    var newId = remapped.project && remapped.project[0] ? remapped.project[0].id : '';
+    if (!remapped.ratingTable || remapped.ratingTable.length === 0) getOrCreateSeedTable(newId);
+    recordAudit({ entityType: 'Project', entityId: newId, action: 'DUPLICATE', entityName: newProjectName, after: { sourceProjectId: projectId, sections: sections }, projectId: newId });
+    commit();
+    return { projectId: newId };
+  }
+
+  // ═══════════ پشتیبان‌گیری ═══════════
+  function createBackup(kind, note) {
+    var snapshot = dumpDomain(null);
+    var snapshotJson = JSON.stringify(snapshot);
+    var settings = getAppSettings();
+    var retention = parseInt(settings['backup.retention'], 10) || 10;
+    var record = {
+      id: U.uid(),
+      fileName: 'timing-backup-' + U.nowISO().replace(/[:.]/g, '-') + '.json',
+      kind: kind || 'MANUAL',
+      sizeBytes: snapshotJson.length,
+      checksum: null,
+      schemaVersion: CONST.SCHEMA_VERSION,
+      projectCount: state.projects.length,
+      createdAt: U.nowISO(),
+      note: note || null,
+    };
+    return checksumOf(snapshot).then(function (sum) {
+      record.checksum = sum;
+      state.backups.push({ record: record, snapshotJson: snapshotJson });
+      if (kind === 'AUTO') {
+        var autos = state.backups.filter(function (b) { return b.record.kind === 'AUTO'; }).sort(function (a, b) { return a.record.createdAt < b.record.createdAt ? -1 : 1; });
+        while (autos.length > retention) {
+          var oldest = autos.shift();
+          state.backups = state.backups.filter(function (b) { return b !== oldest; });
+        }
+      }
+      dirtySinceBackup = false;
+      recordAudit({ entityType: 'BackupRecord', entityId: record.id, action: 'BACKUP', entityName: record.fileName, after: { kind: record.kind, sizeBytes: record.sizeBytes } });
+      commit();
+      return record;
+    });
+  }
+  function listBackups() {
+    return state.backups.slice().sort(function (a, b) { return a.record.createdAt < b.record.createdAt ? 1 : -1; }).map(function (b) { return b.record; });
+  }
+  function deleteBackup(id) {
+    var b = state.backups.find(function (x) { return x.record.id === id; });
+    state.backups = state.backups.filter(function (x) { return x.record.id !== id; });
+    if (b) recordAudit({ entityType: 'BackupRecord', entityId: id, action: 'DELETE', entityName: b.record.fileName });
+    commit();
+  }
+  function applyDeletionMarkersToSnapshot(snapshot) {
+    var FK_DEPS = {
+      projectSetting: [{ t: 'project', fk: 'projectId' }], station: [{ t: 'project', fk: 'projectId' }],
+      activityGroup: [{ t: 'project', fk: 'projectId' }], allowanceCategory: [{ t: 'project', fk: 'projectId' }],
+      operator: [{ t: 'project', fk: 'projectId' }], ratingTable: [{ t: 'project', fk: 'projectId' }],
+      activity: [{ t: 'station', fk: 'stationId' }], ratingTableGrade: [{ t: 'ratingTable', fk: 'ratingTableId' }],
+      groupAllowance: [{ t: 'activityGroup', fk: 'groupId' }, { t: 'allowanceCategory', fk: 'categoryId' }],
+      activityAllowanceOverride: [{ t: 'activity', fk: 'activityId' }, { t: 'allowanceCategory', fk: 'categoryId' }],
+      workElement: [{ t: 'activity', fk: 'activityId' }], studySession: [{ t: 'activity', fk: 'activityId' }, { t: 'operator', fk: 'operatorId' }],
+      ratingAssessment: [{ t: 'workElement', fk: 'workElementId' }, { t: 'ratingTable', fk: 'ratingTableId' }],
+      cycleObservation: [{ t: 'studySession', fk: 'sessionId' }], timelineLane: [{ t: 'cycleObservation', fk: 'cycleId' }],
+      elementObservation: [{ t: 'cycleObservation', fk: 'cycleId' }, { t: 'workElement', fk: 'workElementId' }],
+      chartNode: [{ t: 'project', fk: 'projectId' }], chartEdge: [{ t: 'chartNode', fk: 'sourceNodeId' }, { t: 'chartNode', fk: 'targetNodeId' }],
+      calculationRun: [{ t: 'project', fk: 'projectId' }], finalizationInfo: [{ t: 'project', fk: 'projectId' }],
+    };
+    var ENTITY_OF_TABLE = { project: 'Project', station: 'Station', activity: 'Activity', workElement: 'WorkElement', operator: 'Operator', activityGroup: 'ActivityGroup', allowanceCategory: 'AllowanceCategory', ratingTable: 'RatingTable', studySession: 'StudySession' };
+    Object.keys(snapshot).forEach(function (table) {
+      var entity = ENTITY_OF_TABLE[table];
+      if (entity) snapshot[table] = snapshot[table].filter(function (row) { return !isDeleted(entity, row.id); });
+    });
+    for (var pass = 0; pass < 3; pass++) {
+      Object.keys(FK_DEPS).forEach(function (table) {
+        if (!snapshot[table]) return;
+        snapshot[table] = snapshot[table].filter(function (row) {
+          return FK_DEPS[table].every(function (dep) {
+            if (row[dep.fk] === null || row[dep.fk] === undefined) return true;
+            var parents = snapshot[dep.t] || [];
+            return parents.some(function (p) { return p.id === row[dep.fk]; });
+          });
+        });
+      });
+    }
+    return snapshot;
+  }
+  function restoreSnapshot(snapshot) {
+    return createBackup('PRE_RESTORE', 'پیش از بازیابی خودکار ایجاد شد').then(function () {
+      DOMAIN_ORDER.forEach(function (plural) { state[plural] = []; });
+      loadDomainData(snapshot);
+      recordAudit({ entityType: 'BackupRecord', entityId: 'restore', action: 'RESTORE', entityName: 'بازیابی پشتیبان', after: { projectCount: snapshot.project ? snapshot.project.length : 0 } });
+      commit();
+    });
+  }
+  function restoreBackup(id) {
+    var b = state.backups.find(function (x) { return x.record.id === id; });
+    if (!b) throw new Error('نسخه پشتیبان یافت نشد.');
+    var snapshot = JSON.parse(b.snapshotJson);
+    snapshot = applyDeletionMarkersToSnapshot(snapshot);
+    return restoreSnapshot(snapshot);
+  }
+  function restoreBackupFromJson(parsed) {
+    if (!parsed || parsed.format !== 'timing-offline-backup' || !parsed.snapshot) {
+      throw new Error('فایل پشتیبان معتبر نیست.');
+    }
+    return checksumOf(parsed.snapshot).then(function (actual) {
+      if (actual !== parsed.checksum) throw new Error('checksum پشتیبان با محتوای آن مطابقت ندارد؛ فایل آسیب دیده است.');
+      var snapshot = applyDeletionMarkersToSnapshot(parsed.snapshot);
+      return restoreSnapshot(snapshot);
+    });
+  }
+  function backupFileContent(id) {
+    var b = state.backups.find(function (x) { return x.record.id === id; });
+    if (!b) throw new Error('نسخه پشتیبان یافت نشد.');
+    return JSON.stringify({ format: 'timing-offline-backup', createdAt: b.record.createdAt, record: b.record, snapshot: JSON.parse(b.snapshotJson), checksum: b.record.checksum });
+  }
+  function autoBackupTick() {
+    var settings = getAppSettings();
+    if (settings['backup.autoEnabled'] !== 'true') return Promise.resolve(null);
+    if (!dirtySinceBackup) return Promise.resolve(null);
+    var intervalMin = parseInt(settings['backup.intervalMinutes'], 10) || 30;
+    var lastRaw = g.localStorage ? g.localStorage.getItem('timing2-last-backup-at') : null;
+    var last = lastRaw ? new Date(lastRaw).getTime() : 0;
+    if (Date.now() - last < intervalMin * 60 * 1000) return Promise.resolve(null);
+    if (g.localStorage) g.localStorage.setItem('timing2-last-backup-at', new Date().toISOString());
+    return createBackup('AUTO').then(function (r) {
+      if (typeof g.T2Toast === 'function') g.T2Toast('پشتیبان‌گیری خودکار انجام شد', { description: 'نسخه پشتیبان در حافظهٔ همین مرورگر ذخیره شد.' });
+      return r;
+    });
+  }
+
+  // ═══════════ داده دمو ═══════════
+  function seedDemo() {
+    var p = createProject({
+      name: 'دمو تحلیل — خط مونتاژ پمپ آب',
+      lineName: 'خط مونتاژ ۱', productName: 'پمپ آب مدل A',
+      studyDate: U.jalaliToISO(1404, 8, 13),
+      description: 'پروژه نمایشی برای تست نسخهٔ آفلاین — شامل ساختار کامل، ارزیابی وستینگهاوس، دو جلسهٔ زمان‌سنجی و دادهٔ مشکوک.',
+    });
+    var projectId = p.id;
+
+    var st1 = createStation(projectId, { name: 'ایستگاه مونتاژ بدنه', description: 'مونتاژ بدنه و روتور پمپ' });
+    var st2 = createStation(projectId, { name: 'ایستگاه کنترل نهایی', description: 'بازرسی عملکرد و آب‌بندی' });
+
+    var cat1 = createCategory(projectId, { name: 'استراحت شخصی', code: 'PF', isActive: true, sortOrder: 0 });
+    var cat2 = createCategory(projectId, { name: 'نیازهای طبیعی', code: 'NF', isActive: true, sortOrder: 1 });
+    var cat3 = createCategory(projectId, { name: 'مزاحمت کاری', code: 'WI', isActive: true, sortOrder: 2 });
+    var grp = createGroup(projectId, { name: 'کار دستی سبک', description: 'مونتاژ با ابزار دستی و پیچ‌گوشتی برقی' });
+    setGroupAllowance(grp.id, cat1.id, 0.05);
+    setGroupAllowance(grp.id, cat2.id, 0.03);
+
+    var act1 = createActivity(st1.id, { name: 'بستن درب پنل', description: 'بستن ۴ پیچ با پیچ‌گوشتی برقی', processType: 'OPERATION', groupId: grp.id, targetSampleCount: 10 });
+    var act2 = createActivity(st1.id, { name: 'پرس اتوماتیک روتور', description: 'پرس کوبی روتور روی شفت', processType: 'OPERATION' });
+    var act3 = createActivity(st2.id, { name: 'کنترل کیفیت نهایی', description: 'بازرسی عملکرد و آب‌بندی', processType: 'INSPECTION' });
+
+    var e1 = createElement(act1.id, { name: 'برداشتن قطعه از گراناق', elementType: 'MANUAL' });
+    var e2 = createElement(act1.id, { name: 'بستن چهار پیچ', elementType: 'MANUAL' });
+    var e3 = createElement(act1.id, { name: 'پرس اتوماتیک', elementType: 'MACHINE' });
+    var e4 = createElement(act2.id, { name: 'پرس کوبی روتور', elementType: 'OVERLAP' });
+    var e5 = createElement(act3.id, { name: 'بازرسی آب‌بندی', elementType: 'MANUAL' });
+
+    var op1 = createOperator(projectId, { displayName: 'رضا محمدی', code: 'P-1042', notes: 'سابقه ۵ سال روی این ایستگاه' });
+    var op2 = createOperator(projectId, { displayName: 'سمیه کریمی', code: 'P-1077' });
+
+    // ارزیابی وستینگهاوس — R=1.09 برای e1 (S=+0.06, E=+0.02, C=0, Cons=+0.01) — آزمون مرجع PRD
+    var table = getOrCreateSeedTable(projectId);
+    saveElementRating(e1.id, { ratingTableId: table.id, skillGrade: 'C1', effortGrade: 'C2', conditionsGrade: 'D', consistencyGrade: 'C', notes: 'مبنا: مشاهسه سه چرخه در شیفت صبح' });
+    saveElementRating(e2.id, { ratingTableId: table.id, skillGrade: 'C2', effortGrade: 'C2', conditionsGrade: 'D', consistencyGrade: 'D' });
+    saveElementRating(e3.id, { ratingTableId: table.id, skillGrade: 'D', effortGrade: 'D', conditionsGrade: 'D', consistencyGrade: 'C' });
+    saveElementRating(e4.id, { ratingTableId: table.id, skillGrade: 'C2', effortGrade: 'D', conditionsGrade: 'D', consistencyGrade: 'D' });
+    saveElementRating(e5.id, { ratingTableId: table.id, skillGrade: 'C1', effortGrade: 'C2', conditionsGrade: 'C', consistencyGrade: 'C' });
+
+    // جلسه ۱: رضا محمدی — برگشت به صفر، ۸ چرخه (با یک outlier 30.5)
+    var s1 = createSession(act1.id, { operatorId: op1.id, timingMethod: 'SNAPBACK', notes: 'نوبت صبح، شرایط عادی کارگاه' });
+    addCycles(s1.id, 8);
+    var snap = [
+      [8.2, 12.1, 6.4], [8.4, 11.8, 6.6], [8.1, 12.3, 6.5], [8.3, 12.0, 6.4],
+      [8.2, 30.5, 6.5], [8.4, 12.2, 6.7], [8.1, 11.9, 6.3], [8.3, 12.4, 6.6],
+    ];
+    var cells1 = [];
+    snap.forEach(function (row, i) {
+      row.forEach(function (v, j) { cells1.push({ cycleNo: i + 1, workElementId: [e1.id, e2.id, e3.id][j], rawDuration: v }); });
+    });
+    putCells(s1.id, cells1);
+
+    // جلسه ۲: سمیه کریمی — پیوسته، ۴ چرخه (قرائت تجمعی؛ زنجیره در طول جلسه ادامه دارد)
+    var s2 = createSession(act1.id, { operatorId: op2.id, timingMethod: 'CONTINUOUS', notes: 'نوبت عصر' });
+    addCycles(s2.id, 4);
+    var cont = [
+      [8.5, 21.0, 27.6], [36.0, 48.3, 54.8], [63.2, 75.6, 82.3], [90.8, 103.1, 109.6],
+    ];
+    var cells2 = [];
+    cont.forEach(function (row, i) {
+      row.forEach(function (v, j) { cells2.push({ cycleNo: i + 1, workElementId: [e1.id, e2.id, e3.id][j], cumulativeReading: v }); });
+    });
+    putCells(s2.id, cells2);
+
+    // جلسه ۳: فعالیت پرس — کار هم‌پوشانی با بازه شروع/پایان
+    var s3 = createSession(act2.id, { operatorId: op1.id, timingMethod: 'SNAPBACK', notes: 'پرس اتوماتیک با بارگذاری هم‌زمان' });
+    addCycles(s3.id, 3);
+    var cells3 = [];
+    for (var i = 0; i < 3; i++) {
+      cells3.push({ cycleNo: i + 1, workElementId: e4.id, startOffset: 2 + i * 0.2, endOffset: 14 + i * 0.3 });
+    }
+    putCells(s3.id, cells3);
+
+    // جلسه ۴: بازرسی
+    var s4 = createSession(act3.id, { operatorId: op2.id, timingMethod: 'SNAPBACK' });
+    addCycles(s4.id, 4);
+    var cells4 = [];
+    var insp = [15.2, 14.8, 15.5, 15.1];
+    insp.forEach(function (v, i) { cells4.push({ cycleNo: i + 1, workElementId: e5.id, rawDuration: v }); });
+    putCells(s4.id, cells4);
+
+    refreshOutliersForProject(projectId, { silent: true });
+    commit();
+    return p;
+  }
+
+  // ═══════════ راه‌اندازی و API عمومی ═══════════
+  state = load();
+
+  g.T2DB = {
+    CONST: CONST,
+    getState: getState,
+    subscribe: subscribe,
+    isStorageOk: function () { return storageOk; },
+    storageInfo: function () {
+      try {
+        var bytes = g.localStorage ? (g.localStorage.getItem(STORAGE_KEY) || '').length : 0;
+        return { bytes: bytes, projects: state.projects.length, ok: storageOk };
+      } catch (e) { return { bytes: 0, projects: state.projects.length, ok: false }; }
+    },
+    resetAll: function () {
+      state = emptyState();
+      if (g.localStorage) g.localStorage.removeItem(STORAGE_KEY);
+      commit();
+    },
+    exportAll: function () { return JSON.stringify(state); },
+    importAll: function (json) {
+      var parsed = JSON.parse(json);
+      var s = emptyState();
+      TABLES.forEach(function (t) { if (Array.isArray(parsed[t])) s[t] = parsed[t]; });
+      state = s;
+      commit();
+    },
+
+    getAppSettings: getAppSettings, setAppSettings: setAppSettings,
+    getDisplayPrefs: getDisplayPrefs, setDisplayPrefs: setDisplayPrefs,
+    getProjectSettings: getProjectSettings, getCalcSettings: getCalcSettings, putCalcSettings: putCalcSettings,
+    putProjectSettingRaw: function (projectId, values) { putProjectSettings(projectId, values); commit(); },
+
+    snapshotSessionRows: function (sessionId) {
+      var cycleIds = filterBy('cycleObservations', 'sessionId', sessionId).map(function (c) { return c.id; });
+      var cidMap = {}; cycleIds.forEach(function (id) { cidMap[id] = true; });
+      return {
+        cycles: state.cycleObservations.filter(function (c) { return cidMap[c.id]; }).map(function (c) { return JSON.parse(JSON.stringify(c)); }),
+        lanes: state.timelineLanes.filter(function (l) { return cidMap[l.cycleId]; }).map(function (l) { return JSON.parse(JSON.stringify(l)); }),
+        observations: state.elementObservations.filter(function (o) { return cidMap[o.cycleId]; }).map(function (o) { return JSON.parse(JSON.stringify(o)); }),
+      };
+    },
+    replaceSessionRows: function (sessionId, snap) {
+      var oldCycleIds = {};
+      filterBy('cycleObservations', 'sessionId', sessionId).forEach(function (c) { oldCycleIds[c.id] = true; });
+      state.cycleObservations = state.cycleObservations.filter(function (c) { return !oldCycleIds[c.id]; });
+      state.timelineLanes = state.timelineLanes.filter(function (l) { return !oldCycleIds[l.cycleId]; });
+      state.elementObservations = state.elementObservations.filter(function (o) { return !oldCycleIds[o.cycleId]; });
+      (snap.cycles || []).forEach(function (r) { state.cycleObservations.push(r); });
+      (snap.lanes || []).forEach(function (r) { state.timelineLanes.push(r); });
+      (snap.observations || []).forEach(function (r) { state.elementObservations.push(r); });
+      var se = byId('studySessions', sessionId);
+      markProjectCalculationsStale(se ? projectIdOfActivity(se.activityId) : null);
+      commit();
+    },
+
+    listProjects: listProjects, getProject: function (id) { return byId('projects', id); },
+    createProject: createProject, updateProject: updateProject, deleteProject: deleteProject,
+    duplicateProject: duplicateProject, finalizeProject: finalizeProject, unfinalizeProject: unfinalizeProject,
+    getProjectSummary: getProjectSummary, getFinalization: function (pid) { return state.finalizationInfos.find(function (f) { return f.projectId === pid; }) || null; },
+
+    sortStations: sortStations, sortActivities: sortActivities, sortElements: sortElements,
+    createStation: createStation, updateStation: updateStation, deleteStation: deleteStation, reorderStations: reorderStations,
+    createActivity: createActivity, updateActivity: updateActivity, deleteActivity: deleteActivity, reorderActivities: reorderActivities,
+    createElement: createElement, updateElement: updateElement, deleteElement: deleteElement, reorderElements: reorderElements,
+    getActivity: function (id) { return byId('activities', id); },
+    getStation: function (id) { return byId('stations', id); },
+
+    listOperators: listOperators, createOperator: createOperator, updateOperator: updateOperator, deleteOperator: deleteOperator,
+
+    listCategories: listCategories, createCategory: createCategory, updateCategory: updateCategory, deleteCategory: deleteCategory,
+    listGroups: listGroups, createGroup: createGroup, updateGroup: updateGroup, deleteGroup: deleteGroup,
+    setGroupAllowance: setGroupAllowance,
+    getEffectiveAllowances: getEffectiveAllowances, putActivityAllowances: putActivityAllowances,
+
+    listRatingTables: listRatingTables, getOrCreateSeedTable: getOrCreateSeedTable,
+    createRatingTableVersion: createRatingTableVersion, updateRatingTableMeta: updateRatingTableMeta,
+    updateRatingTableGrade: updateRatingTableGrade, deleteRatingTable: deleteRatingTable,
+    getElementRating: getElementRating, saveElementRating: saveElementRating, deleteElementRating: deleteElementRating,
+    getRatingMatrix: getRatingMatrix,
+
+    listSessions: listSessions, createSession: createSession, updateSession: updateSession,
+    closeSession: closeSession, reopenSession: reopenSession, deleteSession: deleteSession,
+    getSheet: getSheet, addCycles: addCycles, deleteCycle: deleteCycle, updateCycleNotes: updateCycleNotes,
+    putCells: putCells, parseCellInput: parseCellInput, pastePreview: pastePreview, pasteCommit: pasteCommit,
+    setObservationValidity: setObservationValidity,
+
+    getOutlierConfig: getOutlierConfig, setOutlierConfig: setOutlierConfig,
+    refreshOutliersForElement: refreshOutliersForElement, refreshOutliersForActivity: refreshOutliersForActivity,
+    refreshOutliersForProject: refreshOutliersForProject,
+
+    getActivityAnalysis: getActivityAnalysis, listActivitiesForAnalysis: listActivitiesForAnalysis,
+    runProjectCalculation: runProjectCalculation, getLatestCalculation: getLatestCalculation,
+
+    getChart: getChart, createManualNode: createManualNode, updateChartNode: updateChartNode,
+    deleteChartNode: deleteChartNode, saveChartLayout: saveChartLayout, moveChartNodeOrder: moveChartNodeOrder,
+    createChartEdge: createChartEdge, deleteChartEdge: deleteChartEdge, getChartsStageState: getChartsStageState,
+    autoLayout: computeAutoLayout,
+
+    getProjectDashboard: getProjectDashboard, computeStageSummary: computeStageSummary,
+
+    listAudit: listAudit,
+
+    createBackup: createBackup, listBackups: listBackups, deleteBackup: deleteBackup,
+    restoreBackup: restoreBackup, restoreBackupFromJson: restoreBackupFromJson, backupFileContent: backupFileContent,
+    autoBackupTick: autoBackupTick,
+
+    exportProjectPackage: exportProjectPackage, validateProjectPackage: validateProjectPackage,
+    importProjectPackage: importProjectPackage, checksumOf: checksumOf,
+
+    seedDemo: seedDemo,
+    NODE_W: NODE_W, NODE_H_EST: NODE_H_EST,
+  };
+})(typeof window !== 'undefined' ? window : globalThis);

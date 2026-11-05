@@ -73,3 +73,12 @@ export function formatInt(value: number | null | undefined, prefs: DisplayPrefs)
   if (value === null || value === undefined || !Number.isFinite(value)) return '—'
   return applyDigits(String(Math.round(value)), prefs.digits)
 }
+
+/**
+ * متن توضیحی تولیدشدهٔ سرور را مطابق ترجیح ارقام نمایش می‌دهد — FR-29.
+ * فقط برای جمله‌های سیستمی (یادداشت/علت/پیام)؛ نام‌های ثبت‌شدهٔ کاربر
+ * دست‌نخورده می‌مانند.
+ */
+export function displayServerText(text: string, prefs: DisplayPrefs): string {
+  return applyDigits(text, prefs.digits)
+}

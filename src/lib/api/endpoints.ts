@@ -661,8 +661,8 @@ export interface ActivityAnalysisDto {
   allowances: EffectiveAllowancesDto
   sampleProgress: {
     targetSampleCount: number | null
-    validCycles: number
-    totalCycles: number
+    validCycles: number | null
+    totalCycles: number | null
     sessionsCount: number
     reached: boolean | null
     message: string
@@ -775,6 +775,276 @@ export const chartsApi = {
   createEdge: (projectId: string, body: { sourceNodeId: string; targetNodeId: string }) =>
     api.post<{ edge: { id: string } }>(`/api/chart-edges?projectId=${projectId}`, body),
   deleteEdge: (edgeId: string) => api.del<{ deleted: boolean }>(`/api/chart-edges/${edgeId}`),
+}
+
+
+// ── داشبورد و گزارش‌ها — فاز ۶ / FR-21/22 ──
+
+export interface DashboardCardItemDto {
+  key: 'st' | 'meanCycle' | 'samples' | 'target'
+  title: string
+  value: number | null
+  unit: string
+  denominator: number | null
+  reason: string | null
+  note: string
+  tone: 'OK' | 'WARNING' | 'INFO'
+}
+
+export interface DashboardActivityRowDto {
+  activityId: string
+  stationName: string
+  activityName: string
+  processType: string
+  elementsCount: number
+  validCycles: number
+  totalCycles: number
+  target: number | null
+  targetReached: boolean | null
+  otSum: number | null
+  st: number | null
+  stStatus: 'OK' | 'NEEDS_AGGREGATION_RULE' | 'INCOMPLETE'
+  stReason: string
+  suspectsPending: number
+}
+
+export interface DashboardOperatorRowDto {
+  operatorId: string
+  operatorName: string
+  observations: number
+  activitiesCount: number
+  suspectCount: number
+  excludedCount: number
+  relativeIndex: number | null
+}
+
+export interface DashboardElementCvRowDto {
+  elementName: string
+  activityName: string
+  elementType: string
+  cvPercent: number | null
+  count: number
+  ot: number | null
+}
+
+export interface ProjectDashboardDto {
+  project: {
+    id: string
+    name: string
+    lineName: string
+    productName: string
+    studyDate: string | null
+    finalized: boolean
+  }
+  settings: { allowanceMethod: string; aggregationMethod: string }
+  cards: DashboardCardItemDto[]
+  activities: DashboardActivityRowDto[]
+  observationStatus: { valid: number; suspect: number; excluded: number; invalid: number }
+  operators: DashboardOperatorRowDto[]
+  elementCv: DashboardElementCvRowDto[]
+  reviewNeeds: {
+    suspectsPending: number
+    suspectsByActivity: { activityName: string; count: number }[]
+    elementsWithoutRating: string[]
+    activitiesNeedingAggregationRule: string[]
+    activitiesIncomplete: string[]
+    sampleShortfall: { activityName: string; valid: number; target: number }[]
+    needsRecalc: boolean
+    lastCalculationAt: string | null
+    lastCalculationStatus: string | null
+  }
+  cycleSummary: { count: number; weightedMean: number | null }
+  counts: { stations: number; activities: number; elements: number; operators: number; sessions: number }
+  generatedAt: string
+}
+
+/** چیدمان شخصی‌سازی‌شدهٔ داشبورد — FR-21 */
+export interface DashboardLayoutDto {
+  cardOrder?: string[]
+  hiddenCards?: string[]
+  widgetOrder?: string[]
+  hiddenWidgets?: string[]
+}
+
+export const dashboardApi = {
+  get: (projectId: string) => api.get<ProjectDashboardDto>(`/api/projects/${projectId}/dashboard`),
+  getLayout: (projectId: string) =>
+    api.get<{ layout: DashboardLayoutDto | null }>(`/api/projects/${projectId}/dashboard-layout`),
+  putLayout: (projectId: string, layout: DashboardLayoutDto) =>
+    api.put<{ layout: DashboardLayoutDto }>(`/api/projects/${projectId}/dashboard-layout`, layout),
+}
+
+// ── گزارش مطالعه — FR-22 ──
+
+export interface ReportRatingFactorDto {
+  grade: string | null
+  value: number
+  label: string
+}
+
+export interface ReportElementRowDto {
+  name: string
+  elementTypeLabel: string
+  counts: { calcBasis: number; suspect: number; excluded: number }
+  stats: {
+    count: number
+    mean: number | null
+    median: number | null
+    sampleSD: number | null
+    cvPercent: number | null
+    ci95: { lower: number; upper: number } | null
+  }
+  ot: number | null
+  otNote: string
+  rating: {
+    tableName: string
+    tableVersion: number
+    skill: ReportRatingFactorDto
+    effort: ReportRatingFactorDto
+    conditions: ReportRatingFactorDto
+    consistency: ReportRatingFactorDto
+    totalFactor: number
+  } | null
+  nt: number | null
+  st: number | null
+  stError: string | null
+  operatorsCount: number
+}
+
+export interface ReportSuspectDto {
+  observationId: string
+  elementName: string
+  cycleNo: number
+  operatorName: string
+  value: number | null
+  score: number | null
+  rule: string | null
+  validityStatus: 'SUSPECT' | 'EXCLUDED'
+  exclusionReason: string | null
+}
+
+export interface ReportActivitySectionDto {
+  activity: {
+    id: string
+    name: string
+    stationName: string
+    processTypeLabel: string
+    groupName: string | null
+    description: string | null
+    targetSampleCount: number | null
+  }
+  methods: { methodKey: string; methodLabel: string; sessionsCount: number; operators: string[] }[]
+  sampleProgress: {
+    targetSampleCount: number | null
+    validCycles: number
+    totalCycles: number
+    sessionsCount: number
+    reached: boolean | null
+    message: string
+  }
+  allowances: {
+    methodLabel: string
+    formula: string
+    hasGroup: boolean
+    groupName: string | null
+    totalA: number
+    categories: {
+      categoryId: string
+      name: string
+      code: string | null
+      isActive: boolean
+      source: string
+      sourceLabel: string
+      groupValue: number | null
+      overrideValue: number | null
+      effectiveValue: number | null
+    }[]
+  }
+  elements: ReportElementRowDto[]
+  activityTotal: { st: number | null; status: 'OK' | 'NEEDS_AGGREGATION_RULE' | 'INCOMPLETE'; reason: string }
+  cycleStats: { count: number | null; mean: number | null; sampleSD: number | null; cvPercent: number | null; methodNote: string }
+  suspects: ReportSuspectDto[]
+}
+
+export interface StudyReportInfoDto {
+  reportMeta: {
+    title: string
+    generatedAt: string
+    activityFilter: { id: string; name: string } | null
+    operatorFilter: { id: string; name: string } | null
+    operatorNote: string | null
+  }
+  project: {
+    name: string
+    lineName: string
+    productName: string
+    studyDate: string | null
+    statusLabel: string
+    description: string | null
+    finalized: boolean
+    finalizationReason: string | null
+  }
+  assumptions: {
+    allowanceMethodLabel: string
+    stFormula: string
+    stFormulaConstraint: string | null
+    aggregationMethodLabel: string
+    outlierMethodLabel: string
+    outlierThresholdLabel: string
+    formulaVersion: string
+    westinghouseNote: string
+  }
+  activities: ReportActivitySectionDto[]
+  flags: {
+    pendingSuspects: number
+    needsRecalc: boolean
+    lastCalculationAt: string | null
+    lastCalculationStatus: string | null
+    activitiesNeedingAggregationRule: string[]
+    activitiesIncomplete: string[]
+    sampleTargetsNotReached: string[]
+    elementsUnrated: string[]
+    anyStError: boolean
+  }
+  disclaimer: string
+}
+
+export interface ReportSelectionDto {
+  stations: { id: string; name: string; activities: { id: string; name: string; hasData: boolean }[] }[]
+  operators: { id: string; name: string; hasData: boolean }[]
+  sessionsCount: number
+}
+
+export type ExcelReportTypeValue = 'overview' | 'summary' | 'operators' | 'raw'
+
+export const EXCEL_REPORT_LABELS: Record<ExcelReportTypeValue, string> = {
+  overview: 'نگاه کل پروژه',
+  summary: 'خلاصهٔ محاسبات (عناصر)',
+  operators: 'مقایسهٔ اپراتورها',
+  raw: 'داده‌های خام مشاهدات',
+}
+
+export const reportsApi = {
+  selection: (projectId: string) =>
+    api.get<ReportSelectionDto>(`/api/projects/${projectId}/reports/study?mode=selection`),
+  study: (projectId: string, opts: { activityId?: string; operatorId?: string } = {}) => {
+    const params = new URLSearchParams()
+    if (opts.activityId) params.set('activityId', opts.activityId)
+    if (opts.operatorId) params.set('operatorId', opts.operatorId)
+    const qs = params.toString()
+    return api.get<StudyReportInfoDto>(`/api/projects/${projectId}/reports/study${qs ? `?${qs}` : ''}`)
+  },
+  /** آدرس دانلود Excel — با window.open باز شود تا فایل دانلود شود */
+  excelUrl: (
+    projectId: string,
+    type: ExcelReportTypeValue,
+    opts: { activityId?: string; operatorId?: string } = {}
+  ) => {
+    const params = new URLSearchParams({ type })
+    if (opts.activityId) params.set('activityId', opts.activityId)
+    if (opts.operatorId) params.set('operatorId', opts.operatorId)
+    return `/api/projects/${projectId}/reports/excel?${params.toString()}`
+  },
 }
 
 

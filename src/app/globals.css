@@ -289,3 +289,58 @@
     display: none !important;
   }
 }
+
+/* ═══════════ چاپ گزارش رسمی — FR-22 (فاز ۶) ═══════════
+   رویکرد: مرورگر با HarfBuzz متن فارسی را کامل شکل‌دهی می‌کند؛
+   «چاپ / ذخیره PDF» خروجی PDF بومی و کاملاً آفلاین می‌سازد.
+   فقط ناحیهٔ .print-report چاپ می‌شود و بقیهٔ برنامه مخفی است. */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm 10mm;
+  }
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-report,
+  .print-report * {
+    visibility: visible;
+  }
+  .print-report {
+    position: absolute !important;
+    inset-inline-start: 0 !important;
+    inset-block-start: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .print-report .print-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-report tr,
+  .print-report img,
+  .print-report svg {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-report table {
+    break-inside: auto;
+  }
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

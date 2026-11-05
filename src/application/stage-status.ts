@@ -2,10 +2,9 @@
 // سرویس وضعیت مراحل مطالعه — ۷.۲ / FR-03
 // وضعیت چهارگانه از داده واقعی محاسبه می‌شود:
 // انجام‌نشده / در حال انجام / تکمیل‌شده / نیازمند بررسی
-// مراحل فازهای بعدی با برچسب صادقانه «فاز بعدی» نمایش داده می‌شوند.
 // ═══════════════════════════════════════════════════════════
 import { db } from '@/lib/db'
-import { DEVELOPMENT_PHASES, type StageKey, type StageStatus } from '@/domain/types'
+import { type StageKey, type StageStatus } from '@/domain/types'
 import { getChartsStageState } from './chart-service'
 
 export interface StageState {
@@ -219,12 +218,51 @@ export async function computeStageSummary(projectId: string): Promise<StageSumma
     }
   }
 
-  // مراحل فازهای بعدی — برچسب صادقانه (قابلیت‌ها حذف نشده‌اند؛ ترتیب توسعه‌اند)
-  stages.dashboard = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.dashboard, hint: 'کارت‌های خلاصه و شاخص‌های تخصصی.' }
-  stages.reports = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.reports, hint: 'خروجی Excel و PDF.' }
+  // داشبورد — فاز ۶ فعال؛ وضعیت از دادهٔ واقعی — FR-21
+  if (validCycles === 0) {
+    stages.dashboard = {
+      status: 'PENDING',
+      hint: 'برای مشاهدهٔ کارت‌ها و شاخص‌های تخصصی، ابتدا دادهٔ زمان‌سنجی ثبت کنید.',
+    }
+  } else if (suspectCount > 0) {
+    stages.dashboard = {
+      status: 'NEEDS_REVIEW',
+      hint: `${suspectCount} مشاهدهٔ مشکوک نیازمند تصمیم است؛ تا بازبینی، شاخص‌های داشبورد بر مبنای آن‌ها محاسبه می‌شود.`,
+    }
+  } else if (elementsWithRating < elementCount) {
+    stages.dashboard = {
+      status: 'IN_PROGRESS',
+      hint: 'دادهٔ زمان‌سنجی موجود است؛ برای محاسبهٔ NT/ST در کارت‌ها، ارزیابی وستینگهاوس همهٔ عناصر لازم است.',
+    }
+  } else {
+    stages.dashboard = {
+      status: 'DONE',
+      hint: 'داشبورد آماده است؛ کارت‌ها و شاخص‌ها هر بار از جدیدترین داده محاسبه می‌شوند.',
+    }
+  }
+
+  // گزارش‌ها — فاز ۶ فعال؛ وضعیت از دادهٔ واقعی — FR-22
+  if (validCycles === 0) {
+    stages.reports = {
+      status: 'PENDING',
+      hint: 'برای تهیهٔ گزارش Excel/PDF، ابتدا دادهٔ زمان‌سنجی ثبت کنید.',
+    }
+  } else if (suspectCount > 0) {
+    stages.reports = {
+      status: 'NEEDS_REVIEW',
+      hint: `${suspectCount} مشاهدهٔ مشکوک بازبینی نشده است؛ گزارش رسمی باید وضعیت بازبینی را شفاف بیان کند.`,
+    }
+  } else {
+    stages.reports = {
+      status: 'DONE',
+      hint: 'مرکز گزارش‌ها آماده است؛ خروجی Excel برای تحلیل و PDF برای گزارش رسمی.',
+    }
+  }
 
   // پیشرفت شفاف مطالعه — تعریف: میانگین وزن مراحل فعال نسخه اول
-  const activeKeys: StageKey[] = ['info', 'structure', 'operators', 'allowances', 'westinghouse', 'timing', 'analysis', 'charts']
+  const activeKeys: StageKey[] = [
+    'info', 'structure', 'operators', 'allowances', 'westinghouse', 'timing', 'analysis', 'charts', 'dashboard', 'reports',
+  ]
   const weight = (s: StageState): number =>
     s.status === 'DONE' ? 1 : s.status === 'IN_PROGRESS' || s.status === 'NEEDS_REVIEW' ? 0.5 : 0
   const progress =

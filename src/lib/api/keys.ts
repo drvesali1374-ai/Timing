@@ -32,4 +32,10 @@ export const qk = {
   latestCalculation: (projectId: string) => ['latest-calculation', projectId] as const,
   // ── نمودار فرایند — فاز ۵ ──
   chart: (projectId: string, chartType: string) => ['chart', projectId, chartType] as const,
+  // ── داشبورد و گزارش‌ها — فاز ۶ ──
+  dashboard: (projectId: string) => ['dashboard', projectId] as const,
+  dashboardLayout: (projectId: string) => ['dashboard-layout', projectId] as const,
+  reportSelection: (projectId: string) => ['report-selection', projectId] as const,
+  studyReport: (projectId: string, activityId?: string, operatorId?: string) =>
+    ['study-report', projectId, activityId ?? 'all', operatorId ?? 'all'] as const,
 }

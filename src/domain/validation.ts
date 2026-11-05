@@ -386,3 +386,16 @@ export type ChartManualNodeCreateInput = z.infer<typeof chartManualNodeCreateSch
 export type ChartNodeUpdateInput = z.infer<typeof chartNodeUpdateSchema>
 export type ChartEdgeCreateInput = z.infer<typeof chartEdgeCreateSchema>
 export type ChartOrderMoveInput = z.infer<typeof chartOrderMoveSchema>
+
+// ── چیدمان شخصی‌سازی‌شدهٔ داشبورد — FR-21 (فاز ۶) ──
+// ترتیب و مرئی‌بودن کارت‌ها و نمودارها؛ ذخیره در تنظیمات پروژه.
+// توجه: کلیدهای مجاز محدود به شناسه‌های شناخته‌شدهٔ سرویس داشبورد است.
+export const DASHBOARD_CARD_KEYS = ['st', 'meanCycle', 'samples', 'target'] as const
+export const DASHBOARD_WIDGET_KEYS = ['activities', 'statusDonut', 'operators', 'elementCv', 'reviewNeeds'] as const
+
+export const dashboardLayoutSchema = z.object({
+  cardOrder: z.array(z.enum(DASHBOARD_CARD_KEYS)).max(8).optional(),
+  hiddenCards: z.array(z.enum(DASHBOARD_CARD_KEYS)).max(8).optional(),
+  widgetOrder: z.array(z.enum(DASHBOARD_WIDGET_KEYS)).max(8).optional(),
+  hiddenWidgets: z.array(z.enum(DASHBOARD_WIDGET_KEYS)).max(8).optional(),
+})

@@ -17,6 +17,8 @@ import {
   BarChart3,
   CheckCircle2,
   Clock,
+  FileSpreadsheet,
+  FileText,
   FlaskConical,
   Gauge,
   Info,
@@ -48,10 +50,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { EmptyState } from '@/components/common/Feedback'
 import { HelpDot } from '@/components/common/HelpDot'
-import { analysisApi, timingApi, type ElementAnalysisItemDto } from '@/lib/api/endpoints'
+import { analysisApi, reportsApi, timingApi, type ElementAnalysisItemDto } from '@/lib/api/endpoints'
 import { qk } from '@/lib/api/keys'
 import { ELEMENT_TYPE_LABELS, type ElementType } from '@/domain/types'
 import { useDisplayPrefs } from '@/store/display-store'
+import { useAppStore } from '@/store/app-store'
 import { formatDateTime, formatInt, formatPercent, formatTimeValue } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -73,6 +76,8 @@ function TrendDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { s
 export default function AnalysisContent({ activityId }: { activityId: string }) {
   const prefs = useDisplayPrefs()
   const qc = useQueryClient()
+  const navigate = useAppStore((s) => s.navigate)
+  const setReportPrefillActivity = useAppStore((s) => s.setReportPrefillActivity)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [excludeTarget, setExcludeTarget] = useState<{ observationId: string; elementName: string; cycleNo: number; value: number | null } | null>(null)
   const [excludeReason, setExcludeReason] = useState('')
@@ -201,6 +206,50 @@ export default function AnalysisContent({ activityId }: { activityId: string }) 
           }
           tone="brand"
         />
+      </div>
+
+      {/* ── خروجی سریع این فعالیت — FR-22 ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card p-3">
+        <p className="flex items-center gap-1.5 text-sm font-bold">
+          <FileText className="size-4 text-brand" aria-hidden />
+          خروجی سریع این فعالیت
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() =>
+              window.open(reportsApi.excelUrl(analysis.activity.projectId, 'summary', { activityId }))
+            }
+          >
+            <FileSpreadsheet className="size-4" aria-hidden />
+            Excel محاسبات
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() =>
+              window.open(reportsApi.excelUrl(analysis.activity.projectId, 'raw', { activityId }))
+            }
+          >
+            <FileSpreadsheet className="size-4" aria-hidden />
+            Excel داده‌های خام
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              setReportPrefillActivity(activityId)
+              navigate({ name: 'project', projectId: analysis.activity.projectId, stage: 'reports' })
+            }}
+          >
+            <FileText className="size-4" aria-hidden />
+            گزارش رسمی (PDF)
+          </Button>
+        </div>
       </div>
 
       {/* پیام پیشرفت نمونه — FR-12 */}

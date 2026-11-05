@@ -23,7 +23,10 @@ interface AppState {
   helpOpen: boolean
   /** شناسه انتخاب فعلی در درخت ساختار (باقی‌مانده هنگام جابه‌جایی) */
   selectedStationId: string | null
+  /** پیش‌انتخاب فیلتر فعالیت برای مرکز گزارش‌ها (خروجی سریع — FR-22) */
+  reportPrefillActivityId: string | null
   navigate: (view: AppView) => void
+  setReportPrefillActivity: (activityId: string | null) => void
   goHome: () => void
   openProject: (projectId: string, stage?: StageKey) => void
   openActivity: (projectId: string, activityId: string) => void
@@ -59,6 +62,7 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarCollapsed: false,
   helpOpen: false,
   selectedStationId: null,
+  reportPrefillActivityId: null,
   navigate: (view) => {
     const hash = viewToHash(view)
     if (window.location.hash !== hash) {
@@ -74,6 +78,7 @@ export const useAppStore = create<AppState>((set) => ({
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setHelpOpen: (open) => set({ helpOpen: open }),
   setSelectedStation: (stationId) => set({ selectedStationId: stationId }),
+  setReportPrefillActivity: (activityId) => set({ reportPrefillActivityId: activityId }),
 }))
 
 /** همگام‌سازی وضعیت با hash مرورگر (بارگذاری مجدد/اشتراک مسیر) */

@@ -32,7 +32,7 @@ export const registry: Record<RegistryView, ViewComponent> = {
   timing: lazy(() => import('./project/TimingView')),
   analysis: lazy(() => import('./project/AnalysisView')),
   charts: lazy(() => import('./project/ChartsView')),
-  dashboard: lazy(() => import('./project/DashboardPendingView')),
-  reports: lazy(() => import('./project/ReportsPendingView')),
+  dashboard: lazy(() => import('./project/DashboardView')),
+  reports: lazy(() => import('./project/ReportsView')),
   data: lazy(() => import('./project/DataView')),
 }

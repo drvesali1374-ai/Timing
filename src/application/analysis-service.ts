@@ -46,8 +46,10 @@ export interface OperatorComparisonRow {
   operatorName: string
   count: number
   mean: number | null
+  median: number | null
   sampleSD: number | null
   cvPercent: number | null
+  ci95: { lower: number; upper: number } | null
   suspectCount: number
   excludedCount: number
   nt: number | null
@@ -349,8 +351,10 @@ export async function getActivityAnalysis(activityId: string): Promise<ActivityA
         operatorName: operatorById.get(operatorId)?.displayName ?? 'اپراتور حذف‌شده',
         count: vals.length,
         mean: opMean,
+        median: opStats.median,
         sampleSD: opStats.sampleSD,
         cvPercent: opStats.cvPercent,
+        ci95: opStats.ci95,
         suspectCount: opRows.filter((r) => r.validityStatus === 'SUSPECT').length,
         excludedCount: opRows.filter((r) => r.validityStatus === 'EXCLUDED').length,
         nt: opNt,

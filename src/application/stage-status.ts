@@ -30,7 +30,7 @@ export interface StageSummary {
 }
 
 export async function computeStageSummary(projectId: string): Promise<StageSummary> {
-  const [project, stations, activities, elements, operators, groups, categories, assessments] =
+  const [project, stations, activities, elements, operators, groups, categories, assessments, sessions, validCycles] =
     await Promise.all([
       db.project.findUnique({ where: { id: projectId }, select: { studyDate: true, finalization: true } }),
       db.station.findMany({ where: { projectId }, select: { id: true } }),
@@ -40,7 +40,7 @@ export async function computeStageSummary(projectId: string): Promise<StageSumma
       }),
       db.workElement.findMany({
         where: { activity: { station: { projectId } } },
-        select: { id: true },
+        select: { id: true, activityId: true },
       }),
       db.operator.findMany({ where: { projectId }, select: { id: true } }),
       db.activityGroup.findMany({
@@ -51,6 +51,17 @@ export async function computeStageSummary(projectId: string): Promise<StageSumma
       db.ratingAssessment.findMany({
         where: { workElement: { activity: { station: { projectId } } } },
         select: { id: true },
+      }),
+      db.studySession.findMany({
+        where: { activity: { station: { projectId } } },
+        select: { id: true, activityId: true },
+      }),
+      db.cycleObservation.count({
+        where: {
+          isComplete: true,
+          session: { activity: { station: { projectId } } },
+          observations: { none: { validityStatus: { in: ['EXCLUDED', 'INVALID'] } } },
+        },
       }),
     ])
 
@@ -127,15 +138,41 @@ export async function computeStageSummary(projectId: string): Promise<StageSumma
     stages.westinghouse = { status: 'DONE', hint: 'همه عناصر کاری ارزیابی شده‌اند.' }
   }
 
+  // زمان‌سنجی — فاز ۳ فعال؛ وضعیت از دادهٔ واقعی — FR-06/07/12
+  const activitiesWithElements = new Set(elements.map((e) => e.activityId))
+  const sessionActivityIds = new Set(sessions.map((s) => s.activityId))
+  const activitiesMissingSessions = activities.filter(
+    (a) => activitiesWithElements.has(a.id) && !sessionActivityIds.has(a.id)
+  )
+  if (elementCount === 0 || operators.length === 0) {
+    stages.timing = {
+      status: 'PENDING',
+      hint: 'برای زمان‌سنجی، ابتدا عناصر کاری و اپراتورها را تکمیل کنید.',
+    }
+  } else if (sessions.length === 0) {
+    stages.timing = { status: 'PENDING', hint: 'هنوز جلسه‌ای ایجاد نشده است؛ جلسه = فعالیت × اپراتور × روش.' }
+  } else if (validCycles === 0) {
+    stages.timing = { status: 'IN_PROGRESS', hint: 'جلسه‌ها ایجاد شده‌اند؛ چرخه‌ها را در برگه ثبت کنید.' }
+  } else if (activitiesMissingSessions.length > 0) {
+    stages.timing = {
+      status: 'NEEDS_REVIEW',
+      hint: `${activitiesMissingSessions.length} فعالیت دارای عنصر، هنوز جلسه زمان‌سنجی ندارد.`,
+    }
+  } else {
+    stages.timing = {
+      status: validCycles > 0 ? 'DONE' : 'IN_PROGRESS',
+      hint: `تاکنون ${validCycles} چرخهٔ معتبر ثبت شده است.`,
+    }
+  }
+
   // مراحل فازهای بعدی — برچسب صادقانه (قابلیت‌ها حذف نشده‌اند؛ ترتیب توسعه‌اند)
-  stages.timing = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.timing, hint: 'جلسه زمان‌سنجی، جدول چرخه‌محور و Paste از Excel.' }
   stages.analysis = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.analysis, hint: 'آمار، تشخیص غیرعادی و مقایسه اپراتورها.' }
   stages.charts = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.charts, hint: 'نمودار فرایند OPC/FPC.' }
   stages.dashboard = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.dashboard, hint: 'کارت‌های خلاصه و شاخص‌های تخصصی.' }
   stages.reports = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.reports, hint: 'خروجی Excel و PDF.' }
 
   // پیشرفت شفاف مطالعه — تعریف: میانگین وزن مراحل فعال نسخه اول
-  const activeKeys: StageKey[] = ['info', 'structure', 'operators', 'allowances', 'westinghouse']
+  const activeKeys: StageKey[] = ['info', 'structure', 'operators', 'allowances', 'westinghouse', 'timing']
   const weight = (s: StageState): number =>
     s.status === 'DONE' ? 1 : s.status === 'IN_PROGRESS' || s.status === 'NEEDS_REVIEW' ? 0.5 : 0
   const progress =

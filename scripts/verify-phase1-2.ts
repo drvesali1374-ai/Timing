@@ -454,7 +454,8 @@ async function main() {
     const summary = await api('GET', `/api/projects/${PID}/summary`)
     check('وضعیت چهارگانه محاسبه می‌شود', typeof summary.data?.stages?.info?.status === 'string')
     check('مرحله مشخصات DONE', summary.data?.stages?.info?.status === 'DONE', summary.data?.stages?.info?.status)
-    check('مرحله زمان‌سنجی FUTURE_PHASE با برچسب فاز ۳', summary.data?.stages?.timing?.status === 'FUTURE_PHASE' && summary.data?.stages?.timing?.phase === 3)
+    // فاز ۳ پیاده‌سازی شده است؛ مرحلهٔ زمان‌سنجی اکنون از دادهٔ واقعی محاسبه می‌شود
+    check('مرحله زمان‌سنجی فعال است (نه فاز آینده)', summary.data?.stages?.timing?.status !== 'FUTURE_PHASE', summary.data?.stages?.timing?.status)
     check('پیشرفت بین ۰ و ۱', typeof summary.data?.progress === 'number' && summary.data.progress > 0 && summary.data.progress <= 1, summary.data?.progress)
 
     const settings = await api('GET', '/api/settings')

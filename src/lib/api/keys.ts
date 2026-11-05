@@ -23,4 +23,7 @@ export const qk = {
   backups: () => ['backups'] as const,
   audit: (projectId?: string) => ['audit', projectId ?? 'all'] as const,
   settings: () => ['settings'] as const,
+  // ── زمان‌سنجی — فاز ۳ ──
+  sessions: (activityId: string) => ['timing-sessions', activityId] as const,
+  sessionSheet: (sessionId: string) => ['timing-sheet', sessionId] as const,
 }

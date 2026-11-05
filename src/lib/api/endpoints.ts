@@ -265,6 +265,187 @@ export interface AppSettingsDto {
   settings: Record<string, string>
 }
 
+// ── زمان‌سنجی — فاز ۳ ──
+export interface SessionListItemDto {
+  id: string
+  operatorId: string
+  operatorName: string
+  timingMethod: 'SNAPBACK' | 'CONTINUOUS'
+  status: string
+  notes: string | null
+  startedAt: string
+  endedAt: string | null
+  cyclesCount: number
+  validCyclesCount: number
+}
+
+export interface ObservationCellDto {
+  id: string
+  workElementId: string
+  laneId: string | null
+  laneType: string | null
+  rawDuration: number | null
+  cumulativeReading: number | null
+  startOffset: number | null
+  endOffset: number | null
+  derivedDuration: number | null
+  validityStatus: string
+  isUserExcluded: boolean
+  exclusionReason: string | null
+}
+
+export interface CycleRowDto {
+  id: string
+  cycleNo: number
+  notes: string | null
+  isComplete: boolean
+  createdAt: string
+  updatedAt: string
+  elapsed: number | null
+  elapsedExcludesSequential: boolean
+  hasExcluded: boolean
+  hasSuspect: boolean
+  hasIncompleteInterval: boolean
+  observations: ObservationCellDto[]
+}
+
+export interface SessionSheetDto {
+  session: {
+    id: string
+    activityId: string
+    operatorId: string
+    timingMethod: 'SNAPBACK' | 'CONTINUOUS'
+    status: string
+    notes: string | null
+    startedAt: string
+    endedAt: string | null
+    updatedAt: string
+  }
+  activity: {
+    id: string
+    name: string
+    stationName: string
+    targetSampleCount: number | null
+    projectId: string
+  }
+  operator: { id: string; displayName: string; code: string | null }
+  elements: {
+    id: string
+    name: string
+    elementType: string
+    sortOrder: number
+    defaultEntry: 'SEQ' | 'INT'
+  }[]
+  cycles: CycleRowDto[]
+  stats: {
+    perElement: Record<string, { calcCount: number; excludedCount: number; totalCount: number }>
+    sessionCycles: number
+    sessionValidCycles: number
+    activityValidCycles: number
+    targetSampleCount: number | null
+  }
+}
+
+export interface PasteCellResultDto {
+  colIndex: number
+  row: number
+  cycleNo: number
+  elementId: string | null
+  rawDuration?: number | null
+  cumulativeReading?: number | null
+  startOffset?: number | null
+  endOffset?: number | null
+  previewDerived?: number | null
+  status: 'OK' | 'WARN' | 'ERROR' | 'SKIP'
+  message?: string
+}
+
+export interface PastePreviewDto {
+  startCycleNo: number
+  startColIndex: number
+  rows: { cycleNo: number; isNew: boolean; cells: PasteCellResultDto[] }[]
+  errorCount: number
+  warnCount: number
+  okCount: number
+  skipCount: number
+  createdCycles: number
+}
+
+export interface RemovedCycleDataDto {
+  cycle: {
+    cycleNo: number
+    notes: string | null
+    isComplete: boolean
+    observations: {
+      workElementId: string
+      rawDuration: number | null
+      cumulativeReading: number | null
+      startOffset: number | null
+      endOffset: number | null
+      validityStatus: string
+      exclusionReason: string | null
+    }[]
+  }
+}
+
+export const timingApi = {
+  sessions: (activityId: string) =>
+    api.get<{ sessions: SessionListItemDto[] }>(`/api/activities/${activityId}/sessions`),
+  createSession: (
+    activityId: string,
+    body: { operatorId: string; timingMethod: 'SNAPBACK' | 'CONTINUOUS'; notes?: string | null }
+  ) => api.post<{ session: SessionSheetDto['session']; sheet: SessionSheetDto }>(`/api/activities/${activityId}/sessions`, body),
+  sheet: (sessionId: string) => api.get<{ sheet: SessionSheetDto }>(`/api/sessions/${sessionId}`),
+  updateSession: (
+    sessionId: string,
+    body: { notes?: string | null; status?: 'OPEN' | 'CLOSED'; expectedUpdatedAt?: string }
+  ) => api.put<{ sheet: SessionSheetDto }>(`/api/sessions/${sessionId}`, body),
+  deleteSession: (sessionId: string) =>
+    api.del<{ deleted: boolean; removedCounts: { cycles: number; observations: number } }>(`/api/sessions/${sessionId}`),
+
+  addCycles: (sessionId: string, body: { count?: number } | { withData: RemovedCycleDataDto['cycle'][] }) =>
+    api.post<{ created: { id: string; cycleNo: number }[]; sheet: SessionSheetDto }>(`/api/sessions/${sessionId}/cycles`, body),
+  deleteCycle: (cycleId: string) =>
+    api.del<{ removed: RemovedCycleDataDto; sheet: SessionSheetDto }>(`/api/cycles/${cycleId}`),
+  updateCycleNotes: (cycleId: string, body: { notes: string | null; expectedUpdatedAt?: string }) =>
+    api.put<{ cycle: { id: string; cycleNo: number; notes: string | null; updatedAt: string }; sheet: SessionSheetDto }>(`/api/cycles/${cycleId}`, body),
+  updateCells: (
+    cycleId: string,
+    cells: {
+      workElementId: string
+      rawDuration?: number | null
+      cumulativeReading?: number | null
+      startOffset?: number | null
+      endOffset?: number | null
+    }[]
+  ) =>
+    api.put<{ warnings: string[]; sheet: SessionSheetDto }>(`/api/cycles/${cycleId}/cells`, { cells }),
+
+  pastePreview: (
+    sessionId: string,
+    body: { startCycleNo: number; startColIndex: number; data: string[][] }
+  ) => api.post<{ preview: PastePreviewDto }>(`/api/sessions/${sessionId}/paste-preview`, body),
+  pasteCommit: (
+    sessionId: string,
+    body: {
+      startCycleNo: number
+      startColIndex: number
+      data: string[][]
+      mode: 'ALL_OR_NOTHING' | 'SKIP_INVALID'
+    }
+  ) =>
+    api.post<{ committed: number; skipped: number; createdCycles: number; warnings: string[]; sheet: SessionSheetDto }>(
+      `/api/sessions/${sessionId}/paste-commit`,
+      body
+    ),
+
+  setValidity: (observationId: string, body: { validityStatus: 'VALID' | 'EXCLUDED'; exclusionReason?: string | null }) =>
+    api.put<{
+      observation: { id: string; validityStatus: string; isUserExcluded: boolean; exclusionReason: string | null; rawDuration: number | null }
+      sheet: SessionSheetDto
+    }>(`/api/observations/${observationId}/validity`, body),
+}
+
 // ── پروژه ──
 export const projectsApi = {
   list: (params?: { q?: string; sort?: string; dir?: string }) => {

@@ -43,6 +43,15 @@ export const TIMING_METHOD_LABELS: Record<TimingMethod, string> = {
   CONTINUOUS: 'پیوسته (Continuous)',
 }
 
+// ── وضعیت جلسه — FR-06 (جلسه بسته = فقط‌خواندنی؛ جلسه جدید لازم است) ──
+export const SESSION_STATUSES = ['OPEN', 'CLOSED'] as const
+export type SessionStatus = (typeof SESSION_STATUSES)[number]
+
+export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
+  OPEN: 'باز (قابل ثبت داده)',
+  CLOSED: 'بسته (فقط‌خواندنی)',
+}
+
 // ── وضعیت مشاهده — FR-11 ──
 export const VALIDITY_STATUSES = ['VALID', 'SUSPECT', 'EXCLUDED', 'INVALID'] as const
 export type ValidityStatus = (typeof VALIDITY_STATUSES)[number]

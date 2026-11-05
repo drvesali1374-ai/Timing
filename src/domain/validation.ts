@@ -13,6 +13,9 @@ import {
   ALLOWANCE_METHODS,
   AGGREGATION_METHODS,
   RATING_FACTORS,
+  TIMING_METHODS,
+  SESSION_STATUSES,
+  VALIDITY_STATUSES,
 } from './types'
 
 /** پیش‌پردازنده عدد: رشته فارسی/عربی → number (نامعتبر → undefined برای فیلد اختیاری) */
@@ -225,6 +228,88 @@ export const projectCalcSettingsSchema = z.object({
   aggregationMethod: z.enum(AGGREGATION_METHODS).optional(),
 })
 
+// ── جلسه زمان‌سنجی — FR-06 ──
+export const sessionCreateSchema = z.object({
+  operatorId: z.string().uuid('اپراتور انتخاب‌شده معتبر نیست'),
+  timingMethod: z.enum(TIMING_METHODS, { message: 'روش اندازه‌گیری باید برگشت به صفر یا پیوسته باشد' }),
+  notes: z.string().trim().max(2000).nullable().optional(),
+})
+
+// روش اندازه‌گیری پس از ایجاد قابل تغییر نیست — ۶.۴؛ فیلد روش در به‌روزرسانی پذیرفته نمی‌شود
+export const sessionUpdateSchema = z.object({
+  notes: z.string().trim().max(2000).nullable().optional(),
+  status: z.enum(SESSION_STATUSES).optional(),
+  expectedUpdatedAt: z.string().datetime().optional(),
+})
+
+// ── چرخه‌ها — FR-07 ──
+/** داده یک مشاهده برای بازیابی/ایجاد چرخه (مسیر Undo حذف چرخه) */
+export const observationPayloadSchema = z.object({
+  workElementId: z.string().uuid(),
+  rawDuration: optionalNumber({ min: 0 }),
+  cumulativeReading: optionalNumber({ min: 0 }),
+  startOffset: optionalNumber({ min: 0 }),
+  endOffset: optionalNumber({ min: 0 }),
+  validityStatus: z.enum(VALIDITY_STATUSES).optional(),
+  exclusionReason: z.string().trim().max(500).nullable().optional(),
+})
+
+export const cyclesAddSchema = z.object({
+  count: numberFromString({ min: 1, max: 200 }).default(1),
+  /** بارگذاری داده کامل چرخه‌ها (برای بازگردانی Undo) — ترتیب = ترتیب ایجاد */
+  withData: z
+    .array(
+      z.object({
+        cycleNo: numberFromString({ min: 1, max: 100000 }),
+        notes: z.string().trim().max(2000).nullable().optional(),
+        isComplete: z.boolean().optional(),
+        observations: z.array(observationPayloadSchema).default([]),
+      })
+    )
+    .max(200)
+    .optional(),
+})
+
+export const cycleUpdateSchema = z.object({
+  notes: z.string().trim().max(2000).nullable().optional(),
+  expectedUpdatedAt: z.string().datetime().optional(),
+})
+
+// ── سلول‌های برگه — FR-07/08/09/10 ──
+/** به‌روزرسانی دسته‌ای سلول‌های یک چرخه
+ *  غیبت فیلد = بدون تغییر / null = پاک‌کردن مقدار / عدد = ثبت مقدار */
+export const cellPutSchema = z.object({
+  workElementId: z.string().uuid('عنصر کاری معتبر نیست'),
+  rawDuration: optionalNumber({ min: 0 }),
+  cumulativeReading: optionalNumber({ min: 0 }),
+  startOffset: optionalNumber({ min: 0 }),
+  endOffset: optionalNumber({ min: 0 }),
+})
+
+export const cellsPutSchema = z.object({
+  cells: z.array(cellPutSchema).min(1, 'فهرست سلول‌ها خالی است').max(500),
+  expectedUpdatedAt: z.string().datetime().optional(),
+})
+
+// ── Paste چندسلولی — FR-07 ──
+export const pasteModeSchema = z.enum(['ALL_OR_NOTHING', 'SKIP_INVALID'])
+
+export const pasteSchema = z.object({
+  /** شماره چرخهٔ سلول مبدأ (۱-مبنا) */
+  startCycleNo: numberFromString({ min: 1, max: 100000 }),
+  /** اندیس ستون عنصر سلول مبدأ (۰-مبنا؛ ترتیب عناصر فعالیت) */
+  startColIndex: numberFromString({ min: 0, max: 499 }),
+  /** داده خام Paste — سطر×ستون — اعداد فارسی/لاتین پذیرفته می‌شود */
+  data: z.array(z.array(z.string().max(100)).max(500)).min(1).max(200),
+  mode: pasteModeSchema.default('ALL_OR_NOTHING'),
+})
+
+// ── وضعیت مشاهده — FR-11 ──
+export const validityPutSchema = z.object({
+  validityStatus: z.enum(['VALID', 'EXCLUDED']),
+  exclusionReason: z.string().trim().max(500).nullable().optional(),
+})
+
 // ── نهایی‌سازی — FR-12 ──
 export const finalizeSchema = z.object({
   reason: z.string().trim().max(2000).nullable().optional(), // دلیل نهایی‌سازی با کمبود نمونه
@@ -252,3 +337,11 @@ export type CategoryCreateInput = z.infer<typeof categoryCreateSchema>
 export type CategoryUpdateInput = z.infer<typeof categoryUpdateSchema>
 export type RatingTableCreateInput = z.infer<typeof ratingTableCreateSchema>
 export type AssessmentPutInput = z.infer<typeof assessmentPutSchema>
+export type SessionCreateInput = z.infer<typeof sessionCreateSchema>
+export type SessionUpdateInput = z.infer<typeof sessionUpdateSchema>
+export type CyclesAddInput = z.infer<typeof cyclesAddSchema>
+export type CycleUpdateInput = z.infer<typeof cycleUpdateSchema>
+export type CellsPutInput = z.infer<typeof cellsPutSchema>
+export type CellPutInput = z.infer<typeof cellPutSchema>
+export type PasteInput = z.infer<typeof pasteSchema>
+export type ValidityPutInput = z.infer<typeof validityPutSchema>

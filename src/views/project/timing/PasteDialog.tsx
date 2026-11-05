@@ -1,0 +1,342 @@
+'use client'
+
+// ═══════════════════════════════════════════════════════════
+// Paste چندسلولی از Excel با پیش‌نمایش — FR-07 / ۷.۴
+// جریان: چسباندن متن در ناحیهٔ ورودی → پیش‌نمایش سروری با
+// اعتبارسنجی هر سلول (محل + علت دقیق) → انتخاب حالت ثبت
+// («همه یا هیچ» / «رد سلول‌های مشکل‌دار») → تأیید.
+// Paste نامعتبر هرگز ثبت ناقص و پنهانی ایجاد نمی‌کند.
+// ═══════════════════════════════════════════════════════════
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { AlertTriangle, CheckCircle2, ClipboardPaste, Loader2, MinusCircle, XCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { HelpDot } from '@/components/common/HelpDot'
+import { timingApi, type PastePreviewDto } from '@/lib/api/endpoints'
+import type { DisplayPrefs as Prefs } from '@/lib/format'
+import { formatTimeValue, formatInt } from '@/lib/format'
+
+export interface PasteAnchor {
+  cycleNo: number
+  colIndex: number
+}
+
+export function PasteDialog({
+  open,
+  onOpenChange,
+  sessionId,
+  anchor,
+  elementNames,
+  prefs,
+  initialText,
+  onCommit,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  sessionId: string
+  anchor: PasteAnchor
+  elementNames: string[]
+  prefs: Prefs
+  initialText?: string
+  /** ثبت واقعی توسط پنل انجام می‌شود (سازگار با Undo) */
+  onCommit: (data: string[][], mode: 'ALL_OR_NOTHING' | 'SKIP_INVALID') => Promise<void>
+}) {
+  const [text, setText] = useState('')
+  const [mode, setMode] = useState<'ALL_OR_NOTHING' | 'SKIP_INVALID'>('ALL_OR_NOTHING')
+  const [preview, setPreview] = useState<PastePreviewDto | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+  const [committing, setCommitting] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (open) {
+      setText('')
+      setPreview(null)
+      setMode('ALL_OR_NOTHING')
+      if (initialText) {
+        setText(initialText)
+      } else {
+        // تمرکز برای چسباندن مستقیم
+        setTimeout(() => textareaRef.current?.focus(), 50)
+      }
+    }
+  }, [open, initialText])
+
+  // تجزیهٔ محلی متن به سطر×ستون (TSV/جدول)
+  const parsedData = useMemo(() => {
+    const t = text.replace(/\r\n?/g, '\n').replace(/\n+$/, '')
+    if (!t.trim()) return null
+    return t.split('\n').map((line) => line.split('\t'))
+  }, [text])
+
+  const runPreview = useMutation({
+    mutationFn: async () => {
+      if (!parsedData) throw new Error('متن Paste خالی است')
+      const res = await timingApi.pastePreview(sessionId, {
+        startCycleNo: anchor.cycleNo,
+        startColIndex: anchor.colIndex,
+        data: parsedData,
+      })
+      return res.preview
+    },
+    onSuccess: (p) => setPreview(p),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'پیش‌نمایش ناموفق بود'),
+  })
+
+  const doCommit = async () => {
+    if (!parsedData) return
+    setCommitting(true)
+    try {
+      await onCommit(parsedData, mode)
+      onOpenChange(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'ثبت Paste ناموفق بود')
+    } finally {
+      setCommitting(false)
+    }
+  }
+
+  const doPreview = async () => {
+    setPreviewing(true)
+    try {
+      await runPreview.mutateAsync()
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  const targetElement = elementNames[anchor.colIndex]
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent dir="rtl" className="max-h-[90vh] sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ClipboardPaste className="size-5 text-brand" aria-hidden />
+            Paste چندسلولی از Excel
+            <HelpDot
+              label="Paste چندسلولی"
+              content={{
+                what: 'کپی چند سطر و ستون از Excel و ثبت هم‌زمان آن‌ها در برگهٔ زمان‌سنجی.',
+                input: 'محدودهٔ موردنظر را در Excel کپی کنید (Ctrl+C) و همین‌جا بچسبانید (Ctrl+V). ستون‌ها از عنصری که سلول فعال روی آن است شروع می‌شوند و سطرها از چرخهٔ همان ردیف.',
+                example: 'اگر ۳ ستون عنصر دارید و ۵ چرخه Paste می‌کنید، یک محدودهٔ ۵×۳ کپی کنید. برای عنصر هم‌زمان می‌توانید به‌جای یک عدد، «۳-۹» (شروع تا پایان) بنویسید.',
+                note: 'هیچ داده‌ای بدون پیش‌نمایش و تأیید شما ثبت نمی‌شود؛ خطای هر سلول با محل و علت دقیق نمایش داده می‌شود.',
+              }}
+            />
+          </DialogTitle>
+          <DialogDescription>
+            مبدأ: چرخهٔ {formatInt(anchor.cycleNo, prefs)}
+            {targetElement ? `، عنصر «${targetElement}»` : '، بدون عنصر (ابتدا سلولی از برگه انتخاب کنید)'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 overflow-y-auto" style={{ maxHeight: '55vh' }}>
+          {/* ورودی Paste */}
+          <div className="space-y-1.5">
+            <Label htmlFor="paste-text">محتوای Excel را اینجا بچسبانید</Label>
+            <textarea
+              id="paste-text"
+              ref={textareaRef}
+              dir="ltr"
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value)
+                setPreview(null)
+              }}
+              onPaste={(e) => {
+                // چسباندن واقعی از کلیپ‌بورد
+                const pasted = e.clipboardData.getData('text')
+                if (pasted) {
+                  e.preventDefault()
+                  setText(pasted)
+                  setPreview(null)
+                }
+              }}
+              placeholder={'12.5\t8.3\t9.1\n11.9\t8.4\t9.0\n…'}
+              className="num min-h-24 w-full rounded-xl border bg-background p-3 font-mono text-xs focus-visible:outline-2 focus-visible:outline-ring"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              جداکنندهٔ ستون: Tab — جداکنندهٔ اعشار: نقطه یا «٫» — بازه: «۳-۹» یا «۳ تا ۹» — خالی/«-» = بدون تغییر
+            </p>
+          </div>
+
+          <Button
+            variant="outline"
+            onClick={doPreview}
+            disabled={!parsedData || previewing || runPreview.isPending}
+            className="gap-1.5"
+          >
+            {(previewing || runPreview.isPending) && <Loader2 className="size-4 animate-spin" aria-hidden />}
+            پیش‌نمایش و اعتبارسنجی
+          </Button>
+
+          {/* پیش‌نمایش */}
+          {preview && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="num flex items-center gap-1 rounded-full bg-green-soft px-2 py-0.5 font-bold text-green">
+                  <CheckCircle2 className="size-3.5" aria-hidden /> {formatInt(preview.okCount, prefs)} سالم
+                </span>
+                {preview.warnCount > 0 && (
+                  <span className="num flex items-center gap-1 rounded-full bg-amber-soft px-2 py-0.5 font-bold text-amber">
+                    <AlertTriangle className="size-3.5" aria-hidden /> {formatInt(preview.warnCount, prefs)} هشدار
+                  </span>
+                )}
+                {preview.errorCount > 0 && (
+                  <span className="num flex items-center gap-1 rounded-full bg-red-soft px-2 py-0.5 font-bold text-red">
+                    <XCircle className="size-3.5" aria-hidden /> {formatInt(preview.errorCount, prefs)} خطا
+                  </span>
+                )}
+                <span className="num flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
+                  <MinusCircle className="size-3.5" aria-hidden /> {formatInt(preview.skipCount, prefs)} بدون تغییر
+                </span>
+                {preview.createdCycles > 0 && (
+                  <span className="num rounded-full bg-brand-soft px-2 py-0.5 font-bold text-brand">
+                    {formatInt(preview.createdCycles, prefs)} چرخهٔ جدید
+                  </span>
+                )}
+              </div>
+
+              {/* جدول پیش‌نمایش */}
+              <div className="overflow-x-auto rounded-xl border">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b bg-surface-2/70 text-right">
+                      <th className="px-2 py-2 font-bold">چرخه</th>
+                      {Array.from({ length: Math.max(...preview.rows.map((r) => r.cells.length)) }).map((_, i) => (
+                        <th key={i} className="px-2 py-2 font-bold">
+                          {elementNames[anchor.colIndex + i] ?? `ستون ${anchor.colIndex + i + 1}`}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.rows.map((row) => (
+                      <tr key={row.cycleNo} className="border-b last:border-0">
+                        <td className="num px-2 py-1.5 font-bold">
+                          {formatInt(row.cycleNo, prefs)}
+                          {row.isNew && <span className="mr-1 text-[10px] text-brand">(جدید)</span>}
+                        </td>
+                        {Array.from({ length: Math.max(...preview.rows.map((r) => r.cells.length)) }).map((_, ci) => {
+                          const cell = row.cells[ci]
+                          if (!cell) return <td key={ci} className="px-2 py-1.5" />
+                          return (
+                            <td
+                              key={ci}
+                              className={`px-2 py-1.5 ${
+                                cell.status === 'ERROR'
+                                  ? 'bg-red-soft/60 text-red'
+                                  : cell.status === 'WARN'
+                                    ? 'bg-amber-soft/60 text-amber'
+                                    : cell.status === 'SKIP'
+                                      ? 'text-faint'
+                                      : 'text-foreground'
+                              }`}
+                              title={cell.message}
+                            >
+                              <div className="space-y-0.5">
+                                <p className="num">
+                                  {cell.status === 'SKIP'
+                                    ? '—'
+                                    : cell.startOffset !== undefined
+                                      ? `${formatTimeValue(cell.startOffset ?? 0, prefs)}–${formatTimeValue(cell.endOffset ?? 0, prefs)}`
+                                      : formatTimeValue(
+                                          cell.cumulativeReading ?? cell.rawDuration ?? cell.previewDerived ?? null,
+                                          prefs
+                                        )}
+                                </p>
+                                {(() => {
+                                  const isOkWithDerived =
+                                    cell.status === 'OK' &&
+                                    cell.cumulativeReading !== undefined &&
+                                    cell.previewDerived !== undefined &&
+                                    cell.previewDerived !== null
+                                  if (isOkWithDerived) {
+                                    return (
+                                      <p className="num text-[10px] leading-4 text-green">
+                                        → مدت: {formatTimeValue(cell.previewDerived ?? null, prefs)}
+                                      </p>
+                                    )
+                                  }
+                                  if (cell.message) return <p className="text-[10px] leading-4">{cell.message}</p>
+                                  return null
+                                })()}
+                              </div>
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* حالت ثبت — FR-07 */}
+              <div className="space-y-2 rounded-xl border p-3">
+                <div className="flex items-center gap-1">
+                  <p className="text-xs font-bold">در صورت وجود خطا:</p>
+                  <HelpDot
+                    label="حالت ثبت Paste"
+                    content={{
+                      what: 'رفتار سیستم هنگامی که برخی سلول‌های Paste نامعتبر باشند.',
+                      input: '«همه یا هیچ»: تا وقتی حتی یک سلول خطا دارد، هیچ چیزی ثبت نمی‌شود. «رد سلول‌های مشکل‌دار»: فقط سلول‌های سالم ثبت و سلول‌های خطادار رد می‌شوند.',
+                      example: 'در یک Paste با یک سلول منفی، حالت اول هیچ چیزی ثبت نمی‌کند؛ حالت دوم بقیهٔ سلول‌ها را ثبت و همان سلول را رد می‌کند.',
+                      note: 'این انتخاب مطابق الزام PRD است که Paste نامعتبر نباید باعث ثبت ناقص و پنهانی کل محدوده شود.',
+                    }}
+                  />
+                </div>
+                <RadioGroup value={mode} onValueChange={(v) => setMode(v as typeof mode)} className="gap-2">
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg p-2 hover:bg-muted/50">
+                    <RadioGroupItem value="ALL_OR_NOTHING" className="mt-0.5" />
+                    <span className="space-y-0.5 text-xs">
+                      <span className="block font-bold">همه یا هیچ (پیش‌فرض)</span>
+                      <span className="block text-muted-foreground">
+                        با وجود خطا، هیچ داده‌ای ثبت نمی‌شود تا کلیشهٔ ناقص پنهان نماند.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2 rounded-lg p-2 hover:bg-muted/50">
+                    <RadioGroupItem value="SKIP_INVALID" className="mt-0.5" />
+                    <span className="space-y-0.5 text-xs">
+                      <span className="block font-bold">رد سلول‌های مشکل‌دار</span>
+                      <span className="block text-muted-foreground">
+                        سلول‌های سالم ثبت و سلول‌های خطادار رد می‌شوند؛ فهرست ردشده‌ها اطلاع‌داده می‌شود.
+                      </span>
+                    </span>
+                  </label>
+                </RadioGroup>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            انصراف
+          </Button>
+          <Button
+            className="btn-brand border-0 gap-1.5"
+            disabled={!preview || preview.okCount + preview.warnCount === 0 || committing}
+            onClick={() => void doCommit()}
+          >
+            {committing && <Loader2 className="size-4 animate-spin" aria-hidden />}
+            {mode === 'ALL_OR_NOTHING' && preview && preview.errorCount > 0
+              ? 'خطاها را اصلاح کنید'
+              : `ثبت ${preview ? formatInt(preview.okCount + preview.warnCount, prefs) : ''} سلول`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

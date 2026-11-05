@@ -81,7 +81,7 @@ import { useAppStore } from '@/store/app-store'
 import { useDisplayPrefs } from '@/store/display-store'
 import { formatDate, formatDateTime, formatInt, formatPercent, formatTimeValue } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import TimingPendingView from './TimingPendingView'
+import TimingView from './TimingView'
 import AnalysisPendingView from './AnalysisPendingView'
 
 type Prefs = ReturnType<typeof useDisplayPrefs>
@@ -497,9 +497,9 @@ function ActivityScreen({ projectId, activityId }: { projectId: string; activity
           />
         </TabsContent>
 
-        {/* ۳. زمان‌سنجی — فاز ۳ */}
+        {/* ۳. زمان‌سنجی — فاز ۳ فعال: برگهٔ چرخه‌محور این فعالیت */}
         <TabsContent value="timing">
-          <TimingPendingView projectId={projectId} />
+          <TimingView projectId={projectId} initialActivityId={activityId} />
         </TabsContent>
 
         {/* ۴. تحلیل نتایج — فاز ۴ */}

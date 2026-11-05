@@ -54,10 +54,10 @@ export async function collectProjectTreeIds(projectId: string): Promise<Record<s
   }
 }
 
-/** درخت وابستگی ایستگاه‌ها */
+/** درخت وابستگی ایستگاه‌ها — شامل خودِ ایستگاه‌ها (نشانگر حذف باید ریشه را هم بپوشاند تا با Restore شبح خالی برنگردد — FR-26) */
 export async function collectStationsTreeIds(stationIds: string[]): Promise<Record<string, string[]>> {
   if (stationIds.length === 0) {
-    return { Activity: [], WorkElement: [], StudySession: [], CycleObservation: [], TimelineLane: [], ElementObservation: [], ActivityAllowanceOverride: [], RatingAssessment: [], ChartNode: [], ChartEdge: [] }
+    return { Station: [], Activity: [], WorkElement: [], StudySession: [], CycleObservation: [], TimelineLane: [], ElementObservation: [], ActivityAllowanceOverride: [], RatingAssessment: [], ChartNode: [], ChartEdge: [] }
   }
   const activities = await db.activity.findMany({
     where: { stationId: { in: stationIds } },
@@ -65,13 +65,13 @@ export async function collectStationsTreeIds(stationIds: string[]): Promise<Reco
   })
   const activityIds = activities.map((a) => a.id)
   const sub = await collectActivitiesTreeIds(activityIds)
-  return { Activity: activityIds, ...sub }
+  return { Station: [...stationIds], Activity: activityIds, ...sub }
 }
 
-/** درخت وابستگی فعالیت‌ها */
+/** درخت وابستگی فعالیت‌ها — شامل خودِ فعالیت‌ها (نشانگر حذف باید ریشه را هم بپوشاند — FR-26) */
 export async function collectActivitiesTreeIds(activityIds: string[]): Promise<Record<string, string[]>> {
   if (activityIds.length === 0) {
-    return { WorkElement: [], StudySession: [], CycleObservation: [], TimelineLane: [], ElementObservation: [], ActivityAllowanceOverride: [], RatingAssessment: [], ChartNode: [], ChartEdge: [] }
+    return { Activity: [], WorkElement: [], StudySession: [], CycleObservation: [], TimelineLane: [], ElementObservation: [], ActivityAllowanceOverride: [], RatingAssessment: [], ChartNode: [], ChartEdge: [] }
   }
   const [elements, sessions, overrides, chartNodes] = await Promise.all([
     db.workElement.findMany({ where: { activityId: { in: activityIds } }, select: { id: true } }),
@@ -110,6 +110,7 @@ export async function collectActivitiesTreeIds(activityIds: string[]): Promise<R
     ? await db.ratingAssessment.findMany({ where: { workElementId: { in: elementIds } }, select: { id: true } })
     : []
   return {
+    Activity: [...activityIds],
     WorkElement: elementIds,
     StudySession: sessionIds,
     ActivityAllowanceOverride: overrides.map((x) => x.id),

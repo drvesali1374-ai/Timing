@@ -42,7 +42,8 @@ export const SECTION_TABLES: Record<string, DomainTable[]> = {
   structure: ['station', 'activity', 'workElement', 'activityAllowanceOverride'],
   operators: ['operator'],
   groupsAndAllowances: ['activityGroup', 'allowanceCategory', 'groupAllowance'],
-  ratingTables: ['ratingTable', 'ratingTableGrade'],
+  // ارزیابی‌های ثبت‌شدهٔ عناصر نیز بخشی از دادهٔ وستینگهاوس‌اند — FR-25
+  ratingTables: ['ratingTable', 'ratingTableGrade', 'ratingAssessment'],
   rawObservations: ['studySession', 'cycleObservation', 'timelineLane', 'elementObservation'],
   charts: ['chartNode', 'chartEdge'],
   calculations: ['calculationRun'],

@@ -1048,11 +1048,11 @@ function AuditDiff({ item }: { item: AuditDto }) {
           className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-lg bg-muted px-3 py-1.5 text-xs"
         >
           <span className="min-w-24 font-bold">{key}:</span>
-          <span className="text-red" title="مقدار قبل">
+          <span className="min-w-0 break-all text-red" title="مقدار قبل">
             {fmtAuditValue(before?.[key])}
           </span>
           <span aria-hidden>←</span>
-          <span className="font-bold text-green" title="مقدار بعد">
+          <span className="min-w-0 break-all font-bold text-green" title="مقدار بعد">
             {fmtAuditValue(after?.[key])}
           </span>
         </div>

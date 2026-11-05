@@ -325,6 +325,38 @@ export const restoreSchema = z.object({
   confirmReplace: z.literal(true, { message: 'برای بازیابی، تأیید صریح جایگزینی داده‌ها الزامی است' }),
 })
 
+// ── نمودار فرایند OPC/FPC — FR-20 ──
+export const CHART_TYPES = ['OPC', 'FPC'] as const
+export type ChartTypeValue = (typeof CHART_TYPES)[number]
+
+/** انواع گره مجاز در هر نوع نمودار — OPC فقط عملیات/بازرسی، FPC هر پنج نوع — FR-20.3/4 */
+export const OPC_NODE_TYPES = ['OPERATION', 'INSPECTION'] as const
+export const FPC_NODE_TYPES = ['OPERATION', 'INSPECTION', 'TRANSPORT', 'DELAY', 'STORAGE'] as const
+
+export const chartManualNodeCreateSchema = z.object({
+  label: trimmed(200),
+  nodeType: z.enum(FPC_NODE_TYPES, { message: 'نوع گره معتبر نیست' }),
+})
+
+export const chartNodeUpdateSchema = z
+  .object({
+    label: trimmed(200).optional(),
+    nodeType: z.enum(FPC_NODE_TYPES, { message: 'نوع گره معتبر نیست' }).optional(),
+    positionX: numberFromString({ min: -100000, max: 100000 }).optional(),
+    positionY: numberFromString({ min: -100000, max: 100000 }).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'حداقل یک فیلد برای به‌روزرسانی لازم است' })
+
+export const chartEdgeCreateSchema = z.object({
+  sourceNodeId: z.string().uuid('گره مبدأ معتبر نیست'),
+  targetNodeId: z.string().uuid('گره مقصد معتبر نیست'),
+})
+
+export const chartOrderMoveSchema = z.object({
+  nodeId: z.string().uuid('گره معتبر نیست'),
+  direction: z.enum(['up', 'down'], { message: 'جهت جابه‌جایی معتبر نیست' }),
+})
+
 // ── خروجی نوع‌ها ──
 export type ProjectCreateInput = z.infer<typeof projectCreateSchema>
 export type ProjectUpdateInput = z.infer<typeof projectUpdateSchema>
@@ -350,3 +382,7 @@ export type CellsPutInput = z.infer<typeof cellsPutSchema>
 export type CellPutInput = z.infer<typeof cellPutSchema>
 export type PasteInput = z.infer<typeof pasteSchema>
 export type ValidityPutInput = z.infer<typeof validityPutSchema>
+export type ChartManualNodeCreateInput = z.infer<typeof chartManualNodeCreateSchema>
+export type ChartNodeUpdateInput = z.infer<typeof chartNodeUpdateSchema>
+export type ChartEdgeCreateInput = z.infer<typeof chartEdgeCreateSchema>
+export type ChartOrderMoveInput = z.infer<typeof chartOrderMoveSchema>

@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════
 import { db } from '@/lib/db'
 import { DEVELOPMENT_PHASES, type StageKey, type StageStatus } from '@/domain/types'
+import { getChartsStageState } from './chart-service'
 
 export interface StageState {
   status: StageStatus | 'FUTURE_PHASE'
@@ -77,6 +78,9 @@ export async function computeStageSummary(projectId: string): Promise<StageSumma
   const elementCount = elements.length
   const elementsWithRating = assessments.length
   const finalized = Boolean(project?.finalization)
+
+  // وضعیت مرحلهٔ نمودار فرایند — FR-20
+  const chartsState = await getChartsStageState(projectId)
 
   const activitiesWithoutElements = await db.activity.findMany({
     where: { station: { projectId }, workElements: { none: {} } },
@@ -192,13 +196,35 @@ export async function computeStageSummary(projectId: string): Promise<StageSumma
     }
   }
 
+  // نمودار فرایند OPC/FPC — فاز ۵ فعال؛ وضعیت از دادهٔ واقعی — FR-20
+  if (chartsState.activitiesCount === 0) {
+    stages.charts = {
+      status: 'PENDING',
+      hint: 'برای ساخت نمودار، ابتدا فعالیت‌ها را در ساختار تولید تعریف کنید.',
+    }
+  } else if (chartsState.opcNodes === 0) {
+    stages.charts = {
+      status: 'IN_PROGRESS',
+      hint: 'نمودار با بازکردن این مرحله به‌صورت خودکار از فعالیت‌ها ساخته می‌شود.',
+    }
+  } else if (chartsState.unconnectedOpc > 0) {
+    stages.charts = {
+      status: 'NEEDS_REVIEW',
+      hint: `${chartsState.unconnectedOpc} گره بدون اتصال در نمودار است؛ توالی گره‌ها را کامل کنید.`,
+    }
+  } else {
+    stages.charts = {
+      status: 'DONE',
+      hint: `نمودار فرایند ساخته شده و توالی کامل است (${chartsState.opcNodes} گره).`,
+    }
+  }
+
   // مراحل فازهای بعدی — برچسب صادقانه (قابلیت‌ها حذف نشده‌اند؛ ترتیب توسعه‌اند)
-  stages.charts = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.charts, hint: 'نمودار فرایند OPC/FPC.' }
   stages.dashboard = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.dashboard, hint: 'کارت‌های خلاصه و شاخص‌های تخصصی.' }
   stages.reports = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.reports, hint: 'خروجی Excel و PDF.' }
 
   // پیشرفت شفاف مطالعه — تعریف: میانگین وزن مراحل فعال نسخه اول
-  const activeKeys: StageKey[] = ['info', 'structure', 'operators', 'allowances', 'westinghouse', 'timing', 'analysis']
+  const activeKeys: StageKey[] = ['info', 'structure', 'operators', 'allowances', 'westinghouse', 'timing', 'analysis', 'charts']
   const weight = (s: StageState): number =>
     s.status === 'DONE' ? 1 : s.status === 'IN_PROGRESS' || s.status === 'NEEDS_REVIEW' ? 0.5 : 0
   const progress =

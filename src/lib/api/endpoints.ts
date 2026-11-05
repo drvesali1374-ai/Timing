@@ -720,6 +720,63 @@ export const calculationsApi = {
   latest: (projectId: string) => api.get<LatestCalculationInfoDto>(`/api/projects/${projectId}/calculations/latest`),
 }
 
+// ── نمودار فرایند OPC/FPC — فاز ۵ / FR-20 ──
+
+export type ChartTypeValue = 'OPC' | 'FPC'
+
+export interface ChartNodeDto {
+  id: string
+  nodeType: string
+  label: string
+  activityId: string | null
+  activityName: string | null
+  stationName: string | null
+  isManual: boolean
+  sortOrder: number
+  positionX: number
+  positionY: number
+}
+
+export interface ChartEdgeDto {
+  id: string
+  sourceNodeId: string
+  targetNodeId: string
+  isChain: boolean
+  sortOrder: number
+}
+
+export interface ChartDto {
+  chartType: ChartTypeValue
+  nodes: ChartNodeDto[]
+  edges: ChartEdgeDto[]
+  counts: {
+    total: number
+    auto: number
+    manual: number
+    byType: Record<string, number>
+    activitiesIncluded: number
+    activitiesTotal: number
+  }
+  canvas: { width: number; height: number }
+}
+
+export const chartsApi = {
+  get: (projectId: string, chartType: ChartTypeValue) =>
+    api.get<ChartDto>(`/api/projects/${projectId}/charts/${chartType}`),
+  createNode: (projectId: string, chartType: ChartTypeValue, body: { label: string; nodeType: string }) =>
+    api.post<{ node: { id: string } }>(`/api/projects/${projectId}/charts/${chartType}/nodes`, body),
+  applyLayout: (projectId: string, chartType: ChartTypeValue) =>
+    api.post<ChartDto>(`/api/projects/${projectId}/charts/${chartType}/layout`),
+  moveOrder: (projectId: string, chartType: ChartTypeValue, body: { nodeId: string; direction: 'up' | 'down' }) =>
+    api.post<{ moved: boolean }>(`/api/projects/${projectId}/charts/${chartType}/order`, body),
+  updateNode: (nodeId: string, body: { label?: string; nodeType?: string; positionX?: number; positionY?: number }) =>
+    api.patch<{ node: { id: string } }>(`/api/chart-nodes/${nodeId}`, body),
+  deleteNode: (nodeId: string) => api.del<{ deleted: boolean }>(`/api/chart-nodes/${nodeId}`),
+  createEdge: (projectId: string, body: { sourceNodeId: string; targetNodeId: string }) =>
+    api.post<{ edge: { id: string } }>(`/api/chart-edges?projectId=${projectId}`, body),
+  deleteEdge: (edgeId: string) => api.del<{ deleted: boolean }>(`/api/chart-edges/${edgeId}`),
+}
+
 
 export const settingsApi = {
   get: () => api.get<AppSettingsDto>('/api/settings'),

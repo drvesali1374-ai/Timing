@@ -17,7 +17,7 @@ export function AppFooter({ compact = false }: { compact?: boolean }) {
         <p className="flex items-center gap-1.5">
           <span className="font-bold text-muted-foreground">زمان‌سنجی صنعتی</span>
           <span aria-hidden>·</span>
-          <span>نسخه اول — فاز ۲ از ۷</span>
+          <span>نسخه اول — فاز ۵ از ۷</span>
         </p>
         <p className="flex items-center gap-3">
           <span className="flex items-center gap-1" title="بدون هیچ درخواست خارجی در زمان اجرا">

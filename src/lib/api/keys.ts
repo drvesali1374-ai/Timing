@@ -30,4 +30,6 @@ export const qk = {
   activityAnalysis: (activityId: string) => ['activity-analysis', activityId] as const,
   analysisActivities: (projectId: string) => ['analysis-activities', projectId] as const,
   latestCalculation: (projectId: string) => ['latest-calculation', projectId] as const,
+  // ── نمودار فرایند — فاز ۵ ──
+  chart: (projectId: string, chartType: string) => ['chart', projectId, chartType] as const,
 }

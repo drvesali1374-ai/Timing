@@ -57,7 +57,7 @@ export async function collectProjectTreeIds(projectId: string): Promise<Record<s
 /** درخت وابستگی ایستگاه‌ها */
 export async function collectStationsTreeIds(stationIds: string[]): Promise<Record<string, string[]>> {
   if (stationIds.length === 0) {
-    return { Activity: [], WorkElement: [], StudySession: [], CycleObservation: [], TimelineLane: [], ElementObservation: [], ActivityAllowanceOverride: [], RatingAssessment: [] }
+    return { Activity: [], WorkElement: [], StudySession: [], CycleObservation: [], TimelineLane: [], ElementObservation: [], ActivityAllowanceOverride: [], RatingAssessment: [], ChartNode: [], ChartEdge: [] }
   }
   const activities = await db.activity.findMany({
     where: { stationId: { in: stationIds } },
@@ -71,13 +71,25 @@ export async function collectStationsTreeIds(stationIds: string[]): Promise<Reco
 /** درخت وابستگی فعالیت‌ها */
 export async function collectActivitiesTreeIds(activityIds: string[]): Promise<Record<string, string[]>> {
   if (activityIds.length === 0) {
-    return { WorkElement: [], StudySession: [], CycleObservation: [], TimelineLane: [], ElementObservation: [], ActivityAllowanceOverride: [], RatingAssessment: [] }
+    return { WorkElement: [], StudySession: [], CycleObservation: [], TimelineLane: [], ElementObservation: [], ActivityAllowanceOverride: [], RatingAssessment: [], ChartNode: [], ChartEdge: [] }
   }
-  const [elements, sessions, overrides] = await Promise.all([
+  const [elements, sessions, overrides, chartNodes] = await Promise.all([
     db.workElement.findMany({ where: { activityId: { in: activityIds } }, select: { id: true } }),
     db.studySession.findMany({ where: { activityId: { in: activityIds } }, select: { id: true } }),
     db.activityAllowanceOverride.findMany({ where: { activityId: { in: activityIds } }, select: { id: true } }),
+    // گره‌های خودکار نمودارِ این فعالیت‌ها (گره دستی activityId=null دارد و شامل نمی‌شود) — FR-20.10
+    db.chartNode.findMany({
+      where: { activityId: { in: activityIds }, isManual: false },
+      select: { id: true },
+    }),
   ])
+  const chartNodeIds = chartNodes.map((n) => n.id)
+  const chartEdges = chartNodeIds.length
+    ? await db.chartEdge.findMany({
+        where: { OR: [{ sourceNodeId: { in: chartNodeIds } }, { targetNodeId: { in: chartNodeIds } }] },
+        select: { id: true },
+      })
+    : []
   const elementIds = elements.map((e) => e.id)
   const sessionIds = sessions.map((s) => s.id)
   const cycles = sessionIds.length
@@ -105,6 +117,8 @@ export async function collectActivitiesTreeIds(activityIds: string[]): Promise<R
     CycleObservation: cycleIds,
     TimelineLane: lanes,
     ElementObservation: observations,
+    ChartNode: chartNodeIds,
+    ChartEdge: chartEdges.map((x) => x.id),
   }
 }
 

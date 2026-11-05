@@ -7,6 +7,12 @@ import { AppError } from '@/domain/types'
 import { recordAudit } from '@/infrastructure/audit'
 import { collectActivitiesTreeIds, markDeleted } from '@/infrastructure/deletion'
 import { markProjectCalculationsStale } from './calc-stale'
+import {
+  appendActivityToExistingCharts,
+  deleteActivityChartRows,
+  rebuildProjectChains,
+  syncActivityAfterUpdate,
+} from './chart-service'
 import type { StationCreateInput, StationUpdateInput, ActivityCreateInput, ActivityUpdateInput, ElementCreateInput, ElementUpdateInput } from '@/domain/validation'
 
 async function assertProject(projectId: string) {
@@ -116,8 +122,12 @@ export async function deleteStation(stationId: string) {
     for (const [entityType, ids] of Object.entries(treeIds)) {
       await markDeleted(tx, entityType, ids)
     }
+    // گره‌های خودکار نمودارِ فعالیت‌های این ایستگاه + یال‌های وابسته — FR-20.10
+    await deleteActivityChartRows(tx, treeIds.Activity ?? [])
     await tx.station.delete({ where: { id: stationId } })
   })
+  // بازسازی زنجیرهٔ توالی نمودارها پس از حذف
+  await rebuildProjectChains(station.projectId)
   await recordAudit({
     entityType: 'Station', entityId: stationId, action: 'DELETE', entityName: station.name,
     projectId: station.projectId,
@@ -175,6 +185,8 @@ export async function createActivity(stationId: string, input: ActivityCreateInp
   })
   // فعالیت جدید در نتایج پروژه به‌عنوان ناقص ظاهر می‌شود — FR-27
   await markProjectCalculationsStale(station.projectId)
+  // اگر نمودار فرایند از قبل ساخته شده باشد، گره جدید بلافاصله الحاق می‌شود — FR-20.2
+  await appendActivityToExistingCharts(station.projectId, activity.id)
   return activity
 }
 
@@ -207,6 +219,10 @@ export async function updateActivity(activityId: string, input: ActivityUpdateIn
     after: { name: updated.name, processType: updated.processType, groupId: updated.groupId, targetSampleCount: updated.targetSampleCount },
     projectId: existing.station.projectId,
   })
+  // همگام‌سازی گره‌های نمودار (شناسه پایدار؛ فقط برچسب/نوع به‌روز می‌شود و در صورت لزوم از OPC حذف می‌شود) — FR-20.8/10
+  if (input.name !== undefined || input.processType !== undefined) {
+    await syncActivityAfterUpdate(activityId, existing.station.projectId)
+  }
   return updated
 }
 
@@ -227,8 +243,12 @@ export async function deleteActivity(activityId: string) {
     for (const [entityType, ids] of Object.entries(treeIds)) {
       await markDeleted(tx, entityType, ids)
     }
+    // گره‌های خودکار نمودارِ این فعالیت + یال‌های وابسته پاک‌سازی می‌شوند — FR-20.10
+    await deleteActivityChartRows(tx, [activityId])
     await tx.activity.delete({ where: { id: activityId } })
   })
+  // بازسازی زنجیرهٔ توالی نمودارها پس از حذف گره
+  await rebuildProjectChains(activity.station.projectId)
   // حذف فعالیت = حذف مشاهدات آن — FR-27
   await markProjectCalculationsStale(activity.station.projectId)
   await recordAudit({

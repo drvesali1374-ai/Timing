@@ -19,7 +19,7 @@ export interface JalaliDate {
   jd: number
 }
 
-export { isLeapJalaliYear }
+export { isLeapJalaaliYear as isLeapJalaliYear }
 /** نام یکسان با API قبلی ما */
 export const jalaliMonthLength = jalaaliMonthLength
 

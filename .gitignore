@@ -1,4 +1,4 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# See https://help.github.com/articles/ignoring-files/ for more information about ignoring files.
 
 # dependencies
 node_modules
@@ -30,12 +30,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
 
 # vercel
 .vercel
-
 
 # typescript
 *.tsbuildinfo
@@ -46,9 +46,22 @@ local-*
 *.log
 dev.log
 dev.out.log
-test
-prompt
-
+dev.log*
 server.log
+
+# ── داده اجرایی نرم‌افزار زمان‌سنجی (در مخزن قرار نمی‌گیرد) ──
+# پایگاه داده SQLite محلی
+/db/*.db
+/db/*.db-journal
+# پشتیبان‌های محلی سرور
+/app-data/
+# فایل‌های موقت بارگذاری
+/upload/
+# خروجی ابزارها / یادداشت‌های عامل / اسکریپت‌های سندباکس
+/tool-results/
+/.zscripts/
+/.agent-ctx/
+/skills/
+
 # Skills directory
 /skills/

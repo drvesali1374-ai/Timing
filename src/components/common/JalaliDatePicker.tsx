@@ -143,7 +143,7 @@ export function JalaliDatePicker({ value, onChange, label, disabled, id }: Jalal
               >
                 ‹
               </button>
-              <span>{formatNumberByMode(view.jy, digits)}</span>
+              <span>{formatNumberByMode(view.jy, digits, { decimals: 0 })}</span>
               <button
                 type="button"
                 className="rounded px-1 hover:bg-muted"
@@ -190,7 +190,7 @@ export function JalaliDatePicker({ value, onChange, label, disabled, id }: Jalal
                       !isSelected && isToday && 'ring-1 ring-brand/50'
                     )}
                   >
-                    {formatNumberByMode(jd, digits)}
+                    {formatNumberByMode(jd, digits, { decimals: 0 })}
                   </button>
                 )
               })}

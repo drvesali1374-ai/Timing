@@ -122,7 +122,7 @@ console.log('\nA7) تشخیص غیرعادی: MAD با آستانه ۳٫۵ — �
   const flags = detectOutliers(values.map((v) => ({ value: v })))
   check('مقدار 30.5 علامت‌گذاری شد', flags.length === 1 && approx(flags[0].value, 30.5), flags.map((f) => f.value), [30.5])
   check('روش MAD استفاده شد', flags[0]?.rule === 'MODIFIED_Z_MAD', flags[0]?.rule)
-  const madZero = detectOutliers([5, 5, 5, 5, 9])
+  const madZero = detectOutliers([5, 5, 5, 5, 9].map((v) => ({ value: v })))
   check('fallback کنترل‌شده (بدون تقسیم بر صفر)', Array.isArray(madZero), madZero.map((f) => f.rule))
 }
 
@@ -146,9 +146,12 @@ console.log('\nA9) ارقام فارسی/عربی و تقویم جلالی — F
   check('نرمال‌سازی «۱۵۰۰» → 1500', parseNumber('۱۵۰۰') === 1500, parseNumber('۱۵۰۰'), 1500)
   const iso = jalaliToISO(1404, 8, 13)
   const back = isoToJalali(iso)
-  check('برگردان جلالی↔ISO ↔جلالی (۱۴۰۴/۰۸/۱۳)', back && back.jy === 1404 && back.jm === 8 && back.jd === 13, back, { jy: 1404, jm: 8, jd: 13 })
+  check('برگردان جلالی↔ISO ↔جلالی (۱۴۰۴/۰۸/۱۳)', Boolean(back && back.jy === 1404 && back.jm === 8 && back.jd === 13), back, { jy: 1404, jm: 8, jd: 13 })
   check('اعتبارسنجی ۳۱ فروردین ۱۴۰۳ (کبیسه)', isValidJalali(1403, 1, 31), isValidJalali(1403, 1, 31), true)
-  check('رد ۳۰ اسفند ۱۴۰۳ (غیرکبیسه)', !isValidJalali(1403, 12, 30))
+  // نکته: ۱۴۰۳ کبیسه است؛ آخرین روز اسفند آن (۳۰) معتبر است.
+  // سال غیرکبیسه برای آزمون ردّ ۳۰ اسفند: ۱۴۰۴
+  check('اعتبارسنجی ۳۰ اسفند ۱۴۰۳ (کبیسه)', isValidJalali(1403, 12, 30), isValidJalali(1403, 12, 30), true)
+  check('رد ۳۰ اسفند ۱۴۰۴ (غیرکبیسه)', !isValidJalali(1404, 12, 30), isValidJalali(1404, 12, 30), false)
 }
 
 // ═══════════════ بخش B — آزمون یکپارچگی API ═══════════════
@@ -425,7 +428,13 @@ async function main() {
     const d = await api('GET', `/api/projects/${PID}`)
     check('پروژه بازگشت (پس از restore)', Boolean(d.data?.project))
     check('عنصر عمداً حذف‌شده بازنگشت (۲ عنصر)', d.data?.dependencyCounts?.elements === 2, d.data?.dependencyCounts?.elements, 2)
-    check('پروژه‌های دیگر (کپی/ورودی آزمون) حذف شده ماندند', (await api('GET', '/api/projects')).data?.items?.length === 1)
+    // مقاوم به داده از پیش موجود: فقط نبود پروژه‌های آزمون را بررسی کن، نه شمار مطلق
+    const listAfterRestore: any[] = (await api('GET', '/api/projects')).data?.items ?? []
+    check(
+      'پروژه‌های دیگر (کپی/ورودی آزمون) حذف شده ماندند',
+      !listAfterRestore.some((p) => p.name === 'کپی ساختاری آزمون' || String(p.name).includes('(ورودی)')),
+      listAfterRestore.map((p) => p.name),
+    )
 
     // checksum خراب در بازیابی از فایل
     const badRestore = await fetch(`${BASE}/api/backups/restore-upload`, {
@@ -475,8 +484,12 @@ async function main() {
   {
     const del = await api('DELETE', `/api/projects/${PID}`)
     check('حذف نهایی پروژه آزمون', del.status === 200)
-    const list = await api('GET', '/api/projects')
-    check('فهرست پروژه‌ها خالی شد', list.data?.items?.length === 0, list.data?.items?.length, 0)
+    const list: any[] = (await api('GET', '/api/projects')).data?.items ?? []
+    check(
+      'داده آزمون کاملاً پاک شد (هیچ پروژه آزمون نماند)',
+      !list.some((p) => p.id === PID || String(p.name).startsWith('پروژه آزمون خودکار') || p.name === 'کپی ساختاری آزمون'),
+      list.map((p) => p.name),
+    )
   }
 }
 

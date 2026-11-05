@@ -65,7 +65,8 @@ export const ALLOWANCE_METHOD_LABELS: Record<AllowanceMethod, string> = {
 
 export const ALLOWANCE_METHOD_FORMULAS: Record<AllowanceMethod, string> = {
   PERCENT_OF_NT: 'ST = NT × (1 + A)',
-  SHARE_OF_ST: 'ST = NT / (1 − A)   [الزام: A < ۱۰۰٪]',
+  // قید A < ۱۰۰٪ جداگانه و راست‌به‌چپ زیر فرمول نمایش داده می‌شود (تردید جهت متن نمی‌ماند)
+  SHARE_OF_ST: 'ST = NT / (1 − A)',
 }
 
 // ── روش تجمیع چند اپراتور — ۱۰.۱ ──

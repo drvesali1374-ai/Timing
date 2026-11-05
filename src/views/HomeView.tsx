@@ -625,7 +625,7 @@ export default function HomeView() {
           setDeleteDeps(null)
         }}
       >
-        <DialogContent dir="rtl" className="sm:max-w-xs">
+        <DialogContent dir="rtl" className="sm:max-w-xs" aria-describedby={undefined}>
           <DialogTitle className="sr-only">بررسی وابستگی‌های پروژه</DialogTitle>
           <div className="flex flex-col items-center gap-3 py-4" role="status" aria-live="polite">
             <Loader2 className="size-6 animate-spin text-brand" aria-hidden />

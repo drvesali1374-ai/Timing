@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#070b14">
+<title>TradeBot — Premium Trading Dashboard</title>
+
+<link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+<style>
+/* ============================================================
+   TRADEBOT PREMIUM SYSTEM
+   Dark-first, light-compatible, RTL, responsive
+   ============================================================ */
+:root{
+  --bg:#f5f7fb;
+  --surface:#ffffff;
+  --surface-2:#f8fafc;
+  --surface-3:#eef2f7;
+  --glass:rgba(255,255,255,.76);
+  --line:#e4e9f1;
+  --line-strong:#d7dee9;
+  --text:#0c1424;
+  --muted:#69778e;
+  --faint:#98a4b7;
+
+  --brand:#7257ff;
+  --brand-2:#9a7cff;
+  --brand-soft:#efeaff;
+  --cyan:#21c7d9;
+  --cyan-soft:#e5fbfd;
+  --green:#18b77b;
+  --green-soft:#dcf8ec;
+  --red:#ef5b6b;
+  --red-soft:#fde5e8;
+  --amber:#eaa928;
+  --amber-soft:#fff4d7;
+
+  --sidebar:292px;
+  --radius-xl:22px;
+  --radius-lg:17px;
+  --radius-md:13px;
+  --radius-sm:10px;
+
+  --shadow-1:0 1px 2px rgba(20,35,60,.03),0 7px 24px rgba(20,35,60,.05);
+  --shadow-2:0 18px 50px rgba(25,35,60,.11);
+  --shadow-3:0 25px 70px rgba(20,25,55,.18);
+
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --ease-spring:cubic-bezier(.22,1.18,.38,1);
+}
+
+[data-theme="dark"]{
+  --bg:#070b14;
+  --surface:#0d1422;
+  --surface-2:#101a2a;
+  --surface-3:#141f31;
+  --glass:rgba(12,18,30,.74);
+  --line:#1e2a3d;
+  --line-strong:#2a3950;
+  --text:#edf2fb;
+  --muted:#93a0b5;
+  --faint:#627189;
+
+  --brand:#8874ff;
+  --brand-2:#b39fff;
+  --brand-soft:#201b42;
+  --cyan:#37d1df;
+  --cyan-soft:#102f35;
+  --green:#27c992;
+  --green-soft:#0c3025;
+  --red:#ff6c7a;
+  --red-soft:#3a1b22;
+  --amber:#f1b743;
+  --amber-soft:#3b2b10;
+
+  --shadow-1:0 1px 2px rgba(0,0,0,.25),0 12px 30px rgba(0,0,0,.14);
+  --shadow-2:0 20px 55px rgba(0,0,0,.34);
+  --shadow-3:0 30px 80px rgba(0,0,0,.48);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Vazirmatn',system-ui,sans-serif;
+  background:
+    radial-gradient(900px 420px at 76% -8%, rgba(114,87,255,.09), transparent 65%),
+    radial-gradient(720px 380px at 8% 18%, rgba(33,199,217,.055), transparent 60%),
+    var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+  font-size:14px;
+  transition:background .3s,color .3s;
+}
+body::before{
+  content:"";
+  position:fixed; inset:0; pointer-events:none; z-index:-1;
+  background-image:linear-gradient(rgba(120,130,150,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(120,130,150,.035) 1px,transparent 1px);
+  background-size:38px 38px;
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.32),transparent 70%);
+}
+button,input,select{font-family:inherit}
+button{border:0;background:none;color:inherit;cursor:pointer}
+a{text-decoration:none;color:inherit}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:12px}
+::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+
+/* ===================== APP SHELL ===================== */
+.app-shell{min-height:100vh}
+.sidebar{
+  position:fixed;
+  right:0;top:0;bottom:0;
+  width:var(--sidebar);
+  z-index:120;
+  padding:18px 14px 14px;
+  display:flex;flex-direction:column;
+  background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.62));
+  backdrop-filter:blur(24px) saturate(145%);
+  -webkit-backdrop-filter:blur(24px) saturate(145%);
+  border-left:1px solid var(--line);
+  box-shadow:-6px 0 35px rgba(30,45,75,.025);
+  transition:width .3s var(--ease),transform .3s var(--ease);
+}
+[data-theme="dark"] .sidebar{
+  background:linear-gradient(180deg,rgba(11,18,31,.88),rgba(9,14,24,.84));
+  box-shadow:-10px 0 50px rgba(0,0,0,.18);
+}
+.sidebar.collapsed{width:84px}
+.sidebar.collapsed .brand-copy,
+.sidebar.collapsed .nav-section-title,
+.sidebar.collapsed .nav-text,
+.sidebar.collapsed .nav-badge,
+.sidebar.collapsed .nav-chevron,
+.sidebar.collapsed .sidebar-caption,
+.sidebar.collapsed .user-copy,
+.sidebar.collapsed .workspace-text,
+.sidebar.collapsed .workspace-chevron{display:none}
+.sidebar.collapsed .brand{justify-content:center}
+.sidebar.collapsed .nav-link{justify-content:center;padding:11px}
+.sidebar.collapsed .nav-link .nav-leading{gap:0}
+.sidebar.collapsed .submenu{display:none !important}
+.sidebar.collapsed .user-card{justify-content:center}
+.sidebar.collapsed .workspace{justify-content:center;padding:8px}
+
+.brand{
+  display:flex;align-items:center;gap:11px;
+  padding:6px 8px 15px;
+  border-bottom:1px solid var(--line);
+  margin-bottom:15px;
+}
+.brand-mark{
+  width:42px;height:42px;border-radius:14px;
+  display:grid;place-items:center;flex:0 0 auto;
+  background:conic-gradient(from 220deg,#7b64ff,#27cedf,#7b64ff);
+  box-shadow:0 10px 26px rgba(114,87,255,.22);
+  position:relative;overflow:hidden;
+}
+.brand-mark::after{
+  content:"";position:absolute;inset:1px;border-radius:13px;
+  background:linear-gradient(150deg,rgba(255,255,255,.18),rgba(255,255,255,0));
+}
+.brand-mark svg{position:relative;z-index:1;width:24px;height:24px}
+.brand-copy{min-width:0}
+.brand-title{font-size:15px;font-weight:850;letter-spacing:-.2px}
+.brand-subtitle{font-size:10.5px;color:var(--muted);margin-top:2px}
+
+.workspace{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;padding:9px 10px;margin-bottom:13px;
+  border:1px solid var(--line);border-radius:13px;
+  background:var(--surface);
+  box-shadow:var(--shadow-1);
+  transition:var(--ease);
+}
+.workspace:hover{border-color:color-mix(in srgb,var(--brand) 35%,var(--line))}
+.workspace-avatar{
+  width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:var(--brand-soft);color:var(--brand);flex:0 0 auto
+}
+.workspace-text{flex:1;min-width:0}
+.workspace-name{font-size:11.5px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workspace-meta{font-size:9.5px;color:var(--muted);margin-top:1px}
+.workspace-chevron{color:var(--muted)}
+
+.nav-scroll{overflow:auto;flex:1;padding-left:2px}
+.nav-section{margin-bottom:15px}
+.nav-section-title{
+  padding:0 10px 7px;color:var(--faint);font-size:10px;font-weight:800;letter-spacing:.45px
+}
+.nav-list{display:flex;flex-direction:column;gap:4px}
+.nav-item{list-style:none}
+.nav-link{
+  width:100%;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:9px;padding:10px 10px;border-radius:12px;
+  color:var(--muted);font-weight:600;font-size:12.5px;
+  transition:background .2s,color .2s,transform .2s var(--ease);
+  position:relative;
+}
+.nav-link:hover{background:var(--surface-2);color:var(--text);transform:translateX(-1px)}
+.nav-link.active{
+  color:var(--brand);
+  background:linear-gradient(90deg,var(--brand-soft),transparent 90%);
+}
+.nav-link.active::before{
+  content:"";position:absolute;right:2px;top:50%;width:3px;height:23px;
+  transform:translateY(-50%);border-radius:8px;background:linear-gradient(180deg,var(--brand),var(--cyan))
+}
+.nav-leading{display:flex;align-items:center;gap:10px;min-width:0}
+.nav-icon{
+  width:23px;height:23px;display:grid;place-items:center;
+  border-radius:8px;font-size:17px;flex:0 0 auto
+}
+.nav-link.active .nav-icon{background:rgba(114,87,255,.1)}
+.nav-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-right{display:flex;align-items:center;gap:7px}
+.nav-badge{
+  min-width:19px;padding:2px 6px;border-radius:999px;
+  background:var(--surface-3);color:var(--muted);font-size:9px;font-weight:800;
+}
+.nav-link.active .nav-badge{background:rgba(114,87,255,.13);color:var(--brand)}
+.nav-chevron{font-size:14px;color:var(--faint);transition:transform .25s var(--ease)}
+.nav-item.open>.nav-trigger .nav-chevron{transform:rotate(-90deg);color:var(--brand)}
+
+.submenu{
+  display:grid;grid-template-rows:0fr;overflow:hidden;
+  transition:grid-template-rows .3s var(--ease);
+}
+.nav-item.open>.submenu{grid-template-rows:1fr}
+.submenu-inner{overflow:hidden;padding:3px 0 2px 0;margin-right:14px;border-right:1px solid var(--line)}
+.sub-link{
+  display:flex;align-items:center;gap:9px;
+  padding:8px 11px 8px 10px;margin:2px 0;
+  color:var(--muted);border-radius:10px;font-size:11.5px;
+  transition:all .2s var(--ease);
+}
+.sub-link i{font-size:15px}
+.sub-link:hover{background:var(--surface-2);color:var(--text);padding-right:15px}
+.sub-link.active{color:var(--brand);background:var(--brand-soft)}
+
+.sidebar-bottom{border-top:1px solid var(--line);padding-top:11px;margin-top:9px}
+.user-card{
+  display:flex;align-items:center;gap:9px;padding:8px;border-radius:12px;
+  transition:background .2s
+}
+.user-card:hover{background:var(--surface-2)}
+.user-avatar{
+  width:34px;height:34px;border-radius:11px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--brand),#5de0ea);color:#fff;font-weight:850;flex:0 0 auto;
+}
+.user-copy{flex:1;min-width:0}
+.user-name{font-size:11.5px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-plan{font-size:9.5px;color:var(--muted);margin-top:1px}
+
+.main{
+  margin-right:var(--sidebar);min-height:100vh;
+  transition:margin-right .3s var(--ease)
+}
+.sidebar.collapsed~.main{margin-right:84px}
+
+/* ===================== TOP BAR ===================== */
+.topbar{
+  height:72px;padding:12px 30px;
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  position:sticky;top:0;z-index:60;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 82%,transparent),transparent);
+  backdrop-filter:blur(12px)
+}
+.topbar-right,.topbar-left{display:flex;align-items:center;gap:9px}
+.mobile-menu{display:none}
+.crumbs{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:11px}
+.crumbs strong{color:var(--text);font-size:12px}
+.live-pill{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border-radius:999px;
+  background:color-mix(in srgb,var(--green) 10%,var(--surface));color:var(--green);
+  border:1px solid color-mix(in srgb,var(--green) 18%,var(--line));font-size:10px;font-weight:800
+}
+.live-dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px color-mix(in srgb,currentColor 12%,transparent);animation:ping 1.8s infinite}
+.icon-btn{
+  width:37px;height:37px;border:1px solid var(--line);border-radius:11px;
+  display:grid;place-items:center;background:var(--surface);color:var(--muted);
+  transition:all .2s var(--ease);position:relative
+}
+.icon-btn:hover{color:var(--brand);border-color:color-mix(in srgb,var(--brand) 40%,var(--line));transform:translateY(-1px);box-shadow:var(--shadow-1)}
+.notif-dot{position:absolute;top:7px;left:7px;width:7px;height:7px;border-radius:50%;background:var(--red);border:2px solid var(--surface)}
+.top-avatar{width:31px;height:31px;border-radius:10px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand);font-size:11px;font-weight:850}
+.search-btn{
+  min-width:235px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:8px 10px;border:1px solid var(--line);border-radius:11px;background:var(--surface);
+  color:var(--muted);font-size:11px;transition:all .2s
+}
+.search-btn:hover{border-color:color-mix(in srgb,var(--brand) 36%,var(--line));color:var(--text)}
+.search-hint{display:inline-flex;gap:3px;align-items:center;padding:2px 6px;border-radius:6px;background:var(--surface-3);border:1px solid var(--line);font:700 9px/1 monospace}
+.primary-btn{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:11px;
+  background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;font-size:11.5px;font-weight:800;
+  box-shadow:0 9px 20px rgba(114,87,255,.2);transition:all .25s var(--ease)
+}
+.primary-btn:hover{transform:translateY(-2px);box-shadow:0 14px 28px rgba(114,87,255,.26)}
+.primary-btn:active{transform:none}
+
+/* ===================== PAGE / HERO ===================== */
+.page-wrap{padding:0 30px 42px;max-width:1500px;margin:0 auto}
+.page-hero{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  margin:3px 0 22px
+}
+.eyebrow{font-size:10px;color:var(--brand);font-weight:850;letter-spacing:.5px;margin-bottom:4px}
+.page-title{font-size:26px;font-weight:900;letter-spacing:-.65px}
+.page-subtitle{font-size:11.5px;color:var(--muted);margin-top:6px}
+.hero-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.secondary-btn{
+  display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid var(--line);
+  background:var(--surface);border-radius:10px;color:var(--muted);font-size:10.5px;font-weight:700;transition:all .2s
+}
+.secondary-btn:hover{background:var(--surface-2);color:var(--text);border-color:var(--line-strong)}
+.status-mini{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-size:10px}
+.status-mini .led{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px var(--green-soft)}
+
+/* ===================== METRICS ===================== */
+.metrics{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:17px
+}
+.metric{
+  position:relative;overflow:hidden;padding:17px;border:1px solid var(--line);border-radius:17px;
+  background:linear-gradient(160deg,var(--surface),color-mix(in srgb,var(--surface-2) 60%,transparent));
+  box-shadow:var(--shadow-1);transition:all .25s var(--ease)
+}
+.metric::after{
+  content:"";position:absolute;width:150px;height:150px;border-radius:50%;right:-70px;bottom:-85px;
+  background:radial-gradient(circle,color-mix(in srgb,var(--brand) 11%,transparent),transparent 70%);pointer-events:none
+}
+.metric:hover{transform:translateY(-3px);box-shadow:var(--shadow-2);border-color:color-mix(in srgb,var(--brand) 25%,var(--line))}
+.metric-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.metric-icon{width:37px;height:37px;border-radius:11px;display:grid;place-items:center;font-size:18px;background:var(--brand-soft);color:var(--brand)}
+.metric-icon.cyan{background:var(--cyan-soft);color:var(--cyan)}
+.metric-icon.green{background:var(--green-soft);color:var(--green)}
+.metric-icon.amber{background:var(--amber-soft);color:var(--amber)}
+.metric-change{font-size:10px;font-weight:850;padding:4px 7px;border-radius:999px}
+.up{color:var(--green);background:var(--green-soft)}
+.down{color:var(--red);background:var(--red-soft)}
+.neutral{color:var(--muted);background:var(--surface-3)}
+.metric-value{font-size:22px;font-weight:900;letter-spacing:-.55px;font-variant-numeric:tabular-nums}
+.metric-label{font-size:10.5px;color:var(--muted);margin-top:4px}
+.spark{height:36px;margin-top:8px;opacity:.95}
+
+/* ===================== CARDS ===================== */
+.grid-main{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,.85fr);gap:15px}
+.card{
+  border:1px solid var(--line);background:var(--surface);border-radius:18px;box-shadow:var(--shadow-1);
+  overflow:hidden
+}
+.card-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 17px;border-bottom:1px solid var(--line)}
+.card-title{font-size:12.5px;font-weight:850}
+.card-subtitle{font-size:9.5px;color:var(--muted);margin-top:3px}
+.header-tools{display:flex;align-items:center;gap:6px}
+.mini-btn{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--muted);font-size:9px;transition:.2s}
+.mini-btn:hover{color:var(--text);border-color:var(--line-strong)}
+.chart-card{min-height:350px}
+.chart-wrap{padding:12px 14px 14px}
+.chart-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.asset-selector{display:flex;align-items:center;gap:9px}
+.coin-logo{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:#fff;font-size:13px;font-weight:900}
+.btc{background:#f7931a}.eth{background:#6075e8}.sol{background:linear-gradient(145deg,#10c7af,#6d55ff)}
+.asset-name{font-size:11px;font-weight:850}.asset-price{font-size:9.5px;color:var(--muted);margin-top:2px}
+.time-tabs{display:flex;align-items:center;gap:2px;padding:3px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px}
+.time-tab{padding:5px 8px;border-radius:7px;color:var(--muted);font-size:9.5px;font-weight:750}
+.time-tab.active{background:var(--surface);color:var(--brand);box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.chart-box{height:255px;position:relative;border:1px solid var(--line);border-radius:13px;overflow:hidden;background:linear-gradient(180deg,color-mix(in srgb,var(--brand) 2%,var(--surface)),var(--surface))}
+.chart-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(120,130,150,.065) 1px,transparent 1px),linear-gradient(90deg,rgba(120,130,150,.065) 1px,transparent 1px);background-size:45px 36px}
+#equityChart{position:absolute;inset:0;width:100%;height:100%}
+.chart-tip{
+  position:absolute;right:16px;top:15px;padding:7px 9px;border-radius:9px;
+  border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 84%,transparent);backdrop-filter:blur(8px);
+  box-shadow:var(--shadow-1);font-size:9px
+}
+.chart-tip strong{font-size:11px}.chart-tip span{color:var(--muted);display:block;margin-top:2px}
+.chart-legend{display:flex;align-items:center;gap:12px;margin-top:8px;color:var(--muted);font-size:9px}
+.legend{display:flex;align-items:center;gap:5px}.legend-dot{width:7px;height:7px;border-radius:50%;background:var(--brand)}.legend-dot.cyan{background:var(--cyan)}
+
+.side-stack{display:flex;flex-direction:column;gap:15px}
+.signal-card{padding-bottom:14px}
+.signal-body{padding:14px 16px}
+.signal-status{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--surface-2)}
+.signal-icon{width:37px;height:37px;border-radius:11px;display:grid;place-items:center;background:var(--green-soft);color:var(--green);font-size:18px}
+.signal-copy{flex:1}
+.signal-title{font-size:11.5px;font-weight:850}
+.signal-desc{font-size:9.5px;color:var(--muted);margin-top:2px}
+.signal-live{font-size:9px;font-weight:850;color:var(--green)}
+.progress{height:6px;background:var(--surface-3);border-radius:999px;overflow:hidden;margin:13px 0 6px}
+.progress>span{display:block;height:100%;width:82%;background:linear-gradient(90deg,var(--brand),var(--cyan));border-radius:999px}
+.progress-meta{display:flex;justify-content:space-between;font-size:9px;color:var(--muted)}
+.signal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.info-chip{padding:8px 9px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.info-chip span{font-size:8.5px;color:var(--muted);display:block}.info-chip strong{font-size:10.5px;margin-top:3px;display:block}
+
+.mini-list{padding:5px 8px 8px}
+.mini-row{display:flex;align-items:center;gap:9px;padding:9px;border-radius:11px;transition:.2s}
+.mini-row:hover{background:var(--surface-2)}
+.mini-row .coin-logo{width:28px;height:28px;border-radius:8px;font-size:11px}
+.mini-main{flex:1;min-width:0}
+.mini-title{font-size:10.5px;font-weight:800}.mini-meta{font-size:8.5px;color:var(--muted);margin-top:2px}
+.mini-value{text-align:left;font-size:10px;font-weight:800;font-variant-numeric:tabular-nums}.mini-value small{display:block;font-size:8.5px;color:var(--muted);font-weight:600;margin-top:2px}
+
+/* ===================== TABLE ===================== */
+.table-card{margin-top:15px}
+.tabbar{display:flex;align-items:center;gap:4px;padding:11px 13px 0}
+.tab{
+  position:relative;padding:8px 11px;border-radius:9px 9px 0 0;color:var(--muted);font-size:10.5px;font-weight:800
+}
+.tab.active{color:var(--brand)}
+.tab.active::after{content:"";position:absolute;bottom:-1px;right:8px;left:8px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--brand),var(--cyan))}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th{text-align:right;padding:11px 15px;background:var(--surface-2);color:var(--faint);font-size:9px;font-weight:800;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+td{padding:12px 15px;border-bottom:1px solid var(--line);font-size:10px}
+tbody tr{transition:background .18s}
+tbody tr:hover{background:var(--surface-2)}
+.coin-cell{display:flex;align-items:center;gap:9px}.pair{font-weight:800}.strategy{font-size:8.5px;color:var(--muted);margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border-radius:999px;font-size:8.8px;font-weight:850}
+.pill-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.pill.green{background:var(--green-soft);color:var(--green)}
+.pill.red{background:var(--red-soft);color:var(--red)}
+.pill.amber{background:var(--amber-soft);color:var(--amber)}
+.mono{font-variant-numeric:tabular-nums}
+.actions{display:flex;justify-content:flex-start;gap:5px}
+.row-action{width:28px;height:28px;border:1px solid var(--line);border-radius:8px;display:grid;place-items:center;color:var(--muted);background:var(--surface);transition:.2s}
+.row-action:hover{color:var(--brand);border-color:color-mix(in srgb,var(--brand) 32%,var(--line))}
+
+/* ===================== DRAWERS / MODALS / POPOVERS ===================== */
+.overlay{
+  position:fixed;inset:0;z-index:1000;background:rgba(3,8,18,.48);backdrop-filter:blur(7px);
+  opacity:0;visibility:hidden;transition:all .25s var(--ease);display:flex
+}
+.overlay.show{opacity:1;visibility:visible}
+.dialog{
+  width:min(610px,calc(100vw - 28px));max-height:min(88vh,760px);overflow:auto;
+  margin:auto;border:1px solid var(--line);border-radius:20px;background:var(--surface);box-shadow:var(--shadow-3);
+  transform:translateY(18px) scale(.97);transition:transform .33s var(--ease-spring)
+}
+.overlay.show .dialog{transform:none}
+.dialog.wide{width:min(860px,calc(100vw - 28px))}
+.dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 19px;border-bottom:1px solid var(--line)}
+.dialog-title{font-size:15px;font-weight:900}.dialog-desc{font-size:9.5px;color:var(--muted);margin-top:3px}
+.dialog-close{width:31px;height:31px;border-radius:9px;display:grid;place-items:center;color:var(--muted);border:1px solid var(--line)}
+.dialog-close:hover{color:var(--red);background:var(--red-soft)}
+.dialog-body{padding:18px 19px}
+.dialog-footer{display:flex;justify-content:flex-end;gap:8px;padding:13px 19px;border-top:1px solid var(--line);background:var(--surface-2)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-field.full{grid-column:1/-1}
+.label{display:block;font-size:9.5px;font-weight:800;color:var(--muted);margin-bottom:6px}
+.input,.select{
+  width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);
+  color:var(--text);outline:none;font-size:10.5px;transition:.2s
+}
+.input:focus,.select:focus{border-color:var(--brand);box-shadow:0 0 0 4px color-mix(in srgb,var(--brand) 12%,transparent)}
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface-2);margin-top:10px}
+.switch-copy{min-width:0}.switch-title{font-size:10px;font-weight:800}.switch-desc{font-size:8.5px;color:var(--muted);margin-top:2px}
+.switch{position:relative;width:38px;height:22px;flex:0 0 auto}.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;border-radius:999px;background:var(--line-strong);transition:.25s}
+.slider::before{content:"";position:absolute;width:16px;height:16px;top:3px;right:3px;border-radius:50%;background:white;box-shadow:0 2px 4px rgba(0,0,0,.18);transition:.25s}
+.switch input:checked + .slider{background:linear-gradient(90deg,var(--brand),var(--cyan))}
+.switch input:checked + .slider::before{transform:translateX(-16px)}
+
+.drawer{
+  position:absolute;top:0;bottom:0;right:0;width:min(430px,calc(100vw - 24px));background:var(--surface);
+  border-left:1px solid var(--line);box-shadow:var(--shadow-3);transform:translateX(102%);transition:transform .32s var(--ease);display:flex;flex-direction:column
+}
+.overlay.show .drawer{transform:none}
+.drawer-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 17px;border-bottom:1px solid var(--line)}
+.drawer-body{overflow:auto;padding:15px 17px;flex:1}
+.filter-group{margin-bottom:18px}.filter-title{font-size:10px;font-weight:850;margin-bottom:8px}
+.filter-chips{display:flex;flex-wrap:wrap;gap:6px}
+.filter-chip{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:9px;color:var(--muted)}
+.filter-chip.active{border-color:color-mix(in srgb,var(--brand) 30%,var(--line));background:var(--brand-soft);color:var(--brand)}
+.range{width:100%}
+.range::-webkit-slider-thumb{accent-color:var(--brand)}
+
+.notification-item{display:flex;gap:10px;padding:11px 8px;border-radius:10px;transition:.2s}.notification-item:hover{background:var(--surface-2)}
+.notification-icon{width:31px;height:31px;border-radius:9px;display:grid;place-items:center;flex:0 0 auto}.notification-copy{flex:1}.notification-title{font-size:10px;font-weight:800}.notification-meta{font-size:8.5px;color:var(--muted);margin-top:2px}
+
+.popover{
+  position:fixed;top:64px;left:26px;z-index:500;width:300px;background:var(--surface);border:1px solid var(--line);
+  border-radius:15px;box-shadow:var(--shadow-3);opacity:0;visibility:hidden;transform:translateY(-7px);transition:all .22s var(--ease)
+}
+.popover.show{opacity:1;visibility:visible;transform:none}
+.popover-header{padding:12px 13px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.popover-title{font-size:10.5px;font-weight:850}
+.popover-body{padding:6px;max-height:335px;overflow:auto}
+
+/* ===================== COMMAND PALETTE ===================== */
+.command-wrap{width:min(690px,calc(100vw - 28px));margin:90px auto 0}
+.command-search{
+  display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)
+}
+.command-search i{color:var(--muted);font-size:19px}
+.command-search input{flex:1;border:0;outline:none;background:transparent;color:var(--text);font-size:12px}
+.command-list{padding:8px;max-height:430px;overflow:auto}
+.cmd-group{padding:7px 6px 6px;color:var(--faint);font-size:8.5px;font-weight:850}
+.command-item{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer
+}
+.command-item:hover,.command-item.focused{background:var(--surface-2)}
+.command-item i{width:22px;color:var(--brand);font-size:16px}.command-item strong{font-size:10.5px}.command-item small{margin-right:auto;color:var(--faint);font-size:8.5px}
+.command-footer{display:flex;gap:8px;padding:8px 11px;color:var(--faint);font-size:8px;border-top:1px solid var(--line)}
+
+/* ===================== TOAST / MOBILE ===================== */
+.toast-stack{position:fixed;left:18px;bottom:18px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+.toast{
+  min-width:250px;max-width:340px;display:flex;align-items:flex-start;gap:9px;padding:11px 12px;
+  border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow-3);
+  animation:toastIn .35s var(--ease-spring)
+}
+.toast-icon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--green-soft);color:var(--green)}
+.toast-title{font-size:10px;font-weight:850}.toast-msg{font-size:8.5px;color:var(--muted);margin-top:2px;line-height:1.5}
+
+.backdrop-mobile{
+  position:fixed;inset:0;z-index:110;background:rgba(2,7,15,.52);opacity:0;visibility:hidden;transition:.25s
+}
+.backdrop-mobile.show{opacity:1;visibility:visible}
+
+/* ===================== DEMO PAGES ===================== */
+.page-panel{display:none}
+.page-panel.active{display:block;animation:pageIn .34s var(--ease)}
+.placeholder-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.placeholder-card{padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.placeholder-card h3{font-size:12px}.placeholder-card p{font-size:9px;color:var(--muted);line-height:1.8;margin-top:5px}
+.kpi-list{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:11px}
+.kpi-line{padding:9px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}.kpi-line small{display:block;color:var(--muted);font-size:8px}.kpi-line strong{display:block;font-size:11px;margin-top:2px}
+
+@keyframes pageIn{from{opacity:.1;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes ping{0%,100%{box-shadow:0 0 0 0 rgba(24,183,123,.25)}50%{box-shadow:0 0 0 5px rgba(24,183,123,0)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(-20px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===================== RESPONSIVE ===================== */
+@media(max-width:1180px){
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .grid-main{grid-template-columns:1fr}
+  .side-stack{display:grid;grid-template-columns:1fr 1fr}
+}
+@media(max-width:950px){
+  .sidebar{transform:translateX(102%);width:292px}
+  .sidebar.mobile-open{transform:none}
+  .main,.sidebar.collapsed~.main{margin-right:0}
+  .mobile-menu{display:grid}
+  .search-btn{min-width:auto;width:42px;padding:0;justify-content:center}.search-btn span:first-child{display:none}
+  .search-hint{display:none}
+  .page-wrap{padding-inline:18px}
+  .topbar{padding-inline:18px}
+}
+@media(max-width:680px){
+  .metrics{grid-template-columns:1fr}
+  .side-stack{display:flex}
+  .page-hero{align-items:flex-start;flex-direction:column}
+  .hero-actions{width:100%}
+  .hero-actions .primary-btn,.hero-actions .secondary-btn{flex:1;justify-content:center}
+  .form-grid{grid-template-columns:1fr}
+  .form-field.full{grid-column:auto}
+  .topbar-left .live-pill{display:none}
+  .crumbs{display:none}
+  .page-title{font-size:22px}
+  .chart-box{height:220px}
+  .time-tab{padding-inline:6px}
+  .popover{left:14px;right:14px;width:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+
+<body data-theme="dark">
+<div class="app-shell">
+
+  <!-- ========== SIDEBAR ========== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none">
+          <path d="M10 31.5V16.7c0-1.1.6-2.1 1.6-2.7l12.8-7.4c1-.6 2.2-.6 3.2 0l12.8 7.4c1 .6 1.6 1.6 1.6 2.7v14.8c0 1.1-.6 2.1-1.6 2.7l-12.8 7.4c-1 .6-2.2.6-3.2 0l-12.8-7.4c-1-.6-1.6-1.6-1.6-2.7Z" stroke="white" stroke-width="2.6"/>
+          <path d="M15 28.8 20 18l4 8.2L29 14l4.5 9.2L36 18" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="brand-copy">
+        <div class="brand-title">TradeBot</div>
+        <div class="brand-subtitle">هوشمند • خودکار • دقیق</div>
+      </div>
+    </div>
+
+    <button class="workspace" onclick="showToast('فضای کاری','فضای کاری «ربات شخصی» انتخاب شد.')">
+      <span class="workspace-avatar"><i class="ph ph-circles-three-plus"></i></span>
+      <span class="workspace-text">
+        <span class="workspace-name">ربات شخصی من</span>
+        <span class="workspace-meta">۵ ربات متصل</span>
+      </span>
+      <i class="ph ph-caret-down workspace-chevron"></i>
+    </button>
+
+    <div class="nav-scroll">
+      <div class="nav-section">
+        <div class="nav-section-title">نمای کلی</div>
+        <div class="nav-list">
+          <div class="nav-item">
+            <button class="nav-link active" data-page="dashboard" onclick="navigate('dashboard',this)">
+              <span class="nav-leading"><span class="nav-icon"><i class="ph ph-squares-four"></i></span><span class="nav-text">داشبورد</span></span>
+              <span class="nav-right"><span class="nav-badge">Live</span></span>
+            </button>
+          </div>
+          <div class="nav-item has-submenu">
+            <button class="nav-link nav-trigger" onclick="toggleSub(this)">
+              <span class="nav-leading"><span class="nav-icon"><i class="ph ph-cpu"></i></span><span class="nav-text">ربات‌ها</span></span>
+              <span class="nav-right"><span class="nav-badge">4</span><i class="ph ph-caret-left nav-chevron"></i></span>
+            </button>
+            <div class="submenu"><div class="submenu-inner">
+              <button class="sub-link" onclick="navigate('bots',this)"><i class="ph ph-activity"></i> ربات‌های فعال</button>
+              <button class="sub-link" onclick="openModal('newBotModal')"><i class="ph ph-plus-circle"></i> ساخت ربات جدید</button>
+              <button class="sub-link" onclick="navigate('strategies',this)"><i class="ph ph-flask"></i> استراتژی‌ها</button>
+              <button class="sub-link" onclick="navigate('paper',this)"><i class="ph ph-test-tube"></i> Paper / Backtest</button>
+            </div></div>
+          </div>
+          <div class="nav-item has-submenu">
+            <button class="nav-link nav-trigger" onclick="toggleSub(this)">
+              <span class="nav-leading"><span class="nav-icon"><i class="ph ph-chart-line-up"></i></span><span class="nav-text">تحلیل</span></span>
+              <span class="nav-right"><i class="ph ph-caret-left nav-chevron"></i></span>
+            </button>
+            <div class="submenu"><div class="submenu-inner">
+              <button class="sub-link" onclick="navigate('analytics',this)"><i class="ph ph-chart-line"></i> عملکرد و PnL</button>
+              <button class="sub-link" onclick="navigate('risk',this)"><i class="ph ph-shield-check"></i> ریسک و Drawdown</button>
+              <button class="sub-link" onclick="navigate('reports',this)"><i class="ph ph-file-text"></i> گزارش‌ها</button>
+            </div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">حساب و سرمایه</div>
+        <div class="nav-list">
+          <div class="nav-item has-submenu">
+            <button class="nav-link nav-trigger" onclick="toggleSub(this)">
+              <span class="nav-leading"><span class="nav-icon"><i class="ph ph-wallet"></i></span><span class="nav-text">حساب‌ها و سرمایه</span></span>
+              <span class="nav-right"><i class="ph ph-caret-left nav-chevron"></i></span>
+            </button>
+            <div class="submenu"><div class="submenu-inner">
+              <button class="sub-link" onclick="navigate('wallet',this)"><i class="ph ph-wallet"></i> موجودی صرافی‌ها</button>
+              <button class="sub-link" onclick="navigate('transfers',this)"><i class="ph ph-arrows-left-right"></i> واریز و برداشت</button>
+              <button class="sub-link" onclick="navigate('history',this)"><i class="ph ph-receipt"></i> تاریخچه معاملات</button>
+            </div></div>
+          </div>
+          <div class="nav-item">
+            <button class="nav-link" data-page="notifications" onclick="openNotifications()">
+              <span class="nav-leading"><span class="nav-icon"><i class="ph ph-bell"></i></span><span class="nav-text">اعلان‌ها</span></span>
+              <span class="nav-badge">3</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">سیستم</div>
+        <div class="nav-list">
+          <div class="nav-item">
+            <button class="nav-link" onclick="openModal('settingsModal')">
+              <span class="nav-leading"><span class="nav-icon"><i class="ph ph-sliders-horizontal"></i></span><span class="nav-text">تنظیمات</span></span>
+              <i class="ph ph-arrow-up-left nav-chevron"></i>
+            </button>
+          </div>
+          <div class="nav-item">
+            <button class="nav-link" onclick="toggleTheme()">
+              <span class="nav-leading"><span class="nav-icon" id="themeSideIcon"><i class="ph ph-sun"></i></span><span class="nav-text">ظاهر و تم</span></span>
+              <span class="nav-badge">⌘</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-bottom">
+      <button class="user-card" onclick="showToast('پروفایل','پنل حساب کاربری در نسخه بعدی فعال می‌شود.')">
+        <span class="user-avatar">م</span>
+        <span class="user-copy"><span class="user-name">مهدی رضایی</span><span class="user-plan">Pro • API متصل</span></span>
+        <i class="ph ph-dots-three-vertical sidebar-caption"></i>
+      </button>
+    </div>
+  </aside>
+
+  <div class="backdrop-mobile" id="mobileBackdrop" onclick="closeMobileSidebar()"></div>
+
+  <!-- ========== MAIN ========== -->
+  <main class="main" id="main">
+
+    <header class="topbar">
+      <div class="topbar-right">
+        <button class="icon-btn mobile-menu" onclick="openMobileSidebar()" title="منو"><i class="ph ph-list"></i></button>
+        <button class="icon-btn" onclick="toggleSidebar()" title="جمع کردن منو"><i class="ph ph-sidebar-simple"></i></button>
+        <div class="crumbs"><span>TradeBot</span><i class="ph ph-caret-left"></i><strong id="crumbTitle">داشبورد</strong></div>
+      </div>
+
+      <div class="topbar-left">
+        <div class="live-pill"><span class="live-dot"></span> سیستم آنلاین</div>
+        <button class="search-btn" onclick="openCommand()"><span><i class="ph ph-magnifying-glass"></i>&nbsp; جستجو یا اجرای فرمان...</span><span class="search-hint">Ctrl K</span></button>
+        <button class="icon-btn" onclick="toggleTheme()" title="تغییر تم"><i class="ph ph-moon" id="themeIcon"></i></button>
+        <button class="icon-btn" onclick="openNotifications()" title="اعلان‌ها"><i class="ph ph-bell"></i><span class="notif-dot"></span></button>
+        <button class="primary-btn" onclick="openModal('newBotModal')"><i class="ph ph-plus"></i> ربات جدید</button>
+        <div class="top-avatar">م</div>
+      </div>
+    </header>
+
+    <div class="page-wrap">
+
+      <!-- DASHBOARD -->
+      <section class="page-panel active" id="page-dashboard">
+        <div class="page-hero">
+          <div><div class="eyebrow">LIVE OVERVIEW</div><h1 class="page-title">داشبورد اصلی</h1><p class="page-subtitle">وضعیت ربات‌ها، سرمایه و عملکرد لحظه‌ای را یکجا ببین.</p></div>
+          <div class="hero-actions">
+            <div class="status-mini"><span class="led"></span> آخرین همگام‌سازی: <strong id="syncTime">همین حالا</strong></div>
+            <button class="secondary-btn" onclick="openFilter()"><i class="ph ph-funnel"></i> فیلتر</button>
+            <button class="secondary-btn" onclick="showToast('به‌روزرسانی','داده‌های نمایشی تازه‌سازی شد.')" ><i class="ph ph-arrows-clockwise"></i> تازه‌سازی</button>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><div class="metric-top"><div class="metric-icon"><i class="ph ph-wallet"></i></div><span class="metric-change up">+۱۲.۴٪</span></div><div class="metric-value">$45,231</div><div class="metric-label">ارزش کل پورتفوی</div><div class="spark" data-spark="wallet"></div></div>
+          <div class="metric"><div class="metric-top"><div class="metric-icon green"><i class="ph ph-trend-up"></i></div><span class="metric-change up">+۵.۲٪</span></div><div class="metric-value" style="color:var(--green)">+$1,240</div><div class="metric-label">سود خالص امروز</div><div class="spark" data-spark="profit"></div></div>
+          <div class="metric"><div class="metric-top"><div class="metric-icon amber"><i class="ph ph-cpu"></i></div><span class="metric-change neutral">۱ متوقف</span></div><div class="metric-value">۴ / ۵</div><div class="metric-label">ربات‌های فعال</div><div class="spark" data-spark="bots"></div></div>
+          <div class="metric"><div class="metric-top"><div class="metric-icon cyan"><i class="ph ph-target"></i></div><span class="metric-change down">−۲.۱٪</span></div><div class="metric-value">۶۸.۵٪</div><div class="metric-label">نرخ موفقیت معاملات</div><div class="spark" data-spark="winrate"></div></div>
+        </div>
+
+        <div class="grid-main">
+          <div class="card chart-card">
+            <div class="card-header">
+              <div><div class="card-title">ارزش حساب و PnL</div><div class="card-subtitle">روند ۳۰ روز اخیر • داده نمایشی برای پیش‌نمایش</div></div>
+              <div class="header-tools"><button class="mini-btn" onclick="showToast('بازه','بازه زمانی روی «۳۰ روز» تنظیم شد.')">۳۰ روز <i class="ph ph-caret-down"></i></button><button class="mini-btn" onclick="showToast('نمودار','گزینه‌های نمودار باز شد.')"><i class="ph ph-dots-three"></i></button></div>
+            </div>
+            <div class="chart-wrap">
+              <div class="chart-toolbar">
+                <div class="asset-selector"><div class="coin-logo btc">₿</div><div><div class="asset-name">Portfolio / USDT</div><div class="asset-price">۴۵,۲۳۱٫۸۰ <span style="color:var(--green)">+۱٫۸٪</span></div></div></div>
+                <div class="time-tabs"><button class="time-tab">۷D</button><button class="time-tab active">۳۰D</button><button class="time-tab">۹۰D</button><button class="time-tab">۱Y</button></div>
+              </div>
+              <div class="chart-box">
+                <div class="chart-grid"></div>
+                <svg id="equityChart" viewBox="0 0 900 300" preserveAspectRatio="none" aria-label="نمودار عملکرد">
+                  <defs>
+                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(114,87,255,.23)"/><stop offset="1" stop-color="rgba(114,87,255,0)"/></linearGradient>
+                    <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7b64ff"/><stop offset="1" stop-color="#32d2df"/></linearGradient>
+                  </defs>
+                  <path id="areaPath" fill="url(#areaGrad)" d="M0,270 L0,218 L50,224 L100,211 L150,220 L200,188 L250,199 L300,175 L350,184 L400,148 L450,157 L500,132 L550,143 L600,115 L650,126 L700,93 L750,105 L800,72 L850,84 L900,42 L900,270 Z"/>
+                  <path id="linePath" fill="none" stroke="url(#lineGrad)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" d="M0,218 L50,224 L100,211 L150,220 L200,188 L250,199 L300,175 L350,184 L400,148 L450,157 L500,132 L550,143 L600,115 L650,126 L700,93 L750,105 L800,72 L850,84 L900,42"/>
+                  <circle cx="850" cy="84" r="5.5" fill="var(--surface)" stroke="#32d2df" stroke-width="3"/>
+                </svg>
+                <div class="chart-tip"><strong id="chartValue">$45,231.80</strong><span>امروز • 16:25</span></div>
+              </div>
+              <div class="chart-legend"><span class="legend"><span class="legend-dot"></span> ارزش حساب</span><span class="legend"><span class="legend-dot cyan"></span> خط مرجع</span><span style="margin-right:auto">Max DD: <strong style="color:var(--red)">−۴.۸٪</strong></span></div>
+            </div>
+          </div>
+
+          <div class="side-stack">
+            <div class="card signal-card">
+              <div class="card-header"><div><div class="card-title">وضعیت موتور ترید</div><div class="card-subtitle">اجرای چرخه خودکار</div></div><span class="pill green"><span class="pill-dot"></span> فعال</span></div>
+              <div class="signal-body">
+                <div class="signal-status"><div class="signal-icon"><i class="ph ph-activity"></i></div><div class="signal-copy"><div class="signal-title">Cycle Engine</div><div class="signal-desc">اسکن نمادها و بررسی سیگنال‌ها</div></div><span class="signal-live">LIVE</span></div>
+                <div class="progress"><span></span></div><div class="progress-meta"><span>چرخه فعلی</span><strong>82%</strong></div>
+                <div class="signal-grid">
+                  <div class="info-chip"><span>آخرین اجرا</span><strong id="lastCycle">16:24:32</strong></div>
+                  <div class="info-chip"><span>چرخه بعدی</span><strong id="nextCycle">16:29:32</strong></div>
+                  <div class="info-chip"><span>نمادها</span><strong>4 / 5</strong></div>
+                  <div class="info-chip"><span>خطا</span><strong style="color:var(--green)">۰ مورد</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><div><div class="card-title">بازارهای تحت نظر</div><div class="card-subtitle">آخرین قیمت و تغییرات</div></div><button class="mini-btn" onclick="showToast('بازار','لیست بازارها تازه شد.')"><i class="ph ph-arrows-clockwise"></i></button></div>
+              <div class="mini-list">
+                <div class="mini-row"><div class="coin-logo btc">₿</div><div class="mini-main"><div class="mini-title">BTC / USDT</div><div class="mini-meta">Bitcoin</div></div><div class="mini-value">$63,482<small style="color:var(--green)">+2.18%</small></div></div>
+                <div class="mini-row"><div class="coin-logo eth">Ξ</div><div class="mini-main"><div class="mini-title">ETH / USDT</div><div class="mini-meta">Ethereum</div></div><div class="mini-value">$2,491<small style="color:var(--red)">−0.74%</small></div></div>
+                <div class="mini-row"><div class="coin-logo sol">S</div><div class="mini-main"><div class="mini-title">SOL / USDT</div><div class="mini-meta">Solana</div></div><div class="mini-value">$142.10<small style="color:var(--green)">+1.04%</small></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <div class="tabbar">
+            <button class="tab active" onclick="activateTab(this)">همه ربات‌ها</button>
+            <button class="tab" onclick="activateTab(this)">فعال</button>
+            <button class="tab" onclick="activateTab(this)">تاریخچه</button>
+            <button class="tab" onclick="activateTab(this)">خطاها</button>
+            <span style="margin-right:auto"></span>
+            <button class="mini-btn" onclick="openFilter()"><i class="ph ph-funnel"></i> فیلتر پیشرفته</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ربات / بازار</th><th>استراتژی</th><th>سرمایه</th><th>PnL</th><th>وضعیت</th><th>آخرین اجرا</th><th>عملیات</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><div class="coin-cell"><div class="coin-logo btc">₿</div><div><div class="pair">Grid Bot Alpha</div><div class="strategy">BTC / USDT</div></div></div></td>
+                  <td>Grid Trading</td><td class="mono">$10,000</td><td class="mono" style="color:var(--green);font-weight:800">+$450.20</td><td><span class="pill green"><span class="pill-dot"></span> فعال</span></td><td class="mono">16:24:31</td>
+                  <td><div class="actions"><button class="row-action" onclick="openBotDetails('Grid Bot Alpha','BTC / USDT')"><i class="ph ph-chart-line-up"></i></button><button class="row-action" onclick="showToast('ربات','منوی عملیات Grid Bot Alpha باز شد.')"><i class="ph ph-dots-three"></i></button></div></td>
+                </tr>
+                <tr>
+                  <td><div class="coin-cell"><div class="coin-logo eth">Ξ</div><div><div class="pair">DCA Master</div><div class="strategy">ETH / USDT</div></div></div></td>
+                  <td>DCA</td><td class="mono">$5,000</td><td class="mono" style="color:var(--green);font-weight:800">+$120.50</td><td><span class="pill green"><span class="pill-dot"></span> فعال</span></td><td class="mono">16:23:58</td>
+                  <td><div class="actions"><button class="row-action" onclick="openBotDetails('DCA Master','ETH / USDT')"><i class="ph ph-chart-line-up"></i></button><button class="row-action" onclick="showToast('ربات','منوی عملیات DCA Master باز شد.')"><i class="ph ph-dots-three"></i></button></div></td>
+                </tr>
+                <tr>
+                  <td><div class="coin-cell"><div class="coin-logo sol">S</div><div><div class="pair">Scalper Pro</div><div class="strategy">SOL / USDT</div></div></div></td>
+                  <td>Scalping</td><td class="mono">$3,200</td><td class="mono" style="color:var(--red);font-weight:800">−$45.80</td><td><span class="pill amber"><span class="pill-dot"></span> متوقف</span></td><td class="mono">12:18:02</td>
+                  <td><div class="actions"><button class="row-action" onclick="openBotDetails('Scalper Pro','SOL / USDT')"><i class="ph ph-play"></i></button><button class="row-action" onclick="showToast('ربات','Scalper Pro آماده راه‌اندازی است.')"><i class="ph ph-dots-three"></i></button></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- BOTS PAGE -->
+      <section class="page-panel" id="page-bots">
+        <div class="page-hero"><div><div class="eyebrow">BOT CENTER</div><h1 class="page-title">مدیریت ربات‌ها</h1><p class="page-subtitle">ساخت، توقف، تست و مانیتورینگ استراتژی‌ها.</p></div><div class="hero-actions"><button class="secondary-btn" onclick="openFilter()"><i class="ph ph-funnel"></i> فیلتر</button><button class="primary-btn" onclick="openModal('newBotModal')"><i class="ph ph-plus"></i> ساخت ربات</button></div></div>
+        <div class="placeholder-grid">
+          <div class="placeholder-card"><div class="metric-icon green"><i class="ph ph-activity"></i></div><h3 style="margin-top:12px">۴ ربات فعال</h3><p>چرخه اجرای خودکار بدون خطای ثبت‌شده در آخرین بازه.</p><div class="kpi-list"><div class="kpi-line"><small>میانگین PnL</small><strong style="color:var(--green)">+3.8%</strong></div><div class="kpi-line"><small>آخرین سیگنال</small><strong>۲ دقیقه قبل</strong></div></div></div>
+          <div class="placeholder-card"><div class="metric-icon amber"><i class="ph ph-pause"></i></div><h3 style="margin-top:12px">۱ ربات متوقف</h3><p>برای جلوگیری از ترید ناخواسته، ربات می‌تواند در حالت آماده باقی بماند.</p><div class="kpi-list"><div class="kpi-line"><small>بازار</small><strong>SOL / USDT</strong></div><div class="kpi-line"><small>وضعیت</small><strong style="color:var(--amber)">Paused</strong></div></div></div>
+          <div class="placeholder-card"><div class="metric-icon"><i class="ph ph-flask"></i></div><h3 style="margin-top:12px">استراتژی‌های آماده</h3><p>Grid، DCA، Breakout و نمونه‌های قابل تنظیم برای شروع سریع.</p><div class="kpi-list"><div class="kpi-line"><small>فعال</small><strong>۶</strong></div><div class="kpi-line"><small>در تست</small><strong>۲</strong></div></div></div>
+        </div>
+        <div class="card table-card"><div class="card-header"><div><div class="card-title">لیست ربات‌ها</div><div class="card-subtitle">نمایش برای پیش‌نمایش رابط کاربری</div></div><button class="mini-btn" onclick="openModal('newBotModal')"><i class="ph ph-plus"></i> ربات جدید</button></div><div class="table-wrap"><table><thead><tr><th>نام</th><th>بازار</th><th>استراتژی</th><th>سرمایه</th><th>وضعیت</th><th>PnL</th></tr></thead><tbody><tr><td>Grid Bot Alpha</td><td>BTC/USDT</td><td>Grid</td><td>$10,000</td><td><span class="pill green"><span class="pill-dot"></span> فعال</span></td><td style="color:var(--green)">+4.5%</td></tr><tr><td>DCA Master</td><td>ETH/USDT</td><td>DCA</td><td>$5,000</td><td><span class="pill green"><span class="pill-dot"></span> فعال</span></td><td style="color:var(--green)">+2.4%</td></tr><tr><td>Scalper Pro</td><td>SOL/USDT</td><td>Scalping</td><td>$3,200</td><td><span class="pill amber"><span class="pill-dot"></span> متوقف</span></td><td style="color:var(--red)">−1.4%</td></tr></tbody></table></div></div>
+      </section>
+
+      <!-- ANALYTICS PAGE -->
+      <section class="page-panel" id="page-analytics">
+        <div class="page-hero"><div><div class="eyebrow">PERFORMANCE</div><h1 class="page-title">تحلیل عملکرد</h1><p class="page-subtitle">نمایش ساده و خوانا از سود، زیان و رفتار استراتژی‌ها.</p></div><div class="hero-actions"><button class="secondary-btn" onclick="showToast('گزارش','گزارش عملکرد آماده شد.')"><i class="ph ph-download-simple"></i> خروجی</button><button class="secondary-btn" onclick="openFilter()"><i class="ph ph-calendar-blank"></i> ۳۰ روز</button></div></div>
+        <div class="metrics"><div class="metric"><div class="metric-top"><div class="metric-icon green"><i class="ph ph-chart-line-up"></i></div><span class="metric-change up">+14.8%</span></div><div class="metric-value">$6,540</div><div class="metric-label">Net PnL</div></div><div class="metric"><div class="metric-top"><div class="metric-icon"><i class="ph ph-target"></i></div><span class="metric-change up">+3.2%</span></div><div class="metric-value">68.5%</div><div class="metric-label">Win Rate</div></div><div class="metric"><div class="metric-top"><div class="metric-icon amber"><i class="ph ph-wave-sine"></i></div><span class="metric-change neutral">۳۰ روز</span></div><div class="metric-value">۱.۸۲</div><div class="metric-label">Profit Factor</div></div><div class="metric"><div class="metric-top"><div class="metric-icon cyan"><i class="ph ph-shield-check"></i></div><span class="metric-change down">−4.8%</span></div><div class="metric-value">4.8%</div><div class="metric-label">Max Drawdown</div></div></div>
+        <div class="grid-main"><div class="card chart-card"><div class="card-header"><div><div class="card-title">Equity Curve</div><div class="card-subtitle">روند رشد سرمایه و افت‌ها</div></div><span class="pill green"><span class="pill-dot"></span> مثبت</span></div><div class="chart-wrap"><div class="chart-box" style="height:300px"><div class="chart-grid"></div><svg viewBox="0 0 900 320" preserveAspectRatio="none" style="width:100%;height:100%"><path fill="rgba(24,183,123,.12)" d="M0 275 L80 264 L160 248 L240 253 L320 224 L400 231 L480 194 L560 205 L640 163 L720 178 L800 132 L900 94 L900 320 L0 320Z"/><path d="M0 275 L80 264 L160 248 L240 253 L320 224 L400 231 L480 194 L560 205 L640 163 L720 178 L800 132 L900 94" fill="none" stroke="var(--green)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div></div><div class="side-stack"><div class="card"><div class="card-header"><div><div class="card-title">ترکیب سود</div><div class="card-subtitle">سهم هر ربات</div></div></div><div class="mini-list"><div class="mini-row"><div class="coin-logo btc">₿</div><div class="mini-main"><div class="mini-title">Grid Alpha</div><div class="mini-meta">BTC/USDT</div></div><div class="mini-value" style="color:var(--green)">+45%</div></div><div class="mini-row"><div class="coin-logo eth">Ξ</div><div class="mini-main"><div class="mini-title">DCA Master</div><div class="mini-meta">ETH/USDT</div></div><div class="mini-value" style="color:var(--green)">+31%</div></div><div class="mini-row"><div class="coin-logo sol">S</div><div class="mini-main"><div class="mini-title">Scalper</div><div class="mini-meta">SOL/USDT</div></div><div class="mini-value" style="color:var(--red)">−8%</div></div></div></div><div class="card"><div class="card-header"><div><div class="card-title">کنترل ریسک</div><div class="card-subtitle">هشدارهای فعال</div></div><span class="pill green"><span class="pill-dot"></span> نرمال</span></div><div class="signal-body"><div class="info-chip"><span>Risk / Reward</span><strong>1 : 2.4</strong></div><div class="info-chip" style="margin-top:7px"><span>Exposure</span><strong>۳۲٪ سرمایه</strong></div></div></div></div></div>
+      </section>
+
+      <!-- WALLET PAGE -->
+      <section class="page-panel" id="page-wallet">
+        <div class="page-hero"><div><div class="eyebrow">CAPITAL</div><h1 class="page-title">حساب‌ها و کیف پول</h1><p class="page-subtitle">اتصال صرافی‌ها، موجودی و گردش سرمایه.</p></div><div class="hero-actions"><button class="secondary-btn" onclick="showToast('صرافی','پنجره اتصال صرافی آماده است.')"><i class="ph ph-plugs-connected"></i> اتصال صرافی</button><button class="primary-btn" onclick="showToast('افزودن سرمایه','فرم افزودن سرمایه باز شد.')"><i class="ph ph-plus"></i> افزودن حساب</button></div></div>
+        <div class="placeholder-grid"><div class="placeholder-card"><div class="metric-icon"><i class="ph ph-buildings"></i></div><h3 style="margin-top:12px">Exchange Account</h3><p>API اصلی متصل و آماده خواندن موجودی/سفارش‌ها.</p><div class="kpi-list"><div class="kpi-line"><small>وضعیت</small><strong style="color:var(--green)">Connected</strong></div><div class="kpi-line"><small>آخرین Sync</small><strong>16:24</strong></div></div></div><div class="placeholder-card"><div class="metric-icon cyan"><i class="ph ph-wallet"></i></div><h3 style="margin-top:12px">موجودی آزاد</h3><p>سرمایه آزاد برای استراتژی‌ها و سفارش‌های بعدی.</p><div class="kpi-list"><div class="kpi-line"><small>USDT</small><strong>$18,540</strong></div><div class="kpi-line"><small>Margin</small><strong>41.2%</strong></div></div></div><div class="placeholder-card"><div class="metric-icon green"><i class="ph ph-arrows-down-up"></i></div><h3 style="margin-top:12px">گردش امروز</h3><p>ورودی و خروجی‌های ثبت‌شده در سیستم.</p><div class="kpi-list"><div class="kpi-line"><small>ورودی</small><strong style="color:var(--green)">+$3,200</strong></div><div class="kpi-line"><small>خروجی</small><strong>−$1,140</strong></div></div></div></div>
+        <div class="card table-card"><div class="card-header"><div><div class="card-title">دارایی‌ها</div><div class="card-subtitle">اطلاعات نمونه برای تم پایه</div></div></div><div class="table-wrap"><table><thead><tr><th>دارایی</th><th>مقدار</th><th>قیمت</th><th>ارزش</th><th>درصد پورتفوی</th></tr></thead><tbody><tr><td>USDT</td><td>18,540</td><td>$1.00</td><td>$18,540</td><td>41.0%</td></tr><tr><td>BTC</td><td>0.215</td><td>$63,482</td><td>$13,648</td><td>30.2%</td></tr><tr><td>ETH</td><td>3.21</td><td>$2,491</td><td>$7,996</td><td>17.7%</td></tr></tbody></table></div></div>
+      </section>
+
+      <!-- STRATEGIES -->
+      <section class="page-panel" id="page-strategies">
+        <div class="page-hero"><div><div class="eyebrow">STRATEGY LAB</div><h1 class="page-title">آزمایشگاه استراتژی</h1><p class="page-subtitle">قبل از اجرای واقعی، پارامترها را در محیط آزمایشی بررسی کن.</p></div><div class="hero-actions"><button class="secondary-btn" onclick="navigate('paper',this)"><i class="ph ph-test-tube"></i> Paper / Backtest</button><button class="primary-btn" onclick="openModal('newBotModal')"><i class="ph ph-plus"></i> ساخت ربات</button></div></div>
+        <div class="placeholder-grid"><div class="placeholder-card"><div class="metric-icon"><i class="ph ph-grid-four"></i></div><h3 style="margin-top:12px">Grid Trading</h3><p>مناسب برای بازار رنج؛ پارامترهای فاصله، سفارش و سرمایه قابل تنظیم.</p><div class="kpi-list"><div class="kpi-line"><small>نسخه</small><strong>v2.4</strong></div><div class="kpi-line"><small>استفاده</small><strong>۳ ربات</strong></div></div></div><div class="placeholder-card"><div class="metric-icon cyan"><i class="ph ph-stack"></i></div><h3 style="margin-top:12px">DCA</h3><p>ورود پله‌ای با کنترل اندازه پوزیشن و سقف سرمایه.</p><div class="kpi-list"><div class="kpi-line"><small>نسخه</small><strong>v1.8</strong></div><div class="kpi-line"><small>استفاده</small><strong>۱ ربات</strong></div></div></div><div class="placeholder-card"><div class="metric-icon amber"><i class="ph ph-wave-sine"></i></div><h3 style="margin-top:12px">Breakout</h3><p>فیلتر حجم، RSI و ATR برای تأیید شکست‌ها.</p><div class="kpi-list"><div class="kpi-line"><small>نسخه</small><strong>v3.1</strong></div><div class="kpi-line"><small>در تست</small><strong>۲ سناریو</strong></div></div></div></div>
+      </section>
+
+      <!-- PAPER / BACKTEST -->
+      <section class="page-panel" id="page-paper">
+        <div class="page-hero"><div><div class="eyebrow">LAB MODE</div><h1 class="page-title">Paper / Backtest</h1><p class="page-subtitle">محیط مجزا برای اعتبارسنجی منطق استراتژی قبل از Live.</p></div><div class="hero-actions"><button class="secondary-btn" onclick="showToast('داده تاریخی','بارگذاری داده تاریخی آغاز شد.')"><i class="ph ph-database"></i> داده</button><button class="primary-btn" onclick="showToast('Backtest','بک‌تست آزمایشی شروع شد.')"><i class="ph ph-play"></i> اجرای تست</button></div></div>
+        <div class="metrics"><div class="metric"><div class="metric-top"><div class="metric-icon"><i class="ph ph-clock-counter-clockwise"></i></div></div><div class="metric-value">1,000</div><div class="metric-label">کندل آزمایشی</div></div><div class="metric"><div class="metric-top"><div class="metric-icon green"><i class="ph ph-check-circle"></i></div></div><div class="metric-value">124</div><div class="metric-label">معامله</div></div><div class="metric"><div class="metric-top"><div class="metric-icon amber"><i class="ph ph-target"></i></div></div><div class="metric-value">61.3%</div><div class="metric-label">Win Rate</div></div><div class="metric"><div class="metric-top"><div class="metric-icon cyan"><i class="ph ph-chart-line-up"></i></div></div><div class="metric-value">+18.2%</div><div class="metric-label">Return</div></div></div>
+        <div class="card"><div class="card-header"><div><div class="card-title">تنظیمات سناریو</div><div class="card-subtitle">نمونه چیدمان فرم برای صفحه آزمایش</div></div></div><div class="dialog-body"><div class="form-grid"><div><label class="label">نماد</label><select class="select"><option>BTC / USDT</option><option>ETH / USDT</option><option>SOL / USDT</option></select></div><div><label class="label">تایم‌فریم</label><select class="select"><option>1h</option><option>4h</option><option>15m</option></select></div><div><label class="label">سرمایه اولیه</label><input class="input" value="10000"></div><div><label class="label">کارمزد</label><input class="input" value="0.06%"></div><div class="form-field full"><div class="switch-row"><div class="switch-copy"><div class="switch-title">جلوگیری از Leakage</div><div class="switch-desc">داده آینده وارد محاسبات سیگنال نشود.</div></div><label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div></div></div></div></div>
+      </section>
+
+      <!-- REPORTS / OTHER SIMPLE PAGES -->
+      <section class="page-panel" id="page-reports">
+        <div class="page-hero"><div><div class="eyebrow">REPORTS</div><h1 class="page-title">گزارش‌ها</h1><p class="page-subtitle">گزارش‌های دوره‌ای ربات‌ها و وضعیت حساب.</p></div><div class="hero-actions"><button class="primary-btn" onclick="showToast('PDF','گزارش PDF در صف ساخت قرار گرفت.')"><i class="ph ph-file-pdf"></i> گزارش PDF</button></div></div>
+        <div class="placeholder-grid"><div class="placeholder-card"><h3>گزارش روزانه</h3><p>خلاصه PnL، معاملات و خطاهای چرخه امروز.</p></div><div class="placeholder-card"><h3>گزارش هفتگی</h3><p>مقایسه عملکرد ربات‌ها و تغییرات سرمایه.</p></div><div class="placeholder-card"><h3>گزارش ریسک</h3><p>Drawdown، Exposure و هشدارهای ریسک.</p></div></div>
+      </section>
+
+      <section class="page-panel" id="page-risk"><div class="page-hero"><div><div class="eyebrow">RISK CONTROL</div><h1 class="page-title">ریسک و Drawdown</h1><p class="page-subtitle">داشبورد سبک برای کنترل Exposure و سقف زیان.</p></div></div><div class="metrics"><div class="metric"><div class="metric-icon cyan"><i class="ph ph-shield-check"></i></div><div class="metric-value">۳۲٪</div><div class="metric-label">Exposure</div></div><div class="metric"><div class="metric-icon amber"><i class="ph ph-warning"></i></div><div class="metric-value">۲</div><div class="metric-label">هشدار فعال</div></div><div class="metric"><div class="metric-icon green"><i class="ph ph-lock-key"></i></div><div class="metric-value">فعال</div><div class="metric-label">Kill Switch</div></div><div class="metric"><div class="metric-icon"><i class="ph ph-gauge"></i></div><div class="metric-value">1.9x</div><div class="metric-label">Leverage</div></div></div></section>
+
+      <section class="page-panel" id="page-transfers"><div class="page-hero"><div><div class="eyebrow">TRANSFERS</div><h1 class="page-title">واریز و برداشت</h1><p class="page-subtitle">کنترل مسیر ورود و خروج سرمایه در یک نمای ساده.</p></div></div><div class="placeholder-grid"><div class="placeholder-card"><div class="metric-icon green"><i class="ph ph-download-simple"></i></div><h3 style="margin-top:12px">واریز</h3><p>نمایش تراکنش‌های ورودی و وضعیت تأیید.</p></div><div class="placeholder-card"><div class="metric-icon amber"><i class="ph ph-upload-simple"></i></div><h3 style="margin-top:12px">برداشت</h3><p>نمایش درخواست‌های خروج سرمایه و وضعیت آنها.</p></div><div class="placeholder-card"><div class="metric-icon"><i class="ph ph-receipt"></i></div><h3 style="margin-top:12px">تاریخچه</h3><p>فیلتر بر اساس تاریخ، نوع و حساب مقصد.</p></div></div></section>
+
+      <section class="page-panel" id="page-history"><div class="page-hero"><div><div class="eyebrow">TRADE HISTORY</div><h1 class="page-title">تاریخچه معاملات</h1><p class="page-subtitle">نمایش معاملات بسته‌شده با تمرکز بر خوانایی.</p></div></div><div class="card table-card" style="margin-top:0"><div class="table-wrap"><table><thead><tr><th>زمان</th><th>بازار</th><th>سمت</th><th>ورود</th><th>خروج</th><th>PnL</th></tr></thead><tbody><tr><td>15:52</td><td>BTC/USDT</td><td><span class="pill green">Long</span></td><td>$62,880</td><td>$63,410</td><td style="color:var(--green)">+$84.20</td></tr><tr><td>14:18</td><td>ETH/USDT</td><td><span class="pill red">Short</span></td><td>$2,518</td><td>$2,492</td><td style="color:var(--green)">+$31.80</td></tr></tbody></table></div></div></section>
+
+      <section class="page-panel" id="page-settings"><div class="page-hero"><div><div class="eyebrow">SYSTEM</div><h1 class="page-title">تنظیمات</h1><p class="page-subtitle">مدیریت کلیدها، اعلان‌ها و تنظیمات ظاهری.</p></div><div class="hero-actions"><button class="primary-btn" onclick="openModal('settingsModal')"><i class="ph ph-sliders-horizontal"></i> تنظیمات سریع</button></div></div><div class="placeholder-grid"><div class="placeholder-card"><div class="metric-icon"><i class="ph ph-key"></i></div><h3 style="margin-top:12px">API Keys</h3><p>مدیریت امن کلیدهای صرافی و دسترسی‌های ربات.</p></div><div class="placeholder-card"><div class="metric-icon cyan"><i class="ph ph-telegram-logo"></i></div><h3 style="margin-top:12px">اعلان‌ها</h3><p>تنظیم ارسال رویدادها به کانال‌های پیام‌رسان.</p></div><div class="placeholder-card"><div class="metric-icon green"><i class="ph ph-palette"></i></div><h3 style="margin-top:12px">Theme</h3><p>حالت روشن/تیره و ترجیحات نمایش را کنترل کن.</p></div></div></section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ========== FILTER DRAWER ========== -->
+<div class="overlay" id="filterOverlay" onclick="overlayClose(event,'filterOverlay')">
+  <div class="drawer">
+    <div class="drawer-header"><div><div class="card-title">فیلتر پیشرفته</div><div class="card-subtitle">نمایش دقیق‌تر داده‌ها</div></div><button class="dialog-close" onclick="closeOverlay('filterOverlay')"><i class="ph ph-x"></i></button></div>
+    <div class="drawer-body">
+      <div class="filter-group"><div class="filter-title">وضعیت ربات</div><div class="filter-chips"><button class="filter-chip active">همه</button><button class="filter-chip">فعال</button><button class="filter-chip">متوقف</button><button class="filter-chip">خطا</button></div></div>
+      <div class="filter-group"><div class="filter-title">بازار</div><div class="filter-chips"><button class="filter-chip active">BTC</button><button class="filter-chip">ETH</button><button class="filter-chip">SOL</button><button class="filter-chip">سایر</button></div></div>
+      <div class="filter-group"><div class="filter-title">حداقل سرمایه: <strong id="capitalVal">$1,000</strong></div><input type="range" class="range" min="0" max="20000" step="500" value="1000" oninput="document.getElementById('capitalVal').textContent='$'+Number(this.value).toLocaleString('en-US')"></div>
+      <div class="switch-row"><div class="switch-copy"><div class="switch-title">فقط ربات‌های دارای پوزیشن</div><div class="switch-desc">ردیف‌های بدون معامله باز حذف شوند.</div></div><label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
+      <div class="switch-row"><div class="switch-copy"><div class="switch-title">فقط رویدادهای امروز</div><div class="switch-desc">سیگنال‌ها و معاملات امروز نمایش داده شوند.</div></div><label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+    </div>
+    <div class="dialog-footer"><button class="secondary-btn" onclick="closeOverlay('filterOverlay')">انصراف</button><button class="primary-btn" onclick="closeOverlay('filterOverlay');showToast('فیلترها','فیلترهای جدید اعمال شد.')">اعمال فیلتر</button></div>
+  </div>
+</div>
+
+<!-- ========== NOTIFICATIONS POPOVER ========== -->
+<div class="popover" id="notifPopover">
+  <div class="popover-header"><div class="popover-title">اعلان‌های اخیر</div><button class="mini-btn" onclick="clearNotifications()">علامت‌گذاری همه</button></div>
+  <div class="popover-body">
+    <div class="notification-item"><div class="notification-icon" style="background:var(--green-soft);color:var(--green)"><i class="ph ph-check-circle"></i></div><div class="notification-copy"><div class="notification-title">سفارش BTC با موفقیت بسته شد</div><div class="notification-meta">۲ دقیقه قبل • Grid Alpha</div></div></div>
+    <div class="notification-item"><div class="notification-icon" style="background:var(--amber-soft);color:var(--amber)"><i class="ph ph-warning"></i></div><div class="notification-copy"><div class="notification-title">Exposure به ۳۲٪ رسید</div><div class="notification-meta">۹ دقیقه قبل • Risk Guard</div></div></div>
+    <div class="notification-item"><div class="notification-icon" style="background:var(--brand-soft);color:var(--brand)"><i class="ph ph-lightning"></i></div><div class="notification-copy"><div class="notification-title">سیگنال جدید برای ETH</div><div class="notification-meta">۱۳ دقیقه قبل • DCA Master</div></div></div>
+  </div>
+</div>
+
+<!-- ========== COMMAND PALETTE ========== -->
+<div class="overlay" id="commandOverlay" onclick="overlayClose(event,'commandOverlay')">
+  <div class="dialog command-wrap">
+    <div class="command-search"><i class="ph ph-magnifying-glass"></i><input id="commandInput" placeholder="یک صفحه، ربات یا فرمان را جستجو کن..." autocomplete="off"></div>
+    <div class="command-list" id="commandList">
+      <div class="cmd-group">ناوبری</div>
+      <div class="command-item" data-search="داشبورد dashboard" onclick="commandGo('dashboard')"><i class="ph ph-squares-four"></i><strong>داشبورد</strong><small>⌘ 1</small></div>
+      <div class="command-item" data-search="ربات ها bots" onclick="commandGo('bots')"><i class="ph ph-cpu"></i><strong>مدیریت ربات‌ها</strong><small>⌘ 2</small></div>
+      <div class="command-item" data-search="تحلیل analytics performance" onclick="commandGo('analytics')"><i class="ph ph-chart-line-up"></i><strong>تحلیل عملکرد</strong><small>⌘ 3</small></div>
+      <div class="command-item" data-search="کیف پول wallet capital" onclick="commandGo('wallet')"><i class="ph ph-wallet"></i><strong>حساب‌ها و سرمایه</strong><small>⌘ 4</small></div>
+      <div class="cmd-group">عملیات</div>
+      <div class="command-item" data-search="ربات جدید new bot create" onclick="commandAction('new')"><i class="ph ph-plus-circle"></i><strong>ساخت ربات جدید</strong><small>↵</small></div>
+      <div class="command-item" data-search="تنظیمات settings" onclick="commandAction('settings')"><i class="ph ph-sliders-horizontal"></i><strong>تنظیمات</strong><small>↵</small></div>
+      <div class="command-item" data-search="تم theme dark light" onclick="commandAction('theme')"><i class="ph ph-palette"></i><strong>تغییر تم</strong><small>↵</small></div>
+    </div>
+    <div class="command-footer"><span>↑↓ جابه‌جایی</span><span>Enter انتخاب</span><span>Esc بستن</span></div>
+  </div>
+</div>
+
+<!-- ========== NEW BOT MODAL ========== -->
+<div class="overlay" id="newBotModal" onclick="overlayClose(event,'newBotModal')">
+  <div class="dialog">
+    <div class="dialog-header"><div><div class="dialog-title">ساخت ربات جدید</div><div class="dialog-desc">یک پیکربندی اولیه بساز و بعداً جزئیات بیشتری اضافه کن.</div></div><button class="dialog-close" onclick="closeOverlay('newBotModal')"><i class="ph ph-x"></i></button></div>
+    <div class="dialog-body">
+      <div class="form-grid">
+        <div><label class="label">نام ربات</label><input class="input" placeholder="مثلاً BTC Breakout Pro"></div>
+        <div><label class="label">بازار</label><select class="select"><option>BTC / USDT</option><option>ETH / USDT</option><option>SOL / USDT</option></select></div>
+        <div><label class="label">استراتژی</label><select class="select"><option>Breakout</option><option>Grid</option><option>DCA</option><option>Scalping</option></select></div>
+        <div><label class="label">سرمایه (USDT)</label><input class="input" type="number" value="1000"></div>
+        <div class="form-field full"><div class="switch-row" style="margin-top:0"><div class="switch-copy"><div class="switch-title">شروع در حالت Paper</div><div class="switch-desc">ابتدا بدون اجرای سفارش واقعی تست شود.</div></div><label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div></div>
+        <div class="form-field full"><div class="switch-row"><div class="switch-copy"><div class="switch-title">اعلان سیگنال و معامله</div><div class="switch-desc">برای رویدادهای مهم اعلان دریافت کن.</div></div><label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div></div>
+      </div>
+    </div>
+    <div class="dialog-footer"><button class="secondary-btn" onclick="closeOverlay('newBotModal')">انصراف</button><button class="primary-btn" onclick="closeOverlay('newBotModal');showToast('ربات جدید','پیکربندی ربات به صورت نمایشی ساخته شد.')"><i class="ph ph-rocket-launch"></i> ایجاد ربات</button></div>
+  </div>
+</div>
+
+<!-- ========== SETTINGS MODAL ========== -->
+<div class="overlay" id="settingsModal" onclick="overlayClose(event,'settingsModal')">
+  <div class="dialog">
+    <div class="dialog-header"><div><div class="dialog-title">تنظیمات سریع</div><div class="dialog-desc">اعلان‌ها، امنیت و رفتار رابط کاربری.</div></div><button class="dialog-close" onclick="closeOverlay('settingsModal')"><i class="ph ph-x"></i></button></div>
+    <div class="dialog-body">
+      <div class="switch-row" style="margin-top:0"><div class="switch-copy"><div class="switch-title">اعلان‌های پیام‌رسان</div><div class="switch-desc">ارسال سیگنال، معامله و هشدارهای مهم.</div></div><label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+      <div class="switch-row"><div class="switch-copy"><div class="switch-title">Kill Switch</div><div class="switch-desc">در شرایط اضطراری اجرای سفارش‌های جدید متوقف شود.</div></div><label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+      <div class="switch-row"><div class="switch-copy"><div class="switch-title">ذخیره انتخاب تم</div><div class="switch-desc">تم انتخابی در همین مرورگر به خاطر سپرده شود.</div></div><label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+      <div class="switch-row"><div class="switch-copy"><div class="switch-title">حالت کم‌تحرک</div><div class="switch-desc">کاهش انیمیشن‌ها برای نمایشگرهای ضعیف‌تر.</div></div><label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
+    </div>
+    <div class="dialog-footer"><button class="secondary-btn" onclick="closeOverlay('settingsModal')">بستن</button><button class="primary-btn" onclick="closeOverlay('settingsModal');showToast('تنظیمات','تنظیمات با موفقیت ذخیره شد.')"><i class="ph ph-check"></i> ذخیره</button></div>
+  </div>
+</div>
+
+<!-- ========== BOT DETAILS ========== -->
+<div class="overlay" id="botDetailModal" onclick="overlayClose(event,'botDetailModal')">
+  <div class="dialog wide">
+    <div class="dialog-header"><div><div class="dialog-title" id="botDetailTitle">ربات</div><div class="dialog-desc" id="botDetailDesc">جزئیات عملکرد</div></div><button class="dialog-close" onclick="closeOverlay('botDetailModal')"><i class="ph ph-x"></i></button></div>
+    <div class="dialog-body">
+      <div class="metrics" style="margin-bottom:0;grid-template-columns:repeat(4,1fr)">
+        <div class="metric"><div class="metric-icon green"><i class="ph ph-trend-up"></i></div><div class="metric-value">+4.52%</div><div class="metric-label">PnL</div></div>
+        <div class="metric"><div class="metric-icon"><i class="ph ph-target"></i></div><div class="metric-value">71.4%</div><div class="metric-label">Win Rate</div></div>
+        <div class="metric"><div class="metric-icon amber"><i class="ph ph-arrows-left-right"></i></div><div class="metric-value">28</div><div class="metric-label">معامله</div></div>
+        <div class="metric"><div class="metric-icon cyan"><i class="ph ph-shield-check"></i></div><div class="metric-value">2.1%</div><div class="metric-label">Max DD</div></div>
+      </div>
+      <div class="card" style="margin-top:12px"><div class="card-header"><div><div class="card-title">آخرین رویدادها</div><div class="card-subtitle">Timeline نمونه</div></div><span class="pill green"><span class="pill-dot"></span> Running</span></div><div class="mini-list"><div class="mini-row"><div class="notification-icon" style="background:var(--green-soft);color:var(--green)"><i class="ph ph-check"></i></div><div class="mini-main"><div class="mini-title">Position closed</div><div class="mini-meta">BTC/USDT • 16:18:10</div></div><div class="mini-value" style="color:var(--green)">+$84.20</div></div><div class="mini-row"><div class="notification-icon" style="background:var(--brand-soft);color:var(--brand)"><i class="ph ph-lightning"></i></div><div class="mini-main"><div class="mini-title">Signal detected</div><div class="mini-meta">BUY • 16:16:42</div></div><div class="mini-value">0.81</div></div></div></div>
+    </div>
+    <div class="dialog-footer"><button class="secondary-btn" onclick="closeOverlay('botDetailModal')">بستن</button><button class="primary-btn" onclick="closeOverlay('botDetailModal');showToast('ربات','کنسول کنترل ربات باز شد.')"><i class="ph ph-gauge"></i> کنسول ربات</button></div>
+  </div>
+</div>
+
+<div class="toast-stack" id="toastStack"></div>
+
+<script>
+/* ============================================================
+   INTERACTION LAYER
+   ============================================================ */
+const pageTitles = {
+  dashboard:'داشبورد', bots:'مدیریت ربات‌ها', analytics:'تحلیل عملکرد', wallet:'حساب‌ها و سرمایه',
+  strategies:'استراتژی‌ها', paper:'Paper / Backtest', reports:'گزارش‌ها', risk:'ریسک و Drawdown',
+  transfers:'واریز و برداشت', history:'تاریخچه معاملات', settings:'تنظیمات'
+};
+
+function $(id){return document.getElementById(id)}
+
+function toggleSidebar(){
+  const sb=$('sidebar');
+  if(window.innerWidth<=950){ openMobileSidebar(); return; }
+  sb.classList.toggle('collapsed');
+}
+function openMobileSidebar(){ $('sidebar').classList.add('mobile-open'); $('mobileBackdrop').classList.add('show'); }
+function closeMobileSidebar(){ $('sidebar').classList.remove('mobile-open'); $('mobileBackdrop').classList.remove('show'); }
+
+function toggleSub(btn){
+  if($('sidebar').classList.contains('collapsed') && window.innerWidth>950) return;
+  const item=btn.parentElement;
+  const wasOpen=item.classList.contains('open');
+  document.querySelectorAll('.nav-item.has-submenu.open').forEach(x=>{ if(x!==item)x.classList.remove('open'); });
+  item.classList.toggle('open',!wasOpen);
+}
+
+function navigate(page, el){
+  const panel=$('page-'+page);
+  if(!panel) return;
+  document.querySelectorAll('.page-panel').forEach(p=>p.classList.remove('active'));
+  panel.classList.add('active');
+
+  document.querySelectorAll('.nav-link[data-page]').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.sub-link').forEach(n=>n.classList.remove('active'));
+  if(el){
+    el.classList.add('active');
+    const parentNav=el.closest('.nav-item.has-submenu');
+    if(parentNav) parentNav.classList.add('open');
+  } else {
+    const main=document.querySelector('.nav-link[data-page="'+page+'"]');
+    if(main) main.classList.add('active');
+  }
+  $('crumbTitle').textContent=pageTitles[page]||page;
+  closeMobileSidebar();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function activateTab(btn){
+  btn.parentElement.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  showToast('فیلتر تب','نمایش «'+btn.textContent.trim()+'»');
+}
+
+function toggleTheme(){
+  const body=document.body;
+  const next=body.getAttribute('data-theme')==='dark'?'light':'dark';
+  body.setAttribute('data-theme',next);
+  $('themeIcon').className=next==='dark'?'ph ph-moon':'ph ph-sun';
+  $('themeSideIcon').innerHTML=next==='dark'?'<i class="ph ph-moon"></i>':'<i class="ph ph-sun"></i>';
+  try{localStorage.setItem('tradebot-theme',next)}catch(e){}
+  showToast('تم '+(next==='dark'?'تیره':'روشن'),'ظاهر داشبورد تغییر کرد.');
+}
+(function restoreTheme(){
+  try{
+    const saved=localStorage.getItem('tradebot-theme');
+    if(saved){document.body.setAttribute('data-theme',saved); setTimeout(()=>{ $('themeIcon').className=saved==='dark'?'ph ph-moon':'ph ph-sun'; },0);}
+  }catch(e){}
+})();
+
+function openModal(id){ $(id).classList.add('show'); document.body.style.overflow='hidden'; }
+function closeOverlay(id){ $(id).classList.remove('show'); if(!document.querySelector('.overlay.show')) document.body.style.overflow=''; }
+function overlayClose(e,id){ if(e.target.id===id) closeOverlay(id); }
+
+function openFilter(){ closePopover(); openModal('filterOverlay'); }
+function openNotifications(){
+  closePopover();
+  $('notifPopover').classList.toggle('show');
+}
+function closePopover(){ $('notifPopover').classList.remove('show'); }
+function clearNotifications(){
+  $('notifPopover').querySelector('.popover-body').innerHTML='<div style="padding:25px;text-align:center;color:var(--muted);font-size:10px">اعلان جدیدی وجود ندارد ✨</div>';
+  showToast('اعلان‌ها','همه اعلان‌ها خوانده شد.');
+}
+
+function openCommand(){
+  closePopover();
+  openModal('commandOverlay');
+  setTimeout(()=>{ $('commandInput').focus(); $('commandInput').value=''; filterCommands(''); },80);
+}
+function filterCommands(term){
+  const t=term.trim().toLowerCase();
+  document.querySelectorAll('.command-item').forEach(item=>{
+    const text=(item.dataset.search||'').toLowerCase();
+    item.style.display=!t || text.includes(t)?'flex':'none';
+  });
+}
+$('commandInput').addEventListener('input',e=>filterCommands(e.target.value));
+
+function commandGo(page){ closeOverlay('commandOverlay'); navigate(page); }
+function commandAction(type){
+  closeOverlay('commandOverlay');
+  if(type==='new') openModal('newBotModal');
+  if(type==='settings') openModal('settingsModal');
+  if(type==='theme') toggleTheme();
+}
+
+function openBotDetails(name,pair){
+  $('botDetailTitle').textContent=name;
+  $('botDetailDesc').textContent=pair+' • جزئیات عملکرد و وضعیت';
+  openModal('botDetailModal');
+}
+
+function showToast(title,msg){
+  const stack=$('toastStack');
+  const el=document.createElement('div');
+  el.className='toast';
+  el.innerHTML='<div class="toast-icon"><i class="ph ph-check"></i></div><div><div class="toast-title">'+title+'</div><div class="toast-msg">'+msg+'</div></div>';
+  stack.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(-12px)'; setTimeout(()=>el.remove(),250)},2600);
+}
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#notifPopover') && !e.target.closest('[title="اعلان‌ها"]') && !e.target.closest('.ph-bell')) closePopover();
+});
+
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){e.preventDefault();openCommand();}
+  if(e.key==='Escape'){
+    document.querySelectorAll('.overlay.show').forEach(o=>closeOverlay(o.id));
+    closePopover();
+    closeMobileSidebar();
+  }
+});
+
+/* palette keyboard navigation */
+let cmdIndex=0;
+$('commandInput').addEventListener('keydown',e=>{
+  const items=[...document.querySelectorAll('#commandList .command-item')].filter(x=>x.style.display!=='none');
+  if(!items.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();cmdIndex=(cmdIndex+1)%items.length}
+  if(e.key==='ArrowUp'){e.preventDefault();cmdIndex=(cmdIndex-1+items.length)%items.length}
+  items.forEach(x=>x.classList.remove('focused')); items[cmdIndex]?.classList.add('focused');
+  if(e.key==='Enter'){e.preventDefault();items[cmdIndex]?.click()}
+});
+
+/* pseudo live clock / cycle */
+function updateClock(){
+  const now=new Date();
+  const hh=String(now.getHours()).padStart(2,'0'), mm=String(now.getMinutes()).padStart(2,'0'), ss=String(now.getSeconds()).padStart(2,'0');
+  $('syncTime').textContent=hh+':'+mm+':'+ss;
+  $('lastCycle').textContent=hh+':'+mm+':'+String(Math.max(0,ss-1)).padStart(2,'0');
+  $('nextCycle').textContent=hh+':'+mm+':'+String((ss+5)%60).padStart(2,'0');
+}
+setInterval(updateClock,1000); updateClock();
+
+/* Sparkline generator */
+function buildSpark(el, seed, trend){
+  const w=150,h=36,p=2;
+  let y=20, pts=[];
+  for(let i=0;i<18;i++){
+    y += (Math.sin(i*.85+seed)*1.9) + trend + (Math.random()-.5)*2.0;
+    y=Math.max(4,Math.min(h-4,y));
+    pts.push([p+i*((w-2*p)/17),y]);
+  }
+  const d=pts.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ');
+  el.innerHTML='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" style="width:100%;height:100%"><path d="'+d+'" fill="none" stroke="'+(trend>=0?'var(--green)':'var(--red)')+'" stroke-width="2.1" stroke-linecap="round"/></svg>';
+}
+document.querySelectorAll('[data-spark]').forEach((el,i)=>buildSpark(el,i,[.35,.55,.15,-.08][i]||.2));
+
+/* tiny live chart pulse */
+setInterval(()=>{
+  const v=45231 + (Math.random()*140-70);
+  $('chartValue').textContent='$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+},2200);
+</script>
+</body>
+</html>

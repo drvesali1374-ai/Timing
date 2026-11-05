@@ -220,7 +220,12 @@ export const appSettingsPutSchema = z.object({
   'backup.intervalMinutes': z.enum(['5', '10', '15', '30', '60', '120', '240']).optional(),
   'backup.retention': z.enum(['3', '5', '10', '20', '50']).optional(),
   'outlier.method': z.enum(['mad', 'iqr']).optional(),
-  'outlier.threshold': z.enum(['3', '3.5', '4']).optional(),
+  // آستانهٔ امتیاز Z تعدیل‌شده — مقدار عددی معقول (FR-18: قابل مشاهده/تغییر)
+  'outlier.threshold': z
+    .string()
+    .regex(/^\d+(\.\d+)?$/, 'آستانه باید عدد مثبت باشد')
+    .refine((v) => Number(v) >= 0.5 && Number(v) <= 10, 'آستانه باید بین ۰٫۵ و ۱۰ باشد')
+    .optional(),
 })
 
 export const projectCalcSettingsSchema = z.object({

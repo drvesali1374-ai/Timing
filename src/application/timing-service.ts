@@ -25,6 +25,8 @@ import type {
 } from '@/domain/validation'
 import { validateInterval } from '@/calculation/overlap'
 import { round12 } from '@/calculation/westinghouse'
+import { refreshOutliersForElement, refreshOutliersForActivity } from './outlier-service'
+import { markProjectCalculationsStale } from './calc-stale'
 import type { Prisma, ElementObservation, CycleObservation, StudySession, WorkElement } from '@prisma/client'
 
 type Tx = Prisma.TransactionClient
@@ -669,6 +671,8 @@ export async function deleteSession(sessionId: string) {
     await markDeleted(tx, 'StudySession', [sessionId])
     await tx.studySession.delete({ where: { id: sessionId } })
   })
+  // حذف جلسه = حذف مشاهدات → نتایج snapshot قبلی نیازمند محاسبه مجدد — FR-27
+  await markProjectCalculationsStale(session.activity.station.projectId)
   await recordAudit({
     entityType: 'StudySession',
     entityId: sessionId,
@@ -762,6 +766,9 @@ export async function addCycles(sessionId: string, input: CyclesAddInput) {
   })
 
   if (input.withData && input.withData.length > 0) {
+    // بازگردانی داده → بازمحاسبه پرچم‌ها + STALE — FR-18/27
+    await markProjectCalculationsStale(session.activity.station.projectId)
+    await refreshOutliersForActivity(session.activityId)
     await recordAudit({
       entityType: 'CycleObservation',
       entityId: sessionId,
@@ -809,6 +816,11 @@ export async function deleteCycle(cycleId: string) {
     await tx.cycleObservation.delete({ where: { id: cycleId } })
     await recomputeSession(tx, cycle.sessionId)
   })
+  // حذف چرخه → مبنای آماری عناصر تغییر می‌کند — FR-18/27
+  await markProjectCalculationsStale(cycle.session.activity.station.projectId)
+  for (const eid of new Set(observations.map((o) => o.workElementId))) {
+    await refreshOutliersForElement(eid)
+  }
   await recordAudit({
     entityType: 'CycleObservation',
     entityId: cycleId,
@@ -898,6 +910,12 @@ export async function updateCells(cycleId: string, input: CellsPutInput) {
       const el = elementById.get(o.workElementId)
       warnings.push(`مدت صفر برای «${el?.name ?? 'عنصر'}» ثبت شد؛ برای عنصر عادی معمولاً باید مثبت باشد.`)
     }
+  }
+
+  // تغییر داده خام → بازمحاسبه پرچم‌های غیرعادی عناصر تغییر یافته + STALE — FR-18/27
+  await markProjectCalculationsStale(cycle.session.activity.station.projectId)
+  for (const eid of new Set(touchedElementIds)) {
+    await refreshOutliersForElement(eid)
   }
 
   return { warnings, sessionId: cycle.sessionId }
@@ -1239,6 +1257,10 @@ export async function pasteCommit(sessionId: string, input: PasteInput) {
     projectId: session.activity.station.projectId,
   })
 
+  // دادهٔ جدید → بازمحاسبه پرچم‌های غیرعادی کل فعالیت (زنجیره پیوسته ممکن است جابه‌جا شده باشد) — FR-18/27
+  await markProjectCalculationsStale(session.activity.station.projectId)
+  await refreshOutliersForActivity(session.activityId)
+
   return {
     committed: committedCells.length,
     skipped: skippedCells.length,
@@ -1277,6 +1299,11 @@ export async function setObservationValidity(observationId: string, input: Valid
   await db.$transaction(async (tx) => {
     await recomputeSession(tx, obs.cycle.sessionId)
   })
+
+  // مبنای آماری عنصر تغییر کرد → بازمحاسبه پرچم‌های همان عنصر + STALE — FR-18/27
+  // (تصمیم EXCLUDED کاربر هرگز بازنویسی نمی‌شود؛ خارج‌شده در مبنای تشخیص نیست)
+  await markProjectCalculationsStale(obs.cycle.session.activity.station.projectId)
+  await refreshOutliersForElement(obs.workElementId)
 
   return {
     observation: {

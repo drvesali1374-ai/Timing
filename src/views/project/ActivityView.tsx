@@ -6,7 +6,7 @@
 //    مؤثر (FR-04: ارث گروه + بازنویسی با debounce) + عملیات
 // ۲. عناصر کاری: SortableList با D&D، ویرایش autosave، حذف
 //    با شمارش وابستگی‌ها (FR-26)
-// ۳. زمان‌سنجی و ۴. تحلیل نتایج: نمای صادقانه فازهای ۳ و ۴
+// ۳. زمان‌سنجی و ۴. تحلیل نتایج: برگهٔ زمان‌سنجی و تحلیل کامل همان فعالیت
 // سربرگ: بازگشت + مسیر (ساختار ← ایستگاه ← فعالیت) + نوع
 // فرایندی + وضعیت ارزیابی + «اقدام بعدی» — FR-03
 // ═══════════════════════════════════════════════════════════
@@ -82,7 +82,7 @@ import { useDisplayPrefs } from '@/store/display-store'
 import { formatDate, formatDateTime, formatInt, formatPercent, formatTimeValue } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import TimingView from './TimingView'
-import AnalysisPendingView from './AnalysisPendingView'
+import AnalysisContent from './analysis/AnalysisContent'
 
 type Prefs = ReturnType<typeof useDisplayPrefs>
 type TabKey = 'info' | 'elements' | 'timing' | 'analysis'
@@ -502,9 +502,9 @@ function ActivityScreen({ projectId, activityId }: { projectId: string; activity
           <TimingView projectId={projectId} initialActivityId={activityId} />
         </TabsContent>
 
-        {/* ۴. تحلیل نتایج — فاز ۴ */}
+        {/* ۴. تحلیل نتایج — فاز ۴: آمار، وستینگهاوس، مجازها و مقایسهٔ اپراتورها */}
         <TabsContent value="analysis">
-          <AnalysisPendingView projectId={projectId} />
+          <AnalysisContent activityId={activityId} />
         </TabsContent>
       </Tabs>
 

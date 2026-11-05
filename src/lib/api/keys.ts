@@ -26,4 +26,8 @@ export const qk = {
   // ── زمان‌سنجی — فاز ۳ ──
   sessions: (activityId: string) => ['timing-sessions', activityId] as const,
   sessionSheet: (sessionId: string) => ['timing-sheet', sessionId] as const,
+  // ── تحلیل — فاز ۴ ──
+  activityAnalysis: (activityId: string) => ['activity-analysis', activityId] as const,
+  analysisActivities: (projectId: string) => ['analysis-activities', projectId] as const,
+  latestCalculation: (projectId: string) => ['latest-calculation', projectId] as const,
 }

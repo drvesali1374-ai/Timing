@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { AppError } from '@/domain/types'
 import { recordAudit } from '@/infrastructure/audit'
 import { markDeleted } from '@/infrastructure/deletion'
+import { markProjectCalculationsStale } from './calc-stale'
 import type { OperatorCreateInput, OperatorUpdateInput } from '@/domain/validation'
 
 async function assertProject(projectId: string) {
@@ -101,6 +102,8 @@ export async function deleteOperator(operatorId: string) {
     await markDeleted(tx, 'Operator', [operatorId])
     await tx.operator.delete({ where: { id: operatorId } })
   })
+  // حذف اپراتور = حذف آبشاری جلسات و مشاهدات او — FR-27
+  await markProjectCalculationsStale(operator.projectId)
   await recordAudit({
     entityType: 'Operator', entityId: operatorId, action: 'DELETE', entityName: operator.displayName,
     projectId: operator.projectId,

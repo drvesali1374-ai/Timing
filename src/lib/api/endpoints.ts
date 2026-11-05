@@ -573,6 +573,154 @@ export const backupsApi = {
   },
 }
 
+// ── تحلیل و کنترل کیفیت داده — فاز ۴ ──
+
+export interface StatsDto {
+  count: number
+  mean: number | null
+  median: number | null
+  min: number | null
+  max: number | null
+  range: number | null
+  sampleVariance: number | null
+  sampleSD: number | null
+  cvPercent: number | null
+  q1: number | null
+  q3: number | null
+  iqr: number | null
+  ci95: { lower: number; upper: number } | null
+}
+
+export interface OperatorComparisonRowDto {
+  operatorId: string
+  operatorName: string
+  count: number
+  mean: number | null
+  sampleSD: number | null
+  cvPercent: number | null
+  suspectCount: number
+  excludedCount: number
+  nt: number | null
+  st: number | null
+}
+
+export interface ElementAnalysisItemDto {
+  id: string
+  name: string
+  elementType: string
+  counts: { total: number; calcBasis: number; valid: number; suspect: number; excluded: number; invalid: number }
+  stats: StatsDto
+  ot: number | null
+  otAggregationMethod: string
+  otAggregationMethodLabel: string
+  rating: { totalFactor: number; tableName: string; tableVersion: number } | null
+  nt: number | null
+  st: number | null
+  stError: string | null
+  operators: OperatorComparisonRowDto[]
+  trend: { cycleNo: number; operatorId: string; value: number; status: string }[]
+  histogram: { binStart: number; binEnd: number; count: number }[]
+}
+
+export interface SuspectItem {
+  observationId: string
+  elementId: string
+  elementName: string
+  cycleNo: number
+  sessionId: string
+  operatorId: string
+  operatorName: string
+  value: number | null
+  score: number | null
+  rule: string | null
+  validityStatus: 'SUSPECT' | 'EXCLUDED'
+  exclusionReason: string | null
+}
+
+export interface ActivityAnalysisDto {
+  activity: {
+    id: string
+    name: string
+    stationName: string
+    processType: string
+    targetSampleCount: number | null
+    groupId: string | null
+    groupName: string | null
+    projectId: string
+  }
+  settings: {
+    allowanceMethod: string
+    allowanceMethodLabel: string
+    formula: string
+    aggregationMethod: string
+    aggregationMethodLabel: string
+    formulaVersion: string
+    outlierMethod: string
+    outlierThreshold: number
+  }
+  allowances: EffectiveAllowancesDto
+  sampleProgress: {
+    targetSampleCount: number | null
+    validCycles: number
+    totalCycles: number
+    sessionsCount: number
+    reached: boolean | null
+    message: string
+  }
+  elements: ElementAnalysisItemDto[]
+  cycleStats: { count: number; stats: StatsDto; methodNote: string }
+  elementTypeTotals: { manual: number | null; machine: number | null; waiting: number | null; overlapSum: number | null }
+  activityTotal: { st: number | null; status: 'OK' | 'NEEDS_AGGREGATION_RULE' | 'INCOMPLETE'; reason: string }
+  suspects: SuspectItem[]
+  generatedAt: string
+}
+
+export interface AnalysisActivitiesDto {
+  stations: {
+    id: string
+    name: string
+    activities: {
+      id: string
+      name: string
+      processType: string
+      targetSampleCount: number | null
+      elementsCount: number
+      cyclesCount: number
+    }[]
+  }[]
+}
+
+export interface CalculationRunInfoDto {
+  id: string
+  createdAt: string
+  status: 'PENDING' | 'DONE' | 'STALE'
+  formulaVersion: string
+  settings: Record<string, unknown>
+  result: Record<string, unknown> | null
+}
+
+export interface LatestCalculationInfoDto {
+  run: CalculationRunInfoDto | null
+  needsRecalc: boolean
+  hasAnyData: boolean
+  runsCount: number
+}
+
+export const analysisApi = {
+  forActivity: (activityId: string) => api.get<{ analysis: ActivityAnalysisDto }>(`/api/activities/${activityId}/analysis`),
+  refreshOutliers: (activityId: string) =>
+    api.post<{ refreshed: number; results: { elementId: string; flagged: number; unflagged: number }[]; analysis: ActivityAnalysisDto }>(
+      `/api/activities/${activityId}/refresh-outliers`
+    ),
+  activities: (projectId: string) => api.get<AnalysisActivitiesDto>(`/api/projects/${projectId}/analysis-activities`),
+}
+
+export const calculationsApi = {
+  run: (projectId: string) => api.post<{ run: CalculationRunInfoDto }>(`/api/projects/${projectId}/calculations/run`),
+  latest: (projectId: string) => api.get<LatestCalculationInfoDto>(`/api/projects/${projectId}/calculations/latest`),
+}
+
+
 export const settingsApi = {
   get: () => api.get<AppSettingsDto>('/api/settings'),
   put: (values: Record<string, string>) => api.put<AppSettingsDto>('/api/settings', values),

@@ -30,7 +30,7 @@ export interface StageSummary {
 }
 
 export async function computeStageSummary(projectId: string): Promise<StageSummary> {
-  const [project, stations, activities, elements, operators, groups, categories, assessments, sessions, validCycles] =
+  const [project, stations, activities, elements, operators, groups, categories, assessments, sessions, validCycles, suspectCount] =
     await Promise.all([
       db.project.findUnique({ where: { id: projectId }, select: { studyDate: true, finalization: true } }),
       db.station.findMany({ where: { projectId }, select: { id: true } }),
@@ -61,6 +61,13 @@ export async function computeStageSummary(projectId: string): Promise<StageSumma
           isComplete: true,
           session: { activity: { station: { projectId } } },
           observations: { none: { validityStatus: { in: ['EXCLUDED', 'INVALID'] } } },
+        },
+      }),
+      // شمارش مشاهدات مشکوک برای وضعیت مرحلهٔ تحلیل — FR-18
+      db.elementObservation.count({
+        where: {
+          validityStatus: 'SUSPECT',
+          cycle: { session: { activity: { station: { projectId } } } },
         },
       }),
     ])
@@ -165,14 +172,33 @@ export async function computeStageSummary(projectId: string): Promise<StageSumma
     }
   }
 
+  // تحلیل نتایج — فاز ۴ فعال؛ وضعیت از دادهٔ واقعی — FR-12/17/18
+  if (validCycles === 0) {
+    stages.analysis = { status: 'PENDING', hint: 'برای تحلیل، ابتدا چرخهٔ معتبر در زمان‌سنجی ثبت کنید.' }
+  } else if (suspectCount > 0) {
+    stages.analysis = {
+      status: 'NEEDS_REVIEW',
+      hint: `${suspectCount} مشاهدهٔ مشکوک نیازمند تصمیم شماست (نگه‌داشتن یا خروج از محاسبات).`,
+    }
+  } else if (elementsWithRating < elementCount) {
+    stages.analysis = {
+      status: 'IN_PROGRESS',
+      hint: `${elementsWithRating} از ${elementCount} عنصر ارزیابی وستینگهاوس دارد؛ بدون آن NT/ST قابل محاسبه نیست.`,
+    }
+  } else {
+    stages.analysis = {
+      status: 'DONE',
+      hint: `تحلیل کامل است؛ ${validCycles} چرخهٔ معتبر در محاسبات است. وضعیت هدف نمونه را در نمای تحلیل بازبینی کنید.`,
+    }
+  }
+
   // مراحل فازهای بعدی — برچسب صادقانه (قابلیت‌ها حذف نشده‌اند؛ ترتیب توسعه‌اند)
-  stages.analysis = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.analysis, hint: 'آمار، تشخیص غیرعادی و مقایسه اپراتورها.' }
   stages.charts = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.charts, hint: 'نمودار فرایند OPC/FPC.' }
   stages.dashboard = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.dashboard, hint: 'کارت‌های خلاصه و شاخص‌های تخصصی.' }
   stages.reports = { status: 'FUTURE_PHASE', phase: DEVELOPMENT_PHASES.reports, hint: 'خروجی Excel و PDF.' }
 
   // پیشرفت شفاف مطالعه — تعریف: میانگین وزن مراحل فعال نسخه اول
-  const activeKeys: StageKey[] = ['info', 'structure', 'operators', 'allowances', 'westinghouse', 'timing']
+  const activeKeys: StageKey[] = ['info', 'structure', 'operators', 'allowances', 'westinghouse', 'timing', 'analysis']
   const weight = (s: StageState): number =>
     s.status === 'DONE' ? 1 : s.status === 'IN_PROGRESS' || s.status === 'NEEDS_REVIEW' ? 0.5 : 0
   const progress =

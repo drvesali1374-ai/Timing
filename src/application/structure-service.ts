@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { AppError } from '@/domain/types'
 import { recordAudit } from '@/infrastructure/audit'
 import { collectActivitiesTreeIds, markDeleted } from '@/infrastructure/deletion'
+import { markProjectCalculationsStale } from './calc-stale'
 import type { StationCreateInput, StationUpdateInput, ActivityCreateInput, ActivityUpdateInput, ElementCreateInput, ElementUpdateInput } from '@/domain/validation'
 
 async function assertProject(projectId: string) {
@@ -172,6 +173,8 @@ export async function createActivity(stationId: string, input: ActivityCreateInp
     entityType: 'Activity', entityId: activity.id, action: 'CREATE', entityName: activity.name,
     after: { name: activity.name, processType: activity.processType }, projectId: station.project.id,
   })
+  // فعالیت جدید در نتایج پروژه به‌عنوان ناقص ظاهر می‌شود — FR-27
+  await markProjectCalculationsStale(station.projectId)
   return activity
 }
 
@@ -196,10 +199,7 @@ export async function updateActivity(activityId: string, input: ActivityUpdateIn
   const updated = await db.activity.update({ where: { id: activityId }, data })
   // تغییر پارامتر مؤثر بر محاسبات → نتایج قبلی نیازمند محاسبه مجدد — FR-27
   if (input.groupId !== undefined || input.targetSampleCount !== undefined) {
-    await db.calculationRun.updateMany({
-      where: { projectId: existing.station.projectId },
-      data: { status: 'STALE' },
-    })
+    await markProjectCalculationsStale(existing.station.projectId)
   }
   await recordAudit({
     entityType: 'Activity', entityId: activityId, action: 'UPDATE', entityName: updated.name,
@@ -229,6 +229,8 @@ export async function deleteActivity(activityId: string) {
     }
     await tx.activity.delete({ where: { id: activityId } })
   })
+  // حذف فعالیت = حذف مشاهدات آن — FR-27
+  await markProjectCalculationsStale(activity.station.projectId)
   await recordAudit({
     entityType: 'Activity', entityId: activityId, action: 'DELETE', entityName: activity.name,
     projectId: activity.station.projectId,
@@ -275,6 +277,8 @@ export async function createElement(activityId: string, input: ElementCreateInpu
     entityType: 'WorkElement', entityId: element.id, action: 'CREATE', entityName: element.name,
     after: { name: element.name, elementType: element.elementType }, projectId: activity.station.projectId,
   })
+  // عنصر جدید بدون داده = فعالیت ناقص در نتایج — FR-27
+  await markProjectCalculationsStale(activity.station.projectId)
   return element
 }
 
@@ -293,10 +297,7 @@ export async function updateElement(elementId: string, input: ElementUpdateInput
   const updated = await db.workElement.update({ where: { id: elementId }, data })
   // نوع عنصر بر مدل محاسباتی اثر دارد — FR-27
   if (input.elementType !== undefined) {
-    await db.calculationRun.updateMany({
-      where: { projectId: existing.activity.station.projectId },
-      data: { status: 'STALE' },
-    })
+    await markProjectCalculationsStale(existing.activity.station.projectId)
   }
   await recordAudit({
     entityType: 'WorkElement', entityId: elementId, action: 'UPDATE', entityName: updated.name,
@@ -323,6 +324,8 @@ export async function deleteElement(elementId: string) {
     // ارزیابی و مشاهدات با Cascade حذف می‌شوند
     await tx.workElement.delete({ where: { id: elementId } })
   })
+  // حذف عنصر = حذف مشاهدات و ارزیابی آن — FR-27
+  await markProjectCalculationsStale(element.activity.station.projectId)
   await recordAudit({
     entityType: 'WorkElement', entityId: elementId, action: 'DELETE', entityName: element.name,
     projectId: element.activity.station.projectId,
